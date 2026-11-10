@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.PWExpress" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/pw_preto</item>
+        <item name="android:colorAccent">@color/pw_ouro</item>
+    </style>
+</resources>

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "989642675381",
+    "project_id": "pwexfirebase",
+    "storage_bucket": "pwexfirebase.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:989642675381:android:02b5da80180fe94d8bdafc",
+        "android_client_info": {
+          "package_name": "com.pwexpress.motoboy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAOdgEN1Kr_cLeyV_UuWIHDm_rqMnXh1-8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

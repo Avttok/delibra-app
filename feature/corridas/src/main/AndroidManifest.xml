@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <application>
+        <!-- recebe as ofertas de corrida pelo Firebase -->
+        <service
+            android:name="com.pwexpress.feature.corridas.push.FcmService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- tela cheia da oferta (abre por cima da tela bloqueada) -->
+        <activity
+            android:name="com.pwexpress.feature.corridas.ui.OfertaActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.PWExpress.Oferta" />
+
+        <!-- botão "Recusar" da notificação da oferta -->
+        <receiver
+            android:name="com.pwexpress.feature.corridas.push.OfertaReceiver"
+            android:exported="false" />
+
+        <!-- fotos de comprovante tiradas pela câmera -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.comprovantes"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/comprovantes_paths" />
+        </provider>
+    </application>
+</manifest>

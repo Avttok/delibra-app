@@ -189,7 +189,7 @@ class MainActivity : ComponentActivity() {
                             },
                         )
                         chatAberto && chatLigado -> com.pwexpress.core.chat.ChatScreen(
-                            meuId = p?.id, gestor = efetivo == Painel.GESTOR, onVoltar = { com.pwexpress.core.chat.Chat.abrir.value = false }, modifier = conteudo,
+                            meuId = p?.id, gestor = efetivo == Painel.GESTOR, dev = p?.dev == true, onVoltar = { com.pwexpress.core.chat.Chat.abrir.value = false }, modifier = conteudo,
                             onAbrirAnexo = { an ->
                                 val id = an.id
                                 if (efetivo == Painel.GESTOR && id != null) {

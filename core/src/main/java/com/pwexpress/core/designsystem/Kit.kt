@@ -421,20 +421,23 @@ fun PwBotaoPerigo(texto: String, onClick: () -> Unit, modifier: Modifier = Modif
 
 /** Foto (ou inicial) com anel dourado; `teste` troca o anel pelo violeta. */
 @Composable
-fun PwAvatar(nome: String, foto: String?, modifier: Modifier = Modifier, tamanho: Dp = 44.dp, onClick: (() -> Unit)? = null) {
+fun PwAvatar(nome: String, foto: String?, modifier: Modifier = Modifier, tamanho: Dp = 44.dp, onClick: (() -> Unit)? = null, oculto: Boolean = false) {
     val c = Pw.cores
+    val vermelho = androidx.compose.ui.graphics.Color(0xFFEF4444)
     Box(
-        modifier.size(tamanho).clip(CircleShape).background(c.gradOuro).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        modifier.size(tamanho).clip(CircleShape).background(if (oculto) androidx.compose.ui.graphics.SolidColor(vermelho) else c.gradOuro).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         Box(Modifier.size(tamanho - 4.dp).clip(CircleShape).background(c.fundo2), contentAlignment = Alignment.Center) {
+            // Dev oculto: o ícone </> no lugar da foto
+            if (oculto) { Icon(PwIcones.CodeXml, "Dev", tint = vermelho, modifier = Modifier.size(tamanho * 0.5f)); return@Box }
+            // a inicial fica sempre por baixo: se a foto não carregar, ela aparece (nada de círculo vazio)
+            Text(
+                nome.trim().take(1).uppercase().ifEmpty { "?" },
+                style = TextStyle(brush = c.gradOuro, fontFamily = ArchivoLargo, fontWeight = FontWeight.Black, fontSize = (tamanho.value * 0.42f).sp),
+            )
             if (!foto.isNullOrBlank()) {
                 AsyncImage(model = foto, contentDescription = nome, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            } else {
-                Text(
-                    nome.trim().take(1).uppercase().ifEmpty { "?" },
-                    style = TextStyle(brush = c.gradOuro, fontFamily = ArchivoLargo, fontWeight = FontWeight.Black, fontSize = (tamanho.value * 0.42f).sp),
-                )
             }
         }
     }
@@ -786,3 +789,16 @@ fun lembrarLigado(chave: String, padrao: Boolean): androidx.compose.runtime.Muta
 
 /** As chaves PIX da própria conta (a tela vem do módulo do motoboy; o painel do gestor mostra na Carteira). */
 val LocalMinhasChavesPix = androidx.compose.runtime.staticCompositionLocalOf<@Composable () -> Unit> { {} }
+
+/** Pergunta antes de algo que não dá para desfazer (apagar, sair…). */
+@Composable
+fun PwConfirmar(titulo: String, texto: String, acao: String, onConfirmar: () -> Unit, onCancelar: () -> Unit, perigo: Boolean = true) {
+    PwJanela(titulo, onCancelar) {
+        Text(texto, color = Pw.cores.texto2, fontSize = 14.sp)
+        Spacer(Modifier.height(14.dp))
+        if (perigo) PwBotaoPerigo(acao, onClick = onConfirmar, cheio = true, modifier = Modifier.fillMaxWidth())
+        else PwBotaoOuro(acao, onClick = onConfirmar, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
+        PwBotaoVidro("Cancelar", onClick = onCancelar, modifier = Modifier.fillMaxWidth())
+    }
+}

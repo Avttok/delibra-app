@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "989642675381",
-    "project_id": "pwexfirebase",
-    "storage_bucket": "pwexfirebase.firebasestorage.app"
+    "project_number": "731883811405",
+    "project_id": "delibra-c0b69",
+    "storage_bucket": "delibra-c0b69.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:989642675381:android:02b5da80180fe94d8bdafc",
+        "mobilesdk_app_id": "1:731883811405:android:d15b5a7554b20da1566204",
         "android_client_info": {
-          "package_name": "com.pwexpress.motoboy"
+          "package_name": "com.delibra.app"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAOdgEN1Kr_cLeyV_UuWIHDm_rqMnXh1-8"
+          "current_key": "AIzaSyAwJ3HiVYdw3_RRrnDCHXmB-Kml85t1gv8"
         }
       ],
       "services": {

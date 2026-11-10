@@ -44,7 +44,7 @@ fun PwSeletorMapa(inicial: Pair<Double, Double>?, onFechar: () -> Unit, titulo: 
     var irPara by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     androidx.compose.ui.window.Dialog(onDismissRequest = onFechar, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Box(Modifier.fillMaxSize().background(c.fundo)) {
-            PwMapa(
+            PwMapa(maximizavel = false,
                 paradas = emptyList(), rota = null, minhaPosicao = null, modifier = Modifier.fillMaxSize(),
                 inicio = inicial, zoomInicio = 16.0, irPara = irPara,
                 onToque = { la, lo -> irPara = la to lo },

@@ -20,6 +20,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import com.pwexpress.core.designsystem.PwIcones
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
@@ -53,7 +58,17 @@ import org.maplibre.geojson.Point
 /** Pedido para o mapa centralizar num ponto (o [vez] muda a cada toque, para repetir no mesmo ponto). */
 data class FocoMapa(val lat: Double, val lng: Double, val vez: Long = System.nanoTime())
 
-data class PinoMapa(val lat: Double, val lng: Double, val coleta: Boolean, val atual: Boolean, val concluida: Boolean)
+data class PinoMapa(
+    val lat: Double, val lng: Double, val coleta: Boolean, val atual: Boolean, val concluida: Boolean,
+    /** Ícone do que vai no ponto (nome Lucide: file-text, package, pill…); null = loja na coleta, pacote na entrega. */
+    val icone: String? = null,
+    /** Número da parada na rota (aparece no canto do pino). */
+    val numero: Int? = null,
+    /** Itens a mais no mesmo ponto (selo "+N"). */
+    val mais: Int = 0,
+    /** Raio da zona deste ponto, em metros (desenha o círculo em volta). */
+    val raioM: Double? = null,
+)
 
 /** Marcador livre (ex.: motoboy no mapa do gestor): cor em hex e rótulo curto. */
 data class MarcadorMapa(
@@ -126,7 +141,7 @@ object Estabelecimentos {
  * rota planejada em dourado, paradas, motoboys e a posição do motoboy.
  */
 @Composable
-fun PwMapa(
+private fun MapaBase(
     paradas: List<PinoMapa>,
     rota: String?,
     minhaPosicao: Pair<Double, Double>?,
@@ -171,10 +186,18 @@ fun PwMapa(
     legenda: Boolean = true,
     /** A [minhaPosicao] aparece com a sua foto (pino), em vez do ponto. */
     euComFoto: Boolean = true,
+    /** Botões por cima do mapa (só na tela cheia, ou também no pequeno quando [botoesSempre]). */
+    botoes: (@Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit)? = null,
+    destacar: String? = null,
+    onArrastou: (() -> Unit)? = null,
+    onParada: ((Int) -> Unit)? = null,
 ) {
     val ctx = LocalContext.current
+    val arrastou by rememberUpdatedState(onArrastou)
+    val toqueParada by rememberUpdatedState(onParada)
     val escuro = Pw.cores.escuro
     val ouro = Pw.cores.ouro.hex()
+    val ouroInt = Pw.cores.ouro.toArgb()
     // nomes dos estabelecimentos seguem o tema (dourado, violeta no teste, vermelho do Dev)
     val ouroTexto = (if (escuro) Pw.cores.ouroClaro else Pw.cores.ouroEscuro).hex()
     val toque by rememberUpdatedState(onToque)
@@ -249,8 +272,16 @@ fun PwMapa(
                         val achados = m.queryRenderedFeatures(android.graphics.RectF(tela.x - raio, tela.y - raio, tela.x + raio, tela.y + raio), "marcadores", "marcadores-ponto")
                         achados.firstOrNull()?.getStringProperty("id")?.let { cb(it); return@addOnMapClickListener true }
                     }
+                    toqueParada?.let { cb ->
+                        val tela = m.projection.toScreenLocation(p)
+                        val raio = 22 * densidade
+                        m.queryRenderedFeatures(android.graphics.RectF(tela.x - raio, tela.y - raio * 2, tela.x + raio, tela.y + raio), "paradas")
+                            .firstOrNull()?.getNumberProperty("idx")?.toInt()?.let { cb(it); return@addOnMapClickListener true }
+                    }
                     toque?.let { it(p.latitude, p.longitude); true } ?: false
                 }
+                // o dedo mexeu no mapa: quem estava "seguindo" solta (o gestor fica livre para olhar a rota)
+                m.addOnCameraMoveStartedListener { motivo -> if (motivo == org.maplibre.android.maps.MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) arrastou?.invoke() }
                 m.addOnCameraIdleListener { centro?.let { cb -> m.cameraPosition.target?.let { t -> cb(t.latitude, t.longitude) } } }
             }
             m.setStyle(Style.Builder().fromUri(if (escuro) ESTILO_ESCURO else ESTILO_CLARO)) { s ->
@@ -362,7 +393,7 @@ fun PwMapa(
         else -> listOfNotNull(rotaDesenhada) + rotas
     }
     val fundo = if (todasFeitas || restante != null) listOfNotNull(rotaDesenhada) + rotas else emptyList()
-    LaunchedEffect(estilo, paradas, aFazer, fundo, minhaPosicao, todosMarcadores, seguir, trilhas, enquadrar, fotos.size) {
+    LaunchedEffect(estilo, paradas, aFazer, fundo, minhaPosicao, todosMarcadores, seguir, destacar, trilhas, enquadrar, fotos.size) {
         val s = estilo ?: return@LaunchedEffect
         val m = mapa ?: return@LaunchedEffect
         if (enquadrar != ultimoEnquadrar) { ultimoEnquadrar = enquadrar; enquadrou = false }
@@ -386,11 +417,22 @@ fun PwMapa(
         (s.getSource("paradas") as? GeoJsonSource)?.setGeoJson(
             FeatureCollection.fromFeatures(
                 pinos.map { p ->
+                    val img = IconesMapa.chave(p.coleta, p.atual, p.concluida, p.icone, p.numero, p.mais, escuro, ouroInt)
+                    if (s.getImage(img) == null) s.addImage(img, IconesMapa.desenhar(ctx, p.coleta, p.atual, p.concluida, p.icone, p.numero, p.mais, escuro, ouroInt))
                     Feature.fromGeometry(Point.fromLngLat(p.lng, p.lat)).apply {
-                        addStringProperty("cor", if (p.coleta) ouro else "#111114")
-                        addNumberProperty("raio", if (p.atual) 11 else 7)
-                        addNumberProperty("opacidade", if (p.concluida) 0.45 else 1.0)
+                        addStringProperty("img", img)
+                        addNumberProperty("idx", paradas.indexOf(p))
+                        addNumberProperty("ordem", if (p.atual) 3 else if (p.concluida) 0 else if (p.coleta) 2 else 1)
                     }
+                },
+            ),
+        )
+        // zona de cada ponto (raio em volta)
+        (s.getSource("zonas") as? GeoJsonSource)?.setGeoJson(
+            FeatureCollection.fromFeatures(
+                pinos.filter { (it.raioM ?: 0.0) > 0 }.map { p ->
+                    Feature.fromGeometry(org.maplibre.geojson.Polygon.fromLngLats(listOf(pontosDoCirculo(p.lat, p.lng, p.raioM!!).map { Point.fromLngLat(it.second, it.first) })))
+                        .apply { addStringProperty("cor", if (p.coleta) ouro else "#38BDF8") }
                 },
             ),
         )
@@ -402,7 +444,7 @@ fun PwMapa(
         (s.getSource("marcadores") as? GeoJsonSource)?.setGeoJson(
             FeatureCollection.fromFeatures(
                 validos.map { mk ->
-                    val sel = mk.id == seguir
+                    val sel = mk.id == seguir || mk.id == destacar
                     val foto = mk.foto?.let { fotos[it] }
                     val img = "pino-${mk.id}-${mk.cor}-$sel-${foto != null}-$escuro-${mk.teste}"
                     if (mk.pino && s.getImage(img) == null) runCatching {
@@ -415,8 +457,8 @@ fun PwMapa(
                         addStringProperty("cor", mk.cor)
                         addStringProperty("rotulo", mk.rotulo)
                         addStringProperty("inicial", mk.rotulo.trim().take(1).uppercase())
-                        addNumberProperty("raio", if (mk.id == seguir) 17 else 13)
-                        addNumberProperty("borda", if (mk.id == seguir) 4 else 3)
+                        addNumberProperty("raio", if (sel) 17 else 13)
+                        addNumberProperty("borda", if (sel) 4 else 3)
                         addNumberProperty("opacidade", mk.opacidade.coerceIn(0f, 1f))
                         addNumberProperty("ordem", mk.prioridade)
                     }
@@ -465,6 +507,101 @@ fun PwMapa(
     androidx.compose.foundation.layout.Box(modifier) {
         AndroidView(factory = { mapView }, modifier = Modifier.matchParentSize())
         if (legenda && trilhas.any { it.pontos.size >= 2 }) LegendaLinhas(aFazer.isNotEmpty(), Modifier.align(androidx.compose.ui.Alignment.BottomStart).padding(start = 10.dp, bottom = (margemBaixo + 10).dp))
+        if (botoes != null) androidx.compose.foundation.layout.Column(
+            Modifier.align(androidx.compose.ui.Alignment.CenterEnd).padding(end = 12.dp),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
+            content = botoes,
+        )
+    }
+}
+
+/**
+ * Mapa do app (motoboy e gestor): rota planejada em dourado, paradas com ícones, motoboys e a sua posição.
+ * Todo mapa tem o botão de **tela cheia** (canto de cima, à esquerda): abre o mesmo mapa ocupando a tela,
+ * com tudo funcionando (toques, seguir, marcadores) e os [botoesTelaCheia] próprios de cada tela.
+ */
+@Composable
+fun PwMapa(
+    paradas: List<PinoMapa>,
+    rota: String?,
+    minhaPosicao: Pair<Double, Double>?,
+    modifier: Modifier = Modifier,
+    marcadores: List<MarcadorMapa> = emptyList(),
+    onToque: ((Double, Double) -> Unit)? = null,
+    enquadrar: Any? = null,
+    onMarcador: ((String) -> Unit)? = null,
+    seguir: String? = null,
+    trilhas: List<TrilhaMapa> = emptyList(),
+    onCentro: ((Double, Double) -> Unit)? = null,
+    inicio: Pair<Double, Double>? = null,
+    zoomInicio: Double = 7.0,
+    margemBaixo: Int = 0,
+    irPara: Pair<Double, Double>? = null,
+    focar: FocoMapa? = null,
+    caminhoAuto: Boolean = true,
+    rotas: List<String> = emptyList(),
+    circulo: Pair<Pair<Double, Double>, Double>? = null,
+    percursos: List<PercursoMapa> = emptyList(),
+    comPings: Boolean = true,
+    percursoTeste: Boolean = false,
+    calor: List<Pair<Double, Double>>? = null,
+    restanteDe: Pair<Double, Double>? = null,
+    legenda: Boolean = true,
+    euComFoto: Boolean = true,
+    /** false = sem o botão de tela cheia (mapas que já ocupam a tela). */
+    maximizavel: Boolean = true,
+    /** Título da tela cheia. */
+    tituloTelaCheia: String = "Mapa",
+    /** Botões próprios da tela cheia (à direita), ex.: enquadrar, mostrar pings, centralizar. */
+    botoesTelaCheia: (@Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit)? = null,
+    /** Conteúdo embaixo na tela cheia (ex.: lista de paradas, legenda). */
+    rodapeTelaCheia: (@Composable () -> Unit)? = null,
+    /** Marcador destacado sem a câmera prender nele. */
+    destacar: String? = null,
+    /** O dedo mexeu no mapa (para soltar o "seguir"). */
+    onArrastou: (() -> Unit)? = null,
+    /** Toque numa parada (índice na lista [paradas]). */
+    onParada: ((Int) -> Unit)? = null,
+) {
+    var cheio by remember { mutableStateOf(false) }
+    var enquadrarCheio by remember { mutableStateOf(0) }
+    val base: @Composable (Modifier, Boolean) -> Unit = { mod, telaCheia ->
+        MapaBase(paradas, rota, minhaPosicao, mod, marcadores, onToque, if (telaCheia) (enquadrar to enquadrarCheio) else enquadrar, onMarcador, seguir, trilhas,
+            onCentro, inicio, zoomInicio, if (telaCheia) 0 else margemBaixo, irPara, focar, caminhoAuto, rotas, circulo, percursos, comPings, percursoTeste,
+            calor, restanteDe, legenda, euComFoto, if (telaCheia) botoesTelaCheia else null, destacar, onArrastou, onParada)
+    }
+    androidx.compose.foundation.layout.Box(modifier) {
+        if (!cheio) base(Modifier.matchParentSize(), false)
+        else androidx.compose.foundation.layout.Box(Modifier.matchParentSize().background(Pw.cores.fundo))
+        if (maximizavel) com.pwexpress.core.designsystem.PwBotaoIcone(
+            PwIcones.Maximize2, "Tela cheia", { cheio = true },
+            modifier = Modifier.align(androidx.compose.ui.Alignment.TopStart).padding(10.dp), tamanho = 40.dp,
+        )
+    }
+    if (cheio) androidx.compose.ui.window.Dialog(
+        onDismissRequest = { cheio = false },
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(Pw.cores.fundo)) {
+            base(Modifier.fillMaxSize(), true)
+            androidx.compose.foundation.layout.Row(
+                Modifier.align(androidx.compose.ui.Alignment.TopStart).fillMaxWidth().statusBarsPadding().padding(12.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
+            ) {
+                com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.X, "Sair da tela cheia", { cheio = false }, tamanho = 44.dp)
+                androidx.compose.material3.Text(
+                    tituloTelaCheia, color = Pw.cores.texto, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 17.sp,
+                    modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(99.dp)).background(Pw.cores.vidroForte).padding(horizontal = 14.dp, vertical = 8.dp),
+                    maxLines = 1,
+                )
+                androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.Crosshair, "Enquadrar tudo", { enquadrarCheio++ }, tamanho = 44.dp)
+            }
+            rodapeTelaCheia?.let { r ->
+                androidx.compose.foundation.layout.Box(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(12.dp)) { r() }
+            }
+        }
     }
 }
 
@@ -517,6 +654,14 @@ private fun criarCamadas(ctx: Context, s: Style, escuro: Boolean, ouro: String, 
     s.addSource(GeoJsonSource("rota"))
     s.addSource(GeoJsonSource("plano"))
     s.addSource(GeoJsonSource("paradas"))
+    s.addSource(GeoJsonSource("zonas"))
+    s.addLayer(org.maplibre.android.style.layers.FillLayer("zonas-fundo", "zonas").withProperties(
+        PropertyFactory.fillColor(Expression.toColor(Expression.get("cor"))), PropertyFactory.fillOpacity(0.10f),
+    ))
+    s.addLayer(LineLayer("zonas-borda", "zonas").withProperties(
+        PropertyFactory.lineColor(Expression.toColor(Expression.get("cor"))), PropertyFactory.lineOpacity(0.7f),
+        PropertyFactory.lineWidth(1.6f), PropertyFactory.lineDasharray(arrayOf(2f, 1.5f)),
+    ))
     s.addSource(GeoJsonSource("eu"))
 
     s.addLayer(
@@ -558,12 +703,12 @@ private fun criarCamadas(ctx: Context, s: Style, escuro: Boolean, ouro: String, 
         ),
     )
     s.addLayer(
-        CircleLayer("paradas", "paradas").withProperties(
-            PropertyFactory.circleRadius(Expression.get("raio")),
-            PropertyFactory.circleColor(Expression.toColor(Expression.get("cor"))),
-            PropertyFactory.circleOpacity(Expression.get("opacidade")),
-            PropertyFactory.circleStrokeColor("#FFFFFF"),
-            PropertyFactory.circleStrokeWidth(3f),
+        SymbolLayer("paradas", "paradas").withProperties(
+            PropertyFactory.iconImage(Expression.get("img")),
+            PropertyFactory.iconAnchor(Property.ICON_ANCHOR_BOTTOM),
+            PropertyFactory.iconAllowOverlap(true),
+            PropertyFactory.iconIgnorePlacement(true),
+            PropertyFactory.symbolSortKey(Expression.get("ordem")),
         ),
     )
     s.addLayer(

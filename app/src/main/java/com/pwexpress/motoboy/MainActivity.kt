@@ -91,6 +91,9 @@ class MainActivity : ComponentActivity() {
                     val perfil by Perfis.perfil.collectAsState()
                     var noPerfil by remember { mutableStateOf(false) }
                     var naConfig by remember { mutableStateOf(false) }
+                    // o raio tem janela própria (atalho "Sem raio definido" / "Raio N km" no Início)
+                    var raioAberto by remember { mutableStateOf(false) }
+                    if (raioAberto) com.pwexpress.motoboy.ui.JanelaRaio(onFechar = { raioAberto = false })
                     var simulador by remember { mutableStateOf(false) }
                     var conta by remember { mutableStateOf(false) }
                     var aba by rememberSaveable { mutableStateOf("inicio") }
@@ -189,7 +192,7 @@ class MainActivity : ComponentActivity() {
                             },
                         )
                         chatAberto && chatLigado -> com.pwexpress.core.chat.ChatScreen(
-                            meuId = p?.id, gestor = efetivo == Painel.GESTOR, onVoltar = { com.pwexpress.core.chat.Chat.abrir.value = false }, modifier = conteudo,
+                            meuId = p?.id, gestor = efetivo == Painel.GESTOR, dev = p?.dev == true, onVoltar = { com.pwexpress.core.chat.Chat.abrir.value = false }, modifier = conteudo,
                             onAbrirAnexo = { an ->
                                 val id = an.id
                                 if (efetivo == Painel.GESTOR && id != null) {
@@ -231,7 +234,7 @@ class MainActivity : ComponentActivity() {
                                         else -> TrackingScreen(
                                             saudacao = NomePerfil(s.email).substringBefore(" "),
                                             extras = { CartaoGanhos(onCarteira = if (comCarteira) ({ aba = "carteira" }) else null) },
-                                            chips = { com.pwexpress.feature.tracking.ui.ChipInicio(PwIcones.Radar, com.pwexpress.motoboy.ui.textoRaio(p?.raioKm, p?.raioModo ?: "posicao")) { naConfig = true } },
+                                            chips = { com.pwexpress.feature.tracking.ui.ChipInicio(PwIcones.Radar, com.pwexpress.motoboy.ui.textoRaio(p?.raioKm, p?.raioModo ?: "posicao")) { raioAberto = true } },
                                             onConfiguracoes = { naConfig = true },
                                         )
                                     }

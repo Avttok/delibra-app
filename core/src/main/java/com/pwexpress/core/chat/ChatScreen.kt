@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -107,7 +108,7 @@ fun BotaoChatTopo(onClick: () -> Unit) {
  * [onAbrirAnexo] abre o que foi compartilhado (no gestor: a tela do pedido, da rota…).
  */
 @Composable
-fun ChatScreen(meuId: String?, gestor: Boolean, onVoltar: () -> Unit, modifier: Modifier = Modifier, onAbrirAnexo: (Anexo) -> Unit = {}) {
+fun ChatScreen(meuId: String?, gestor: Boolean, onVoltar: () -> Unit, modifier: Modifier = Modifier, onAbrirAnexo: (Anexo) -> Unit = {}, dev: Boolean = false) {
     val c = Pw.cores
     val conversas by Chat.conversas.collectAsState()
     val contatos by Chat.contatos.collectAsState()
@@ -117,6 +118,10 @@ fun ChatScreen(meuId: String?, gestor: Boolean, onVoltar: () -> Unit, modifier: 
     var novo by remember { mutableStateOf<String?>(null) } // "direta" | "grupo"
     var carregou by remember { mutableStateOf(false) }
     val escopo = rememberCoroutineScope()
+    // Dev: alterna entre as conversas dele e todas as da plataforma (lê e apaga)
+    var todas by remember { mutableStateOf(false) }
+    var listaDev by remember { mutableStateOf<List<Conversa>>(emptyList()) }
+    LaunchedEffect(todas) { if (todas) Chat.todasDev().onSuccess { listaDev = it } }
 
     LaunchedEffect(Unit) {
         Chat.carregarContatos()
@@ -125,14 +130,16 @@ fun ChatScreen(meuId: String?, gestor: Boolean, onVoltar: () -> Unit, modifier: 
     LaunchedEffect(pedida) { pedida?.let { aberta = it; Chat.conversaPedida.value = null } }
     BackHandler(enabled = aberta != null || novo != null) { if (novo != null) novo = null else aberta = null }
 
-    val conv = conversas.find { it.id == aberta }
+    val conv = conversas.find { it.id == aberta } ?: listaDev.find { it.id == aberta }
     Column(modifier.fillMaxSize().background(c.fundo)) {
         when {
-            aberta != null -> ConversaAberta(aberta!!, conv, meuId, gestor, contatos, onVoltar = { aberta = null }, onAbrirAnexo = onAbrirAnexo)
+            aberta != null -> ConversaAberta(aberta!!, conv, meuId, gestor, contatos, onVoltar = { aberta = null }, onAbrirAnexo = onAbrirAnexo, dev = dev,
+                onApagada = { aberta = null; escopo.launch { Chat.todasDev().onSuccess { listaDev = it } } })
             novo != null -> NovaConversa(novo!!, contatos, onVoltar = { novo = null }, onCriada = { id -> novo = null; aberta = id; escopo.launch { Chat.carregar() } })
             else -> {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    PwCabecalho("Conversas", onVoltar, subtitulo = "Equipe, diretas e grupos") {
+                    PwCabecalho("Conversas", onVoltar, subtitulo = if (todas) "Todas as conversas da plataforma" else "Equipe, diretas e grupos") {
+                        if (dev) PwBotaoIcone(PwIcones.Eye, if (todas) "Minhas conversas" else "Ver todas as conversas", { todas = !todas }, ativo = todas)
                         PwBotaoIcone(PwIcones.UserPlus, "Nova conversa", { novo = "direta" })
                         if (gestor) PwBotaoIcone(PwIcones.Users, "Novo grupo", { novo = "grupo" })
                     }
@@ -149,23 +156,27 @@ fun ChatScreen(meuId: String?, gestor: Boolean, onVoltar: () -> Unit, modifier: 
                 if (!carregou) PwCarregando(texto = "Carregando conversas…")
                 else if (conversas.isEmpty()) PwVazio("Nenhuma conversa ainda. Toque em + para falar com alguém.", Modifier.padding(16.dp), icone = PwIcones.MessagesSquare)
                 LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    items(conversas, key = { it.id }) { cv ->
+                    items(if (todas) listaDev else conversas, key = { it.id }) { cv ->
                         Row(
                             Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable { aberta = cv.id }.padding(horizontal = 8.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            if (cv.tipo == "direta") PwAvatar(cv.nome, cv.foto, tamanho = 46.dp)
+                            if (cv.tipo == "direta") PwAvatar(cv.nome, cv.foto, tamanho = 46.dp, oculto = cv.oculto)
                             else Box(Modifier.size(46.dp).clip(CircleShape).background(c.gradOuro), contentAlignment = Alignment.Center) {
                                 Icon(if (cv.tipo == "geral") PwIcones.Megaphone else PwIcones.Users, null, tint = Color(0xFF0A0A0A), modifier = Modifier.size(22.dp))
                             }
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(cv.nome, color = c.texto, fontWeight = if (cv.naoLidas > 0) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                                    if (cv.silenciada) { Spacer(Modifier.width(4.dp)); Icon(PwIcones.BellOff, "Silenciada", tint = c.texto3, modifier = Modifier.size(13.dp)) }
-                                    Spacer(Modifier.weight(1f))
-                                    Text(quando(cv.ultimaEm), color = if (cv.naoLidas > 0) c.ouro else c.texto3, fontSize = 11.5.sp)
+                                    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                        Text(cv.nome, color = c.texto, fontWeight = if (cv.naoLidas > 0) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                                        if (cv.tipo == "direta" && cv.papeis.isNotEmpty()) SelosCargo(cv.papeis)
+                                        if (cv.silenciada) { Spacer(Modifier.width(4.dp)); Icon(PwIcones.BellOff, "Silenciada", tint = c.texto3, modifier = Modifier.size(13.dp)) }
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(quando(cv.ultimaEm), color = if (cv.naoLidas > 0) c.ouro else c.texto3, fontSize = 11.5.sp, maxLines = 1, textAlign = androidx.compose.ui.text.style.TextAlign.End, modifier = Modifier.widthIn(min = 44.dp))
                                 }
+                                if (todas && cv.empresa != null) Text(cv.empresa + if (!cv.souMembro) " · você lê como Dev" else "", color = c.texto3, fontSize = 11.5.sp, maxLines = 1)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text((if (cv.ultimaMinha) "Você: " else "") + (cv.previa ?: if (cv.tipo == "grupo") "${cv.membros} pessoas" else "Diga oi!"),
                                         color = c.texto2, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
@@ -222,7 +233,8 @@ private fun NovaConversa(modo: String, contatos: List<Contato>, onVoltar: () -> 
 }
 
 @Composable
-private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: Boolean, contatos: List<Contato>, onVoltar: () -> Unit, onAbrirAnexo: (Anexo) -> Unit) {
+private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: Boolean, contatos: List<Contato>, onVoltar: () -> Unit, onAbrirAnexo: (Anexo) -> Unit,
+    dev: Boolean = false, onApagada: () -> Unit = {}) {
     val c = Pw.cores
     val ctx = LocalContext.current
     val escopo = rememberCoroutineScope()
@@ -264,8 +276,15 @@ private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: 
         Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             PwCabecalho(conv?.nome ?: "Conversa", onVoltar, subtitulo = when (conv?.tipo) { "geral" -> "Toda a equipe"; "grupo" -> "${conv.membros} pessoas"; else -> nomes[conv?.outro]?.papel }) {
                 if (conv?.tipo == "direta") SelosCargo(nomes[conv.outro]?.papeis.orEmpty())
-                if (conv != null) PwBotaoIcone(if (conv.silenciada) PwIcones.BellRing else PwIcones.BellOff, if (conv.silenciada) "Voltar a avisar" else "Silenciar",
+                if (conv != null && conv.souMembro) PwBotaoIcone(if (conv.silenciada) PwIcones.BellRing else PwIcones.BellOff, if (conv.silenciada) "Voltar a avisar" else "Silenciar",
                     { escopo.launch { Chat.silenciar(id, !conv.silenciada) } })
+                if (dev) {
+                    var confirmar by remember { mutableStateOf(false) }
+                    PwBotaoIcone(PwIcones.Trash2, "Apagar conversa", { confirmar = true }, cor = Color(0xFFEF4444))
+                    if (confirmar) com.pwexpress.core.designsystem.PwConfirmar("Apagar a conversa?", "Apaga a conversa inteira e todas as mensagens, para todo mundo. Não dá para desfazer.", "Apagar",
+                        onConfirmar = { confirmar = false; escopo.launch { Chat.apagarConversaDev(id).onSuccess { onApagada() }.onFailure { PwToast.mostrar(it.message ?: "Não foi.", TipoAviso.ERRO) } } },
+                        onCancelar = { confirmar = false })
+                }
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -273,11 +292,17 @@ private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: 
             if (l == null) PwCarregando()
             else if (l.isEmpty()) PwVazio("Nenhuma mensagem ainda. Mande a primeira!", Modifier.padding(16.dp), icone = PwIcones.MessageCircle)
             else LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp), state = estado, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(l, key = { it.id }) { m ->
+                itemsIndexed(l, key = { _, it -> it.id }) { i, m ->
                     val minha = m.autor == meuId
                     val autor = if (minha) null else nomes[m.autor]
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = if (minha) Arrangement.End else Arrangement.Start, verticalAlignment = Alignment.Bottom) {
-                        if (!minha && conv?.tipo != "direta") { PwAvatar(autor?.nome ?: "?", autor?.foto, tamanho = 28.dp); Spacer(Modifier.width(6.dp)) }
+                    val emGrupo = !minha && conv?.tipo != "direta"
+                    // foto e nome só na primeira mensagem de uma sequência da mesma pessoa
+                    val primeira = l.getOrNull(i - 1)?.autor != m.autor
+                    Row(Modifier.fillMaxWidth().padding(top = if (primeira && i > 0) 6.dp else 0.dp), horizontalArrangement = if (minha) Arrangement.End else Arrangement.Start, verticalAlignment = Alignment.Top) {
+                        if (emGrupo) {
+                            if (primeira) PwAvatar(autor?.nome ?: "?", autor?.foto, tamanho = 30.dp, oculto = autor?.oculto == true) else Spacer(Modifier.width(30.dp))
+                            Spacer(Modifier.width(8.dp))
+                        }
                         val forma = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = if (minha) 16.dp else 4.dp, bottomEnd = if (minha) 4.dp else 16.dp)
                         Column(
                             Modifier.widthIn(max = 290.dp).clip(forma)
@@ -285,8 +310,8 @@ private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: 
                                 .border(1.dp, if (minha) c.ouro.copy(alpha = 0.5f) else c.borda, forma)
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
                         ) {
-                            if (!minha && conv?.tipo != "direta") Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(autor?.nome ?: "Alguém", color = c.ouro, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            if (emGrupo && primeira) Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(autor?.nome ?: "Alguém", color = c.ouro, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                                 SelosCargo(autor?.papeis.orEmpty())
                             }
                             if (m.apagada) Text("Mensagem apagada", color = c.texto3, fontSize = 13.sp)
@@ -297,11 +322,11 @@ private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: 
                                 }
                                 m.texto?.let { Text(it, color = c.texto, fontSize = 15.sp) }
                             }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(Modifier.align(if (minha) Alignment.End else Alignment.Start), verticalAlignment = Alignment.CenterVertically) {
                                 Text(quando(m.quando), color = c.texto3, fontSize = 10.5.sp)
-                                if (!m.apagada && (minha || gestor)) {
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("apagar", color = c.texto3, fontSize = 10.5.sp, modifier = Modifier.clickable { escopo.launch { Chat.apagar(m.id); recarregar() } })
+                                if (!m.apagada && (minha || gestor || dev)) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Icon(PwIcones.Trash2, "Apagar mensagem", tint = c.texto3, modifier = Modifier.size(14.dp).clip(CircleShape).clickable { escopo.launch { Chat.apagar(m.id); recarregar() } })
                                 }
                             }
                         }
@@ -349,22 +374,62 @@ private fun FotoChat(caminho: String, onAbrir: (String) -> Unit) {
     Spacer(Modifier.size(4.dp))
 }
 
+private val STATUS_CARTAO = mapOf(
+    "recebido" to "Para revisar", "aprovado" to "Aprovado", "roteirizado" to "Em rota montada", "em_rota" to "Em rota", "concluido" to "Concluído",
+    "cancelado" to "Cancelado", "recusado" to "Recusado", "montada" to "Montada · esperando soltar", "agendada" to "Planejada", "reservada" to "Reservada",
+    "aguardando_motoboy" to "Procurando motoboy", "sem_motoboy" to "Sem motoboy", "aceita" to "Aceita", "em_andamento" to "Em andamento", "concluida" to "Concluída",
+    "cancelada" to "Cancelada", "disponivel" to "Online", "em_corrida" to "Em corrida", "offline" to "Offline",
+)
+private fun corStatusCartao(s: String?): Color = when (s) {
+    "concluido", "concluida", "disponivel" -> Color(0xFF22C55E); "cancelado", "cancelada", "recusado", "sem_motoboy" -> Color(0xFFEF4444)
+    "em_rota", "em_andamento", "aceita", "em_corrida" -> Color(0xFF38BDF8); "offline" -> Color(0xFF8A8A8E); else -> Color(0xFFD6B04C)
+}
+
+/** Cartão do que foi compartilhado: título, status ao vivo e as linhas do essencial (o motoboy vê um resumo, sem valores). */
 @Composable
 private fun CartaoAnexo(a: Anexo, onClick: () -> Unit) {
     val c = Pw.cores
-    val forma = RoundedCornerShape(12.dp)
-    Row(Modifier.fillMaxWidth().clip(forma).background(c.fundo2).border(1.dp, c.borda, forma).clickable(onClick = onClick).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(c.ouro.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
-            Icon(iconeAnexo(a.tipo), null, tint = c.ouro, modifier = Modifier.size(18.dp))
+    val forma = RoundedCornerShape(14.dp)
+    var info by remember(a.tipo, a.id) { mutableStateOf<CartaoInfo?>(null) }
+    LaunchedEffect(a.tipo, a.id) { if (a.id != null && a.tipo in setOf("pedido", "rota", "cliente", "pessoa")) info = Chat.cartao(a.tipo, a.id) }
+    val i = info
+    Column(Modifier.widthIn(min = 230.dp).clip(forma).background(c.fundo2).border(1.dp, c.borda, forma).clickable(onClick = onClick).padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (a.tipo == "pessoa" && i != null) PwAvatar(i.titulo ?: a.titulo ?: "?", i.foto, tamanho = 36.dp, oculto = i.oculto)
+            else Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(c.ouro.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+                Icon(iconeAnexo(a.tipo), null, tint = c.ouro, modifier = Modifier.size(18.dp))
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                PwRotulo(mapOf("pedido" to "Pedido", "rota" to "Rota", "cliente" to "Cliente", "pessoa" to "Pessoa", "local" to "Local").getOrElse(a.tipo) { "Anexo" })
+                Text(i?.titulo ?: a.titulo ?: "—", color = c.texto, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                (i?.sub ?: a.sub)?.takeIf { it.isNotBlank() }?.let { Text(it, color = c.texto2, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            }
         }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            PwRotulo(mapOf("pedido" to "Pedido", "rota" to "Rota", "cliente" to "Cliente", "pessoa" to "Pessoa", "local" to "Local").getOrElse(a.tipo) { "Anexo" })
-            Text(a.titulo ?: "—", color = c.texto, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            a.sub?.let { Text(it, color = c.texto2, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        i?.status?.let { st ->
+            val cor = corStatusCartao(st)
+            Text(STATUS_CARTAO[st] ?: st.replace("_", " "), color = cor, fontSize = 11.5.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.clip(RoundedCornerShape(99.dp)).background(cor.copy(alpha = 0.14f)).padding(horizontal = 9.dp, vertical = 3.dp))
         }
+        if (i?.semAcesso == true) Text("Você não tem acesso a este cartão.", color = c.texto3, fontSize = 12.sp)
+        i?.linhas?.forEach { (ic, rot, v) ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(iconeLinha(ic), null, tint = c.texto3, modifier = Modifier.size(13.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(rot, color = c.texto3, fontSize = 12.sp, modifier = Modifier.width(78.dp), maxLines = 1)
+                Text(v, color = c.texto, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        if (i?.resumo == true) Text("Resumo para a equipe", color = c.texto3, fontSize = 10.5.sp)
     }
     Spacer(Modifier.size(4.dp))
+}
+
+private fun iconeLinha(nome: String): ImageVector = when (nome) {
+    "bike" -> PwIcones.Bike; "list-checks" -> PwIcones.ListChecks; "ruler" -> PwIcones.Ruler; "map-pin" -> PwIcones.MapPin
+    "calendar-clock" -> PwIcones.CalendarClock; "building-2" -> PwIcones.Building2; "wallet" -> PwIcones.Wallet; "package" -> PwIcones.Package
+    "clock" -> PwIcones.Clock; "info" -> PwIcones.Info; "phone" -> PwIcones.Phone; "clipboard-list" -> PwIcones.ClipboardList
+    "shield-check" -> PwIcones.ShieldCheck; "route" -> PwIcones.Route; else -> PwIcones.Info
 }
 
 /** Foto para o chat: até 1600 px no lado maior, JPEG 82%. */
@@ -377,13 +442,14 @@ private fun comprimir(ctx: android.content.Context, uri: Uri): ByteArray? = runC
 }.getOrNull()
 
 
-/** Selos de cargo (Dev, Gestor, Motoboy, Cliente) ao lado do nome. */
+/** Selo do cargo de maior hierarquia (Dev > Gestor > Supervisor > Motoboy > Cliente) ao lado do nome. */
 @Composable
 fun SelosCargo(papeis: List<String>) {
     if (papeis.isEmpty()) return
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(start = 6.dp)) {
-        listOf("dev" to ("Dev" to Color(0xFFEF4444)), "gestor" to ("Gestor" to Pw.cores.ouro), "motoboy" to ("Motoboy" to Color(0xFF22C55E)), "cliente" to ("Cliente" to Color(0xFF38BDF8)))
-            .filter { it.first in papeis }.forEach { (_, rc) ->
+        listOf("dev" to ("Dev" to Color(0xFFEF4444)), "gestor" to ("Gestor" to Pw.cores.ouro), "supervisor" to ("Supervisor" to Color(0xFFF59E0B)),
+            "motoboy" to ("Motoboy" to Color(0xFF22C55E)), "cliente" to ("Cliente" to Color(0xFF38BDF8)))
+            .firstOrNull { it.first in papeis }?.let { listOf(it) }.orEmpty().forEach { (_, rc) ->
                 val (r, cor) = rc
                 Text(r, color = cor, fontSize = 9.5.sp, fontWeight = FontWeight.ExtraBold,
                     modifier = Modifier.clip(RoundedCornerShape(99.dp)).border(1.dp, cor, RoundedCornerShape(99.dp)).padding(horizontal = 6.dp, vertical = 1.dp))

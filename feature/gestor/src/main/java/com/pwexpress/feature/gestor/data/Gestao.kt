@@ -87,7 +87,7 @@ object Gestao {
                 val corridas = async { rpc.rest("GET", "/rest/v1/corridas?select=*,paradas(*)&or=(criada_em.gte.${enc(desde)},agendada_para.gte.${enc(desde)})&order=criada_em.desc&limit=400").exigirOk().lista() }
                 val ofertas = async { rpc.rest("GET", "/rest/v1/ofertas?select=id,corrida_id,motoboy_id,status,distancia_m,expira_em&status=eq.pendente").exigirOk().lista() }
                 val equipe = async { rpc.chamar("listar_equipe", JsonObject(emptyMap())).exigirOk().lista() }
-                val pos = async { rpc.rest("GET", "/rest/v1/motoboys?select=id,status,lat,lng,posicao_em,modo_teste,modo_economia,bateria,precisao_m").exigirOk().lista() }
+                val pos = async { rpc.rest("GET", "/rest/v1/motoboys?select=id,status,lat,lng,posicao_em,modo_teste,modo_economia,bateria,precisao_m,raio_km,raio_modo,raio_lat,raio_lng").exigirOk().lista() }
                 // trilhas pesam mais: a cada 5 voltas (~30 s)
                 // percursos de teste e reais são separados: só os do modo atual (troca de modo recarrega na hora)
                 val teste = com.pwexpress.core.designsystem.TemaApp.modoTeste.value

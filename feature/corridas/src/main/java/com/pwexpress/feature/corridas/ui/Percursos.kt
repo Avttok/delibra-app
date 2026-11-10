@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -94,19 +95,49 @@ fun MeusPercursos() {
             })
         }.getOrDefault(emptyList())
     }
+    val r = regs
+    var soRotas by remember { mutableStateOf(false) }
+    var todos by remember(dia) { mutableStateOf(false) }
+    val br = Locale("pt", "BR")
     PwCartao {
-        PwRotulo("Meus percursos")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(PwIcones.Footprints, null, tint = c.ouro, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
+            PwRotulo("Meus percursos")
+        }
         Spacer(Modifier.height(8.dp))
         com.pwexpress.core.mapa.SeletorDia(dia, { dia = it })
         Spacer(Modifier.height(10.dp))
-        val r = regs
+        // resumo do dia
+        if (!r.isNullOrEmpty()) {
+            val rotas = r.count { it.corrida }
+            val kmRota = r.filter { it.corrida }.sumOf { it.metros } / 1000
+            val kmDia = r.sumOf { it.metros } / 1000
+            val min = r.sumOf { (it.fim - it.inicio).coerceAtLeast(0) } / 60000
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("$rotas" to "rotas", String.format(br, "%.1f", kmRota) to "km em rota", String.format(br, "%.1f", kmDia) to "km no dia",
+                    (if (min >= 60) "${min / 60}h${String.format(br, "%02d", min % 60)}" else "${min}min") to "rodando").forEach { (v, rot) ->
+                    Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(c.vidro).border(1.dp, c.borda, RoundedCornerShape(12.dp)).padding(vertical = 8.dp, horizontal = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(v, color = c.texto, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
+                        Text(rot, color = c.texto3, fontSize = 10.5.sp, maxLines = 1)
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+        }
         val forma = RoundedCornerShape(18.dp)
-        Box(Modifier.fillMaxWidth().height(240.dp).clip(forma).border(1.dp, c.borda, forma)) {
+        val pontos = r.orEmpty().flatMap { it.pontos }
+        // início (bandeira pequena) e onde terminou, com a SUA foto
+        val marcadores = listOfNotNull(
+            pontos.firstOrNull()?.let { com.pwexpress.core.mapa.MarcadorMapa("ini", it.lat, it.lng, "#22C55E", "Início", pino = false, prioridade = 1) },
+            pontos.lastOrNull()?.let { com.pwexpress.core.mapa.MarcadorMapa("eu", it.lat, it.lng, String.format("#%06X", 0xFFFFFF and c.ouro.toArgb()),
+                eu?.nome?.substringBefore(" ") ?: "Você", foto = eu?.fotoUrl, prioridade = 3) },
+        )
+        Box(Modifier.fillMaxWidth().height(250.dp).clip(forma).border(1.dp, c.borda, forma)) {
             PwMapa(
-                paradas = emptyList(), rota = null, minhaPosicao = null, modifier = Modifier.fillMaxWidth().height(240.dp),
+                paradas = emptyList(), rota = null, minhaPosicao = null, modifier = Modifier.fillMaxWidth().height(250.dp),
                 percursos = r.orEmpty().mapIndexed { i, g -> PercursoMapa.de(g, destaque = destaque == i, apagado = destaque != null && destaque != i) },
-                percursoTeste = teste, enquadrar = "$dia-${r?.size}-$destaque",
-                marcadores = r.orEmpty().flatMap { it.pontos }.let { pts -> listOfNotNull(pts.firstOrNull()?.let { com.pwexpress.core.mapa.MarcadorMapa("ini", it.lat, it.lng, "#FFFFFF", "Início", pino = false) }) },
+                percursoTeste = teste, enquadrar = "$dia-${r?.size}-$destaque", marcadores = marcadores, tituloTelaCheia = "Meus percursos",
             )
         }
         Spacer(Modifier.height(8.dp))
@@ -122,8 +153,16 @@ fun MeusPercursos() {
             else -> {
                 val fmt = DateTimeFormatter.ofPattern("HH:mm")
                 fun h(ms: Long) = java.time.Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault()).format(fmt)
+                // parado procurando corrida (menos de 100 m) não ajuda a entender o dia
+                val uteis = r.withIndex().filter { (_, g) -> g.corrida || g.metros >= 100 }.filter { (_, g) -> !soRotas || g.corrida }
+                val mostrar = (if (todos) uteis else uteis.takeLast(6)).reversed()
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    com.pwexpress.core.designsystem.PwPilula("Só rotas", PwIcones.Package, { soRotas = !soRotas }, ligada = soRotas)
+                    if (uteis.size > 6) com.pwexpress.core.designsystem.PwPilula(if (todos) "Mostrar menos" else "Ver todos (${uteis.size})", PwIcones.Lista, { todos = !todos }, ligada = todos)
+                }
+                Spacer(Modifier.height(6.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    r.withIndex().reversed().forEach { (i, g) ->
+                    mostrar.forEach { (i, g) ->
                         val sel = destaque == i
                         val f = RoundedCornerShape(12.dp)
                         Row(
@@ -131,13 +170,19 @@ fun MeusPercursos() {
                                 .clickable { destaque = if (sel) null else i }.padding(horizontal = 10.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(if (g.corrida) PwIcones.Package else PwIcones.Search, null, tint = if (g.corrida) c.ouro else c.texto2, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(if (g.corrida) "Corrida" else "Procurando corrida", color = c.texto, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                            Text("${h(g.inicio)}–${h(g.fim)} · ${String.format(Locale("pt", "BR"), "%.1f km", g.metros / 1000)}", color = c.texto3, fontSize = 12.sp)
+                            Box(Modifier.size(28.dp).clip(RoundedCornerShape(99.dp)).background(if (g.corrida) c.ouro.copy(alpha = 0.18f) else c.vidroForte), contentAlignment = Alignment.Center) {
+                                Icon(if (g.corrida) PwIcones.Package else PwIcones.Search, null, tint = if (g.corrida) c.ouro else c.texto2, modifier = Modifier.size(15.dp))
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(if (g.corrida) "Rota" else "Procurando corrida", color = c.texto, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                Text("${h(g.inicio)} – ${h(g.fim)} · ${(g.fim - g.inicio) / 60000} min", color = c.texto3, fontSize = 11.5.sp, maxLines = 1)
+                            }
+                            Text(String.format(br, "%.1f km", g.metros / 1000), color = if (g.corrida) c.ouro else c.texto2, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
-                    Text("Total: ${String.format(Locale("pt", "BR"), "%.1f km", r.sumOf { it.metros } / 1000)}", color = c.texto2, fontSize = 12.5.sp)
+                    val escondidos = r.size - r.count { it.corrida || it.metros >= 100 }
+                    if (escondidos > 0 && !soRotas) Text("$escondidos período${if (escondidos == 1) "" else "s"} parado procurando corrida (menos de 100 m) não aparece${if (escondidos == 1) "" else "m"}.", color = c.texto3, fontSize = 11.5.sp)
                 }
             }
         }

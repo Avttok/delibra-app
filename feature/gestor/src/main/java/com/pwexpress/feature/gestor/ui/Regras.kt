@@ -53,6 +53,7 @@ import com.pwexpress.core.designsystem.numeroBr
 import com.pwexpress.feature.gestor.data.GRUPOS_CONFIG
 import com.pwexpress.feature.gestor.data.Gestao
 import com.pwexpress.feature.gestor.data.PARAMETROS
+import com.pwexpress.feature.gestor.data.PARAMETROS_VISIVEIS
 import com.pwexpress.feature.gestor.data.Param
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
@@ -217,7 +218,7 @@ internal fun RegrasDoAlvoG(escopo: String, alvo: String, nome: String) {
         when (escopo) { "cliente" -> "Valem para todos os pedidos dele (um pedido pode ter regras próprias)."; "motoboy" -> "Valem para todas as rotas dele."; else -> "Valem para todos os pedidos deste tipo." })
     PwCampo(busca, { busca = it }, "Buscar regra")
     if (!carregado) { com.pwexpress.core.designsystem.PwCarregando(); return }
-    EditorRegrasG(PARAMETROS.filter { escopo in it.escopos }, valores, { chave, v ->
+    EditorRegrasG(PARAMETROS_VISIVEIS.filter { escopo in it.escopos }, valores, { chave, v ->
         escopoCo.launch {
             Gestao.definirPolitica(escopo, alvo, chave, v).onSuccess {
                 if (v == null) valores.remove(chave) else valores[chave] = v
@@ -255,7 +256,7 @@ internal fun ExcecoesG(onVoltar: () -> Unit) {
 }
 
 /** Regras que fazem sentido num pedido só (preço, junção em rotas, despacho, revisão). */
-internal val PARAMS_PEDIDO = PARAMETROS.filter { ("cliente" in it.escopos || "tipo" in it.escopos) && it.grupo !in setOf("pagamento", "pag_combinar", "pag_zonas", "pag_km", "pag_entrega", "pag_fixo", "faturas") && !it.soDev }
+internal val PARAMS_PEDIDO = PARAMETROS_VISIVEIS.filter { ("cliente" in it.escopos || "tipo" in it.escopos) && it.grupo !in setOf("pagamento", "pag_combinar", "pag_zonas", "pag_km", "pag_entrega", "pag_fixo", "faturas") && !it.soDev }
 
 /** Regras deste pedido (a peça mais alta do lego). Grava na hora e recalcula o orçamento. */
 @Composable

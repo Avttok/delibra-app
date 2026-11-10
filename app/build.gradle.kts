@@ -27,14 +27,27 @@ android {
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
 
+    // Assinatura digital de produção (Delibra). A chave NÃO fica no repositório: o GitHub Actions
+    // monta o arquivo a partir dos secrets DELIBRA_KEYSTORE_B64 / DELIBRA_KEYSTORE_SENHA / DELIBRA_KEY_ALIAS
+    // e passa o caminho em DELIBRA_KEYSTORE. Sem ela (build local), o release usa a chave de desenvolvimento.
+    val chaveProducao = System.getenv("DELIBRA_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
     signingConfigs {
-        // Chave fixa de desenvolvimento (só para o piloto via sideload).
-        // Garante que o APK do Android Studio e o do GitHub tenham a mesma assinatura.
+        // Chave fixa de desenvolvimento (Android Studio e testes locais).
         getByName("debug") {
             storeFile = rootProject.file("keystore/pwex-debug.jks")
             storePassword = "android"
             keyAlias = "androiddebugkey"
             keyPassword = "android"
+        }
+        if (chaveProducao != null) create("producao") {
+            storeFile = chaveProducao
+            storePassword = System.getenv("DELIBRA_KEYSTORE_SENHA")
+            keyAlias = System.getenv("DELIBRA_KEY_ALIAS") ?: "delibra"
+            keyPassword = System.getenv("DELIBRA_KEY_SENHA") ?: System.getenv("DELIBRA_KEYSTORE_SENHA")
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = false
         }
     }
 
@@ -44,7 +57,7 @@ android {
         }
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug") // trocar por chave de produção antes da Play Store
+            signingConfig = if (chaveProducao != null) signingConfigs.getByName("producao") else signingConfigs.getByName("debug")
         }
     }
 

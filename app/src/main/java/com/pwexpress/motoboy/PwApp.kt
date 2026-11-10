@@ -33,6 +33,7 @@ class PwApp : Application() {
         Tracking.init(this, BuildConfig.VERSION_NAME)
         Corridas.init(this)
         Atualizador.init(this, BuildConfig.VERSION_CODE)
+        com.pwexpress.core.marca.MarcaEmpresa.iniciar(this)
         PwNotificacoes.criarCanais(this)
         ligarModulos()
     }

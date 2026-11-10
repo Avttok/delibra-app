@@ -139,7 +139,7 @@ fun OfertaScreen(oferta: Oferta, onFim: (aceitou: Boolean) -> Unit, modifier: Mo
     ) {
         val alturaPainel = maxHeight * 0.56f
         // ------------------------------------------------ mapa em tela cheia, atrás de tudo
-        PwMapa(paradas = pinos, rota = corrida.rotaPlanejada, minhaPosicao = posicao, modifier = Modifier.fillMaxSize(),
+        PwMapa(maximizavel = false, paradas = pinos, rota = corrida.rotaPlanejada, minhaPosicao = posicao, modifier = Modifier.fillMaxSize(),
             enquadrar = "${corrida.id}-${posicao != null}", margemBaixo = alturaPainel.value.toInt() + 10, focar = foco)
         Box(Modifier.fillMaxWidth().height(150.dp).background(Brush.verticalGradient(listOf(c.fundo, c.fundo.copy(alpha = 0.7f), Color.Transparent))))
 

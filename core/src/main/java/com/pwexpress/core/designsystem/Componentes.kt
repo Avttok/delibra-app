@@ -201,7 +201,16 @@ fun BotaoTema(modifier: Modifier = Modifier) {
 
 /** Logo da Delibra (o D com as ondas de radar). A cor segue o tema: dourado, violeta no teste, vermelho do Dev. */
 @Composable
-fun PwSeloLogo(tamanho: Dp, modifier: Modifier = Modifier, descricao: String? = "Delibra") {
+fun PwSeloLogo(tamanho: Dp, modifier: Modifier = Modifier, descricao: String? = "Delibra", delibra: Boolean = false) {
+    // ícone próprio da empresa (enviado pelo dono no site) no lugar do Delibra
+    val empresa by com.pwexpress.core.marca.MarcaEmpresa.marca.collectAsState()
+    val url = empresa?.logoUrl
+    if (!delibra && url != null) {
+        coil.compose.AsyncImage(url, empresa?.nome ?: descricao, modifier.size(tamanho).clip(RoundedCornerShape(tamanho * 0.22f)),
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            error = painterResource(R.drawable.pwex_marca_ouro))
+        return
+    }
     val marca = Pw.cores.marca
     val res = when (marca) { Marca.VIOLETA -> R.drawable.pwex_marca_violeta; Marca.VERMELHO -> R.drawable.pwex_marca_vermelho; Marca.AZUL -> R.drawable.pwex_marca_azul; Marca.VERDE -> R.drawable.pwex_marca_verde; Marca.BRANCO -> R.drawable.pwex_marca_branco; Marca.PRETO -> R.drawable.pwex_marca_preto; Marca.OURO -> R.drawable.pwex_marca_ouro }
     Image(painterResource(res), descricao, modifier.size(tamanho), contentScale = androidx.compose.ui.layout.ContentScale.Fit)
@@ -216,10 +225,12 @@ fun PwLogo(modifier: Modifier = Modifier, tamanho: Int = 26, soSelo: Boolean = f
         return
     }
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        PwSeloLogo((tamanho * 1.35f).dp, descricao = "Delibra")
+        val empresa by com.pwexpress.core.marca.MarcaEmpresa.marca.collectAsState()
+        val propria = empresa?.nomeExibido
+        PwSeloLogo((tamanho * 1.35f).dp, descricao = propria ?: "Delibra")
         Spacer(Modifier.width((tamanho * 0.3f).dp))
         Text(
-            "delibra",
+            propria ?: "delibra",
             color = c.texto,
             fontFamily = Archivo,
             fontWeight = FontWeight.ExtraBold,
@@ -235,8 +246,9 @@ fun PwLogo(modifier: Modifier = Modifier, tamanho: Int = 26, soSelo: Boolean = f
 fun PwLogoGrande(tamanho: Dp, modifier: Modifier = Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         PwSeloLogo(tamanho)
+        val empresa by com.pwexpress.core.marca.MarcaEmpresa.marca.collectAsState()
         Text(
-            "EXPRESS", color = Pw.cores.texto2, fontFamily = Archivo, fontWeight = FontWeight.Light,
+            empresa?.nomeExibido?.uppercase() ?: "DELIBRA", color = Pw.cores.texto2, fontFamily = Archivo, fontWeight = FontWeight.Light,
             fontSize = (tamanho.value * 0.09f).coerceAtLeast(12f).sp, letterSpacing = (tamanho.value * 0.055f).sp, maxLines = 1,
         )
     }

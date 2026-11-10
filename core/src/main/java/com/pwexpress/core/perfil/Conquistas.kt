@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -315,6 +316,91 @@ fun FaixaConquistas(onVerTodas: () -> Unit, modifier: Modifier = Modifier) {
             if (ganhas.isEmpty()) Text("Conclua a primeira corrida para ganhar a primeira medalha.", color = c.texto3, fontSize = 12.5.sp)
             else Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 ganhas.reversed().forEach { MedalhaConquista(it, true, stats, tamanho = 40.dp, comNome = false) }
+            }
+        }
+    }
+}
+
+private val GRUPO_STAT = mapOf("corridas" to "Rotas", "entregas" to "Entregas", "km" to "Quilômetros", "dias" to "Dias rodando", "seguidos" to "Sequências")
+
+/**
+ * Janela das conquistas (aberta pelo menu da foto): anel com o total, filtros, as que estão
+ * "quase lá" e cada medalha com a barra do quanto falta.
+ */
+@Composable
+fun JanelaConquistas(onFechar: () -> Unit) {
+    val c = Pw.cores
+    val stats by Conquistas.minhas.collectAsState()
+    LaunchedEffect(Unit) { Conquistas.atualizarMinhas(0) }
+    var filtro by remember { mutableStateOf(0) }
+    val ganhas = Conquistas.ganhas(stats).toSet()
+    val total = Conquistas.catalogo.size
+    fun progresso(cq: Conquista) = if (cq in ganhas) 1f else (Conquistas.valor(stats, cq.stat) / cq.meta).toFloat().coerceIn(0f, 1f)
+    com.pwexpress.core.designsystem.PwTelaCheia("Conquistas", onFechar, subtitulo = "${ganhas.size} de $total medalhas") {
+        // anel do total
+        val alvo = if (total == 0) 0f else ganhas.size.toFloat() / total
+        val p by animateFloatAsState(if (stats == null) 0f else alvo, spring(0.8f, 60f), label = "anel")
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(150.dp).drawBehind {
+                val esp = 12.dp.toPx()
+                drawCircle(c.borda, size.minDimension / 2 - esp / 2, style = androidx.compose.ui.graphics.drawscope.Stroke(esp))
+                drawArc(Brush.sweepGradient(listOf(c.ouroClaro, c.ouro, c.ouroEscuro, c.ouroClaro)), -90f, 360f * p, false,
+                    topLeft = androidx.compose.ui.geometry.Offset(esp / 2, esp / 2), size = androidx.compose.ui.geometry.Size(size.width - esp, size.height - esp),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(esp, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+            }, contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(PwIcones.Trophy, null, tint = c.ouro, modifier = Modifier.size(26.dp))
+                    Text("${ganhas.size}", color = c.texto, fontFamily = Archivo, fontWeight = FontWeight.Black, fontSize = 32.sp)
+                    Text("de $total", color = c.texto3, fontSize = 12.sp)
+                }
+            }
+        }
+        if (stats == null) { Text("Carregando…", color = c.texto3, fontSize = 13.sp); return@PwTelaCheia }
+        // estatísticas principais
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("corridas" to "rotas", "entregas" to "entregas", "km" to "km").forEach { (k, r) ->
+                Column(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(c.vidro).border(1.dp, c.borda, RoundedCornerShape(14.dp)).padding(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(com.pwexpress.core.designsystem.numeroBr(Conquistas.valor(stats, k), 0), color = c.texto, fontFamily = Archivo, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(r, color = c.texto3, fontSize = 11.5.sp)
+                }
+            }
+        }
+        // quase lá: as 3 que faltam menos
+        val quase = Conquistas.catalogo.filter { it !in ganhas }.sortedByDescending { progresso(it) }.take(3).filter { progresso(it) > 0f }
+        if (quase.isNotEmpty()) {
+            com.pwexpress.core.designsystem.PwRotulo("Quase lá")
+            quase.forEach { LinhaConquista(it, false, progresso(it), stats) }
+        }
+        com.pwexpress.core.designsystem.PwSegmentado(listOf("Todas" to null, "Ganhas" to PwIcones.CircleCheck, "Faltam" to PwIcones.Lock), filtro, { filtro = it })
+        val lista = Conquistas.catalogo.filter { when (filtro) { 1 -> it in ganhas; 2 -> it !in ganhas; else -> true } }
+        lista.groupBy { it.stat }.forEach { (stat, itens) ->
+            com.pwexpress.core.designsystem.PwRotulo(GRUPO_STAT[stat] ?: stat.replaceFirstChar { it.uppercase() })
+            itens.forEach { LinhaConquista(it, it in ganhas, progresso(it), stats) }
+        }
+        if (lista.isEmpty()) Text(if (filtro == 1) "Nenhuma medalha ainda. Conclua a primeira rota!" else "Você já tem todas. Lenda!", color = c.texto3, fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun LinhaConquista(cq: Conquista, ganha: Boolean, progresso: Float, stats: JsonObject?) {
+    val c = Pw.cores
+    val forma = RoundedCornerShape(16.dp)
+    Row(Modifier.fillMaxWidth().clip(forma).background(if (ganha) cq.cor.copy(alpha = 0.10f) else c.vidro).border(1.dp, if (ganha) cq.cor.copy(alpha = 0.45f) else c.borda, forma)
+        .clickable { explicarConquista(cq, stats) }.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        MedalhaConquista(cq, ganha, stats, tamanho = 46.dp, comNome = false)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(cq.nome, color = c.texto, fontWeight = FontWeight.Bold, fontSize = 14.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                if (ganha) Icon(PwIcones.CircleCheck, "Ganha", tint = cq.cor, modifier = Modifier.size(16.dp))
+            }
+            Text(cq.descricao, color = c.texto3, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (!ganha) {
+                Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(99.dp)).background(c.borda)) {
+                    Box(Modifier.fillMaxWidth(progresso).height(6.dp).clip(RoundedCornerShape(99.dp)).background(cq.cor))
+                }
+                Text("${com.pwexpress.core.designsystem.numeroBr(Conquistas.valor(stats, cq.stat), 0)} de ${com.pwexpress.core.designsystem.numeroBr(cq.meta, 0)}", color = c.texto3, fontSize = 11.sp)
             }
         }
     }

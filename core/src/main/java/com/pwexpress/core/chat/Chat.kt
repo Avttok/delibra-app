@@ -34,14 +34,25 @@ data class Anexo(
 data class Conversa(
     val id: String, val tipo: String, val nome: String, val foto: String?, val outro: String?, val membros: Int,
     val ultimaEm: Long?, val previa: String?, val ultimaMinha: Boolean, val silenciada: Boolean, val naoLidas: Int,
+    /** Direta com o Dev oculto: mostra "Dev" com o ícone </>. */
+    val oculto: Boolean = false, val papeis: List<String> = emptyList(),
+    /** Só na visão do Dev (todas as conversas). */
+    val empresa: String? = null, val souMembro: Boolean = true,
 )
 
-data class Contato(val id: String, val nome: String, val foto: String?, val papeis: List<String>, val status: String?, val empresa: String?) {
+data class Contato(val id: String, val nome: String, val foto: String?, val papeis: List<String>, val status: String?, val empresa: String?, val oculto: Boolean = false) {
+    /** Só o cargo de maior hierarquia: Dev > Gestor > Supervisor > Motoboy > Cliente. */
     val papel: String get() = when {
-        "dev" in papeis -> "Dev"; "gestor" in papeis -> "Gestor"; "motoboy" in papeis -> "Motoboy"
+        "dev" in papeis -> "Dev"; "gestor" in papeis -> "Gestor"; "supervisor" in papeis -> "Supervisor"; "motoboy" in papeis -> "Motoboy"
         empresa != null -> "Cliente · $empresa"; else -> "Cliente"
     }
 }
+
+/** Cartão rico do que foi compartilhado (status, motoboy, entregas…); o motoboy recebe só o essencial. */
+data class CartaoInfo(
+    val titulo: String?, val sub: String?, val status: String?, val linhas: List<Triple<String, String, String>>, val resumo: Boolean,
+    val semAcesso: Boolean, val foto: String? = null, val oculto: Boolean = false, val lat: Double? = null, val lng: Double? = null,
+)
 
 data class Mensagem(val id: String, val autor: String?, val texto: String?, val anexo: Anexo?, val quando: Long, val apagada: Boolean)
 
@@ -79,6 +90,8 @@ object Chat {
         "mensagem_vazia" in corpo -> "Escreva algo ou anexe uma foto."
         "conversa_invalida" in corpo || "sem_permissao" in corpo -> "Você não está nessa conversa."
         "anexo_invalido" in corpo -> "Esse anexo não pôde ser enviado."
+        "compartilhamento_desligado" in corpo -> "Compartilhar esse tipo de cartão está desligado nos ajustes."
+        "dev_so_le" in corpo -> "Você está lendo esta conversa como Dev: não dá para escrever nela."
         else -> "Não deu para falar com o servidor agora."
     }
 
@@ -90,6 +103,8 @@ object Chat {
                 (o["membros"] as? JsonPrimitive)?.intOrNull ?: 0, instante(o.t("ultima_em")), o.t("ultima_previa"),
                 (o["ultima_minha"] as? JsonPrimitive)?.booleanOrNull == true, (o["silenciada"] as? JsonPrimitive)?.booleanOrNull == true,
                 (o["nao_lidas"] as? JsonPrimitive)?.intOrNull ?: 0,
+                (o["oculto"] as? JsonPrimitive)?.booleanOrNull == true,
+                (o["papeis"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content },
             )
         }
         _conversas.value = l
@@ -101,7 +116,8 @@ object Chat {
         val l = (rpc("chat_contatos") as? JsonArray).orEmpty().mapNotNull { e ->
             val o = e as? JsonObject ?: return@mapNotNull null
             Contato(o.t("id") ?: return@mapNotNull null, o.t("nome") ?: "Sem nome", o.t("foto"),
-                (o["papeis"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content }, o.t("status"), o.t("empresa"))
+                (o["papeis"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content }, o.t("status"), o.t("empresa"),
+                (o["oculto"] as? JsonPrimitive)?.booleanOrNull == true)
         }
         _contatos.value = l
         l
@@ -112,9 +128,38 @@ object Chat {
         (rpc("chat_autores", buildJsonObject { put("p_conversa", conversa) }) as? JsonArray).orEmpty().mapNotNull { e ->
             val o = e as? JsonObject ?: return@mapNotNull null
             Contato(o.t("id") ?: return@mapNotNull null, o.t("nome") ?: "Sem nome", o.t("foto"),
-                (o["papeis"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content }, null, o.t("empresa"))
+                (o["papeis"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content }, null, o.t("empresa"),
+                (o["oculto"] as? JsonPrimitive)?.booleanOrNull == true)
         }
     }.getOrDefault(emptyList())
+
+    private val cartoes = java.util.concurrent.ConcurrentHashMap<String, Pair<CartaoInfo, Long>>()
+    /** Detalhes do cartão compartilhado (guardado por 1 min). */
+    suspend fun cartao(tipo: String, id: String): CartaoInfo? {
+        val k = "$tipo|$id"
+        cartoes[k]?.takeIf { it.second > System.currentTimeMillis() }?.let { return it.first }
+        return tentar {
+            val o = rpc("chat_cartao", buildJsonObject { put("p_tipo", tipo); put("p_id", id) }) as? JsonObject ?: return@tentar null
+            CartaoInfo(o.t("titulo"), o.t("sub"), o.t("status"),
+                (o["linhas"] as? JsonArray).orEmpty().mapNotNull { e -> (e as? JsonObject)?.let { x -> Triple(x.t("icone") ?: "", x.t("rotulo") ?: "", x.t("valor") ?: "") } },
+                (o["resumo"] as? JsonPrimitive)?.booleanOrNull == true, (o["sem_acesso"] as? JsonPrimitive)?.booleanOrNull == true,
+                o.t("foto"), (o["oculto"] as? JsonPrimitive)?.booleanOrNull == true, (o["lat"] as? JsonPrimitive)?.doubleOrNull, (o["lng"] as? JsonPrimitive)?.doubleOrNull)
+        }.getOrNull()?.also { cartoes[k] = it to System.currentTimeMillis() + 60_000 }
+    }
+
+    /** Dev: todas as conversas da plataforma. */
+    suspend fun todasDev(): Result<List<Conversa>> = tentar {
+        (rpc("dev_conversas") as? JsonArray).orEmpty().mapNotNull { e ->
+            val o = e as? JsonObject ?: return@mapNotNull null
+            val membros = (o["membros"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.t("nome") }
+            Conversa(o.t("id") ?: return@mapNotNull null, o.t("tipo") ?: "direta",
+                o.t("nome") ?: if (o.t("tipo") == "direta") membros.joinToString(" e ") else "Conversa", null, null, membros.size,
+                instante(o.t("ultima_em")), o.t("ultima_previa"), false, false, 0, empresa = o.t("organizacao") ?: "Plataforma",
+                souMembro = (o["sou_membro"] as? JsonPrimitive)?.booleanOrNull == true)
+        }
+    }
+
+    suspend fun apagarConversaDev(conversa: String) = tentar { rpc("dev_apagar_conversa", buildJsonObject { put("p_conversa", conversa) }); carregar() }
 
     suspend fun mensagens(conversa: String, limite: Int = 120): Result<List<Mensagem>> = tentar {
         val r = PwCore.rpc.rest("GET", "/rest/v1/chat_mensagens?select=id,autor_id,texto,anexo,criada_em,apagada_em&conversa_id=eq.$conversa&order=criada_em.desc&limit=$limite")

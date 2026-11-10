@@ -136,14 +136,12 @@ internal fun CartaoCorridaG(corrida: CorridaG, dados: Gestao.Dados, onClick: () 
                 Spacer(Modifier.width(8.dp))
             }
             Text(corrida.numeroExibicao, fontFamily = ArchivoLargo, fontWeight = FontWeight.Black, fontSize = 16.sp, color = c.texto, maxLines = 1)
-            Spacer(Modifier.width(8.dp))
-            PwSelo(Status.rotulo[corrida.status] ?: corrida.status, corStatus(corrida.status, c))
             if (corrida.urgente) { Spacer(Modifier.width(6.dp)); Icon(PwIcones.Zap, "Urgente", tint = c.vermelho, modifier = Modifier.size(16.dp)) }
-            Spacer(Modifier.width(8.dp))
-            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                TextoAjustado(moedaBr(corrida.valor), TextStyle(fontFamily = ArchivoLargo, fontWeight = FontWeight.Bold, color = c.texto), 15, minimo = 11)
-            }
+            Spacer(Modifier.weight(1f))
+            // o preço tem a linha só para ele: nunca fica cortado
+            Text(moedaBr(corrida.valor), fontFamily = ArchivoLargo, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.texto, maxLines = 1, softWrap = false)
         }
+        PwSelo(Status.rotulo[corrida.status] ?: corrida.status, corStatus(corrida.status, c))
         if (corrida.planejada && corrida.agendadaPara != null) {
             val f2 = RoundedCornerShape(10.dp)
             val cor = if (corrida.atrasada) c.vermelho else c.azul

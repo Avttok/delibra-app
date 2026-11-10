@@ -207,7 +207,7 @@ private fun JanelaPedido(p: PedidoG, empresa: String?, onFechar: () -> Unit) {
             p.orcamento?.let { o ->
                 if (editando) EditarOrcamentoG(p.id, o, onFechar = { editando = false })
                 else {
-                    OrcamentoG(o)
+                    OrcamentoG(o, p.pontos)
                     if (p.status !in setOf("concluido", "cancelado", "recusado") && p.faturaId == null)
                         PwBotaoVidro("Mudar o cálculo", onClick = { editando = true }, icone = PwIcones.Pencil, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
                 }
@@ -650,7 +650,16 @@ internal fun MapaPedidoG(p: PedidoG, altura: androidx.compose.ui.unit.Dp = 220.d
     val dados by Gestao.dados.collectAsState()
     val pontos = p.pontos.filter { it.lat != null && it.lng != null }
     if (pontos.isEmpty()) return
-    val pinos = pontos.map { com.pwexpress.core.mapa.PinoMapa(it.lat!!, it.lng!!, it.coleta, false, it.status == "concluido") }
+    var categorias by remember { mutableStateOf<List<com.pwexpress.feature.gestor.data.CategoriaG>>(emptyList()) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { categorias = runCatching { Gestao.catalogoPedido().second }.getOrDefault(emptyList()) }
+    // cada ponto mostra o ícone do que vai nele; mais de um tipo de item = selo "+N"
+    val pinos = pontos.mapIndexed { i, pt ->
+        val doPonto = p.itens.filter { if (pt.coleta) it.coletaId == null || it.coletaId == pt.id else it.entregaId == null || it.entregaId == pt.id }
+        val tipos = doPonto.map { it.categoriaId to it.descricao }.distinct()
+        com.pwexpress.core.mapa.PinoMapa(pt.lat!!, pt.lng!!, pt.coleta, false, pt.status == "concluido", numero = i + 1,
+            icone = if (pt.coleta && tipos.size != 1) "store" else categorias.firstOrNull { it.id == doPonto.firstOrNull()?.categoriaId }?.icone ?: (if (pt.coleta) "store" else "package"),
+            mais = (tipos.size - 1).coerceAtLeast(0))
+    }
     // rota que leva este pedido (mesmos endereços, criada depois dele)
     val rota = dados.corridas.firstOrNull { cor -> cor.teste == p.teste && cor.status != "cancelada" && cor.criadaEm >= p.criadoEm - 60_000 &&
         cor.paradas.any { pa -> p.pontos.any { it.endereco == pa.endereco } } }
@@ -663,10 +672,10 @@ internal fun MapaPedidoG(p: PedidoG, altura: androidx.compose.ui.unit.Dp = 220.d
         val feito = com.pwexpress.core.mapa.rememberTrilhaCorrida(rota?.takeIf { it.motoboyId != null }?.id, rota?.ativa == true)
         val posMoto = moto?.takeIf { rota?.ativa == true }?.let { it.lat to it.lng }
         com.pwexpress.core.mapa.PwMapa(paradas = pinos, rota = rota?.rota, minhaPosicao = null, marcadores = listOfNotNull(moto),
-            modifier = Modifier.fillMaxSize(), enquadrar = "${p.id}-${pinos.size}-${moto != null}", focar = foco,
+            modifier = Modifier.fillMaxSize(), enquadrar = "${p.id}-${pinos.size}-${moto != null}", focar = foco, tituloTelaCheia = "Pedido ${p.numeroExibicao}",
             trilhas = if (feito.size >= 2) listOf(com.pwexpress.core.mapa.TrilhaMapa(feito + listOfNotNull(posMoto))) else emptyList(),
             restanteDe = posMoto)
-        if (rota != null) Row(Modifier.align(Alignment.TopStart).padding(10.dp)) {
+        if (rota != null) Row(Modifier.align(Alignment.TopEnd).padding(10.dp)) {
             PwSelo("Rota ${rota.numeroExibicao}" + (rota.motoboyId?.let { " · ${dados.membro(it)?.nome?.substringBefore(" ") ?: ""}" } ?: ""), c.ouro, icone = PwIcones.Route)
         }
     }
@@ -740,11 +749,17 @@ private fun DetalhesPedidoG(p: PedidoG, onFocar: (Double, Double) -> Unit = { _,
 
 /** Como o valor foi calculado (as mesmas linhas do site). */
 @Composable
-internal fun OrcamentoG(o: kotlinx.serialization.json.JsonObject) {
+internal fun OrcamentoG(o: kotlinx.serialization.json.JsonObject, pontos: List<com.pwexpress.feature.gestor.data.PontoPedidoG> = emptyList()) {
     val c = Pw.cores
     fun num(e: kotlinx.serialization.json.JsonElement?) = (e as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull()
     fun txt(e: kotlinx.serialization.json.JsonElement?) = (e as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { it !is kotlinx.serialization.json.JsonNull }?.content
-    com.pwexpress.core.designsystem.PwRotulo("Como chegou no valor")
+    var noMapa by com.pwexpress.core.designsystem.lembrarLigado("orcamento_no_mapa", false)
+    val comMapa = pontos.count { it.lat != null && it.lng != null } >= 2
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        com.pwexpress.core.designsystem.PwRotulo("Como chegou no valor", Modifier.weight(1f))
+        if (comMapa) PwPilula(if (noMapa) "Esconder mapa" else "Ver no mapa", PwIcones.Mapa, { noMapa = !noMapa }, ligada = noMapa)
+    }
+    if (comMapa && noMapa) OrcamentoNoMapaG(o, pontos)
     if (txt(o["editado"]) == "true") TextoDica("Mudado à mão" + (txt(o["motivo"])?.let { ": $it" } ?: "") + (num((o["original"] as? kotlinx.serialization.json.JsonObject)?.get("total"))?.let { " · era ${moedaBr(it)}" } ?: ""))
     if (txt(o["modo_distancia"]) == "soma_entregas") TextoDica("Distância: coleta → cada entrega, somadas.")
     Spacer(Modifier.size(4.dp))
@@ -783,6 +798,33 @@ internal fun OrcamentoG(o: kotlinx.serialization.json.JsonObject) {
         (if (txt(o["perigoso"]) == "true") " · perigoso" else ""))
 }
 
+
+/**
+ * O orçamento desenhado: coleta e entregas numeradas, uma linha da coleta até cada entrega
+ * e, no meio de cada linha, quanto aquela entrega custou (km × valor).
+ */
+@Composable
+private fun OrcamentoNoMapaG(o: kotlinx.serialization.json.JsonObject, pontos: List<com.pwexpress.feature.gestor.data.PontoPedidoG>) {
+    val c = Pw.cores
+    val validos = pontos.filter { it.lat != null && it.lng != null }
+    val coleta = validos.firstOrNull { it.coleta } ?: return
+    val entregas = validos.filter { !it.coleta }
+    val linhas = (o["linhas"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it as? kotlinx.serialization.json.JsonObject }.orEmpty()
+    fun valorEntrega(i: Int) = linhas.firstOrNull { (it["chave"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "entrega_${i + 1}" }
+        ?.let { (it["valor"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull() }
+    val pinos = listOf(com.pwexpress.core.mapa.PinoMapa(coleta.lat!!, coleta.lng!!, true, false, false, icone = "store", numero = 1)) +
+        entregas.mapIndexed { i, e -> com.pwexpress.core.mapa.PinoMapa(e.lat!!, e.lng!!, false, false, false, numero = i + 2) }
+    val linhasMapa = entregas.map { e -> com.pwexpress.core.mapa.TrilhaMapa(listOf(coleta.lat to coleta.lng, e.lat!! to e.lng!!)) }
+    val rotulos = entregas.mapIndexedNotNull { i, e ->
+        valorEntrega(i)?.let { v -> com.pwexpress.core.mapa.MarcadorMapa("orc_$i", (coleta.lat + e.lat!!) / 2, (coleta.lng + e.lng!!) / 2, corHex(c.ouro), moedaBr(v), pino = false, prioridade = 2) }
+    }
+    val forma = RoundedCornerShape(16.dp)
+    Box(Modifier.fillMaxWidth().padding(vertical = 6.dp).height(220.dp).clip(forma).border(1.dp, c.borda, forma)) {
+        com.pwexpress.core.mapa.PwMapa(paradas = pinos, rota = null, minhaPosicao = null, caminhoAuto = false, trilhas = linhasMapa, marcadores = rotulos, legenda = false,
+            modifier = Modifier.fillMaxSize(), enquadrar = pinos.size, tituloTelaCheia = "Como chegou no valor")
+    }
+    TextoDica("Cada linha vai da coleta até uma entrega; o valor no meio é o que aquela entrega custou.")
+}
 
 /** "Mudar o cálculo": cada linha (quantidade × valor), os percentuais, o mínimo e o motivo. Igual ao site. */
 @Composable

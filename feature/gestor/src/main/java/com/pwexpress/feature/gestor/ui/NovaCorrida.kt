@@ -407,7 +407,7 @@ fun NovaCorridaG(onVoltar: () -> Unit, onCriada: (String) -> Unit) {
             if (divisaoPropria) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     PwCampo(repasseCorrida, { repasseCorrida = it }, "Motoboy %", Modifier.weight(1f), dica = numeroBr(empresa?.repassePct ?: cfg.numero("repasse_motoboy_pct", 67.5)), teclado = androidx.compose.ui.text.input.KeyboardType.Decimal)
-                    PwCampo(devCorrida, { devCorrida = it }, "Dev %", Modifier.weight(1f), dica = numeroBr(empresa?.devPct ?: cfg.numero("dev_pct", 5.0)), teclado = androidx.compose.ui.text.input.KeyboardType.Decimal)
+                    if (com.pwexpress.core.perfil.Perfis.perfil.value?.dev == true) PwCampo(devCorrida, { devCorrida = it }, "Plataforma %", Modifier.weight(1f), dica = numeroBr(empresa?.devPct ?: cfg.numero("dev_pct", 5.0)), teclado = androidx.compose.ui.text.input.KeyboardType.Decimal)
                 }
             }
             Espaco(8)

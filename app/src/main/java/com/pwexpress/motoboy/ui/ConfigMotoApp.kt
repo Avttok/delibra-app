@@ -87,7 +87,8 @@ private fun CartaoIconeEmpresa() {
     val marca by com.pwexpress.core.marca.MarcaEmpresa.marca.collectAsState()
     val versao by com.pwexpress.core.marca.MarcaEmpresa.versaoIcone.collectAsState()
     val escopo = rememberCoroutineScope()
-    val m = marca?.takeIf { it.logoUrl != null } ?: return
+    val m = marca?.takeIf { it.propria } ?: return
+    val nomeApp = m.nomeExibido ?: m.nome
     val pode = remember(versao) { com.pwexpress.core.marca.MarcaEmpresa.podeFixar(ctx) }
     PwCartao {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -98,14 +99,14 @@ private fun CartaoIconeEmpresa() {
         Row(verticalAlignment = Alignment.CenterVertically) {
             com.pwexpress.core.designsystem.PwSeloLogo(52.dp)
             Spacer(Modifier.width(12.dp))
-            Text("Coloque o ícone da ${m.nome} na tela do celular. Ele abre o app direto.", color = c.texto2, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            Text("Coloque o ícone do $nomeApp na tela do celular. Ele abre o app direto.", color = c.texto2, fontSize = 13.sp, modifier = Modifier.weight(1f))
         }
         Spacer(Modifier.height(10.dp))
         PwBotaoOuro(if (pode) "Adicionar à tela inicial" else "Baixando o ícone…", icone = PwIcones.ImagePlus, altura = 50.dp, habilitado = pode,
             onClick = {
                 escopo.launch {
                     val ok = com.pwexpress.core.marca.MarcaEmpresa.fixarNaTelaInicial(ctx)
-                    if (ok) PwToast.mostrar("Confirme no aviso do celular para colocar o ícone.", titulo = "Ícone da ${m.nome}")
+                    if (ok) PwToast.mostrar("Confirme no aviso do celular para colocar o ícone.", titulo = nomeApp)
                     else PwToast.mostrar("Este celular não deixa adicionar atalhos.", TipoAviso.ERRO)
                 }
             })

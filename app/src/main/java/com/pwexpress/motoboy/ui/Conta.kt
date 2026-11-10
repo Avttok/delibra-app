@@ -112,6 +112,7 @@ fun JanelaConta(
 
     var conquistas by remember { mutableStateOf(false) }
     var raio by remember { mutableStateOf(false) }
+    var empresa by remember { mutableStateOf(false) }
     val ehMotoboy = painel == Painel.MOTOBOY && perfil?.motoboy == true
     com.pwexpress.core.designsystem.PwTelaCheia("Sua conta", onFechar) {
         // cabeçalho: foto grande, nome, e-mail, empresa e o cargo principal (toque edita o perfil)
@@ -139,6 +140,7 @@ fun JanelaConta(
             if (perfil?.motoboy == true) add(Triple(PwIcones.Trophy, "Conquistas", { conquistas = true }))
             add(Triple(PwIcones.SlidersHorizontal, "Ajustes", onConfiguracoes))
             if (ehMotoboy) add(Triple(PwIcones.Radar, "Raio", { raio = true }))
+            if (perfil?.dev == true || (perfil?.gestor == true && perfil?.supervisor != true)) add(Triple(PwIcones.Landmark, "Minha empresa", { empresa = true }))
             if (perfil?.dev == true) add(Triple(PwIcones.CodeXml, "Console Dev", onDev))
         }
         atalhos.chunked(2).forEach { linha ->
@@ -230,6 +232,7 @@ fun JanelaConta(
     }
     if (conquistas) com.pwexpress.core.perfil.JanelaConquistas(onFechar = { conquistas = false })
     if (raio) JanelaRaio(onFechar = { raio = false })
+    if (empresa) JanelaMinhaEmpresa(onFechar = { empresa = false })
 }
 
 /** Bloco grande de atalho (ícone em cima, nome embaixo). */

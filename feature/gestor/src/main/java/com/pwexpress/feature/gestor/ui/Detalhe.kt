@@ -159,9 +159,9 @@ fun DetalheCorridaG(id: String, onVoltar: () -> Unit) {
                     PwNumero(if (corrida.pagCalculo != null && corrida.pagCalculo["modo"]?.toString()?.contains("percentual") != true) "Motoboy (por km)" else "Motoboy ${corrida.repassePct?.let { numeroBr(it) } ?: "—"}%", moedaBr(corrida.valorMotoboy), Modifier.weight(1f), icone = PwIcones.Bike)
                     PwNumero("Gestão", moedaBr(corrida.valorGestao), Modifier.weight(1f), icone = PwIcones.Landmark)
                 }
-                if ((corrida.valorDev ?: 0.0) > 0) {
+                if ((corrida.valorDev ?: 0.0) > 0 && com.pwexpress.core.perfil.Perfis.perfil.value?.dev == true) {
                     Espaco(8)
-                    PwNumero("Dev ${corrida.devPct?.let { numeroBr(it) } ?: "—"}%", moedaBr(corrida.valorDev), Modifier.fillMaxWidth(), icone = PwIcones.CodeXml)
+                    PwNumero("Plataforma ${corrida.devPct?.let { numeroBr(it) } ?: "—"}%", moedaBr(corrida.valorDev), Modifier.fillMaxWidth(), icone = PwIcones.CodeXml)
                 }
             }
             Espaco(6)

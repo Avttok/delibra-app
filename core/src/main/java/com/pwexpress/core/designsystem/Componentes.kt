@@ -226,11 +226,11 @@ fun PwLogo(modifier: Modifier = Modifier, tamanho: Int = 26, soSelo: Boolean = f
     }
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         val empresa by com.pwexpress.core.marca.MarcaEmpresa.marca.collectAsState()
-        val propria = empresa?.takeIf { it.logoUrl != null }
-        PwSeloLogo((tamanho * 1.35f).dp, descricao = propria?.nome ?: "Delibra")
+        val propria = empresa?.nomeExibido
+        PwSeloLogo((tamanho * 1.35f).dp, descricao = propria ?: "Delibra")
         Spacer(Modifier.width((tamanho * 0.3f).dp))
         Text(
-            propria?.nome ?: "delibra",
+            propria ?: "delibra",
             color = c.texto,
             fontFamily = Archivo,
             fontWeight = FontWeight.ExtraBold,
@@ -248,7 +248,7 @@ fun PwLogoGrande(tamanho: Dp, modifier: Modifier = Modifier) {
         PwSeloLogo(tamanho)
         val empresa by com.pwexpress.core.marca.MarcaEmpresa.marca.collectAsState()
         Text(
-            empresa?.takeIf { it.logoUrl != null }?.nome?.uppercase() ?: "DELIBRA", color = Pw.cores.texto2, fontFamily = Archivo, fontWeight = FontWeight.Light,
+            empresa?.nomeExibido?.uppercase() ?: "DELIBRA", color = Pw.cores.texto2, fontFamily = Archivo, fontWeight = FontWeight.Light,
             fontSize = (tamanho.value * 0.09f).coerceAtLeast(12f).sp, letterSpacing = (tamanho.value * 0.055f).sp, maxLines = 1,
         )
     }

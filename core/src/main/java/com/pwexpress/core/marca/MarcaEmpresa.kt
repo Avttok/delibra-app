@@ -29,7 +29,11 @@ import java.net.URL
  * virar o ícone do atalho na tela inicial do celular. Fica guardada no aparelho: o app já abre
  * com ela, mesmo sem internet.
  */
-data class Marca(val nome: String, val logoUrl: String?, val cor: String?)
+data class Marca(val nome: String, val logoUrl: String?, val cor: String?, val nomeApp: String? = null) {
+    /** Nome no lugar de "Delibra": o escolhido pela empresa, ou o da empresa quando ela tem ícone. */
+    val nomeExibido: String? get() = nomeApp ?: nome.takeIf { logoUrl != null }
+    val propria: Boolean get() = logoUrl != null || nomeApp != null
+}
 
 object MarcaEmpresa {
     private const val PREFS = "delibra_marca"
@@ -52,7 +56,7 @@ object MarcaEmpresa {
         app = ctx.applicationContext
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val nome = p.getString("nome", null)
-        if (nome != null) _marca.value = Marca(nome, p.getString("logo", null), p.getString("cor", null))
+        if (nome != null) _marca.value = Marca(nome, p.getString("logo", null), p.getString("cor", null), p.getString("nome_app", null))
         val f = arquivo(ctx)
         if (f.exists() && _marca.value?.logoUrl != null) icone = runCatching { BitmapFactory.decodeFile(f.path) }.getOrNull()
     }
@@ -64,10 +68,11 @@ object MarcaEmpresa {
         if (antes == m) return
         _marca.value = m
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().apply {
-            if (m == null) clear() else { putString("nome", m.nome); putString("logo", m.logoUrl); putString("cor", m.cor) }
+            if (m == null) clear() else { putString("nome", m.nome); putString("logo", m.logoUrl); putString("cor", m.cor); putString("nome_app", m.nomeApp) }
         }.apply()
         if (m?.logoUrl == null) {
             icone = null; arquivo(ctx).delete(); _versaoIcone.value++
+            atualizarAtalho(ctx)
             return
         }
         if (antes?.logoUrl != m.logoUrl || icone == null) escopo.launch {
@@ -92,7 +97,7 @@ object MarcaEmpresa {
 
     /** Ícone "adaptável" (com margem de segurança) para o atalho da tela inicial. */
     private fun iconeAtalho(): Bitmap? {
-        val b = icone ?: return null
+        val b = icone ?: app?.let { runCatching { BitmapFactory.decodeResource(it.resources, com.pwexpress.core.R.drawable.pwex_marca_ouro) }.getOrNull() } ?: return null
         val lado = 432; val dentro = (lado * 0.66f).toInt()
         val saida = Bitmap.createBitmap(lado, lado, Bitmap.Config.ARGB_8888)
         val tela = Canvas(saida)
@@ -103,7 +108,7 @@ object MarcaEmpresa {
         return saida
     }
 
-    fun podeFixar(ctx: Context) = icone != null && ShortcutManagerCompat.isRequestPinShortcutSupported(ctx)
+    fun podeFixar(ctx: Context) = (icone != null || _marca.value?.logoUrl == null) && _marca.value?.propria == true && ShortcutManagerCompat.isRequestPinShortcutSupported(ctx)
 
     /**
      * Pede ao celular para colocar na tela inicial um atalho com o ícone e o nome da empresa.
@@ -115,8 +120,8 @@ object MarcaEmpresa {
         val m = _marca.value ?: return@withContext false
         val abrir = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)?.apply { action = Intent.ACTION_MAIN } ?: return@withContext false
         val atalho = ShortcutInfoCompat.Builder(ctx, "marca_empresa")
-            .setShortLabel(m.nome.take(24))
-            .setLongLabel(m.nome)
+            .setShortLabel((m.nomeExibido ?: "Delibra").take(24))
+            .setLongLabel(m.nomeExibido ?: "Delibra")
             .setIcon(IconCompat.createWithAdaptiveBitmap(bmp))
             .setIntent(abrir)
             .build()
@@ -135,7 +140,7 @@ object MarcaEmpresa {
             if (ShortcutManagerCompat.getShortcuts(ctx, ShortcutManagerCompat.FLAG_MATCH_PINNED).none { it.id == "marca_empresa" }) return
             val abrir = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)?.apply { action = Intent.ACTION_MAIN } ?: return
             ShortcutManagerCompat.updateShortcuts(ctx, listOf(ShortcutInfoCompat.Builder(ctx, "marca_empresa")
-                .setShortLabel(m.nome.take(24)).setLongLabel(m.nome).setIcon(IconCompat.createWithAdaptiveBitmap(bmp)).setIntent(abrir).build()))
+                .setShortLabel((m.nomeExibido ?: "Delibra").take(24)).setLongLabel(m.nomeExibido ?: "Delibra").setIcon(IconCompat.createWithAdaptiveBitmap(bmp)).setIntent(abrir).build()))
         }
     }
 }

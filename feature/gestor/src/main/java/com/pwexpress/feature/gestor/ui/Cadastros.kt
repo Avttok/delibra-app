@@ -96,6 +96,7 @@ import com.pwexpress.feature.gestor.data.Geo
 import com.pwexpress.feature.gestor.data.Gestao
 import com.pwexpress.feature.gestor.data.ItemRegistro
 import com.pwexpress.feature.gestor.data.PARAMETROS
+import com.pwexpress.feature.gestor.data.PARAMETROS_VISIVEIS
 import com.pwexpress.feature.gestor.data.Param
 import com.pwexpress.feature.gestor.data.Precos
 import com.pwexpress.feature.gestor.data.logico
@@ -308,7 +309,6 @@ fun EmpresaG(id: String?, onVoltar: () -> Unit) {
             Espaco(6)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PwCampo(repasse, { repasse = it }, "Motoboy %", Modifier.weight(1f), dica = numeroBr(dados.config.numero("repasse_motoboy_pct", 67.5)), teclado = KeyboardType.Decimal)
-                PwCampo(devPct, { devPct = it }, "Dev %", Modifier.weight(1f), dica = numeroBr(dados.config.numero("dev_pct", 5.0)), teclado = KeyboardType.Decimal)
             }
         }
         PwCartao {
@@ -352,7 +352,7 @@ fun EmpresaG(id: String?, onVoltar: () -> Unit) {
             if (d.isNotEmpty() && d.length != 14) { erro = "CNPJ deve ter 14 dígitos."; return@PwBotaoOuro }
             if (dCpf.isNotEmpty() && !cpfValido(dCpf)) { erro = "CPF inválido."; return@PwBotaoOuro }
             val pr = num(repasse); val pd = num(devPct)
-            if ((pr ?: 0.0) + (pd ?: 0.0) > 100 || (pr ?: 0.0) < 0 || (pd ?: 0.0) < 0) { erro = "A soma de motoboy + Dev não pode passar de 100%."; return@PwBotaoOuro }
+            if ((pr ?: 0.0) + (pd ?: 0.0) > 100 || (pr ?: 0.0) < 0 || (pd ?: 0.0) < 0) { erro = "A parte do motoboy fica entre 0 e 100%."; return@PwBotaoOuro }
             val linha = buildJsonObject {
                 put("tipo", tipo); put("cpf", dCpf.ifEmpty { null }); put("pode_express", podeExpress)
                 put("pagamento_metodos", kotlinx.serialization.json.buildJsonArray { metodos.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } })
@@ -880,7 +880,7 @@ private fun ClientesCarteiraG(onVoltar: (() -> Unit)?, abas: @Composable () -> U
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(nome, color = c.texto, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        TextoDica("${cs.size} rota${if (cs.size == 1) "" else "s"} · gestão ${moedaBr(cs.sumOf { it.valorGestao ?: 0.0 })} · Dev ${moedaBr(cs.sumOf { it.valorDev ?: 0.0 })}")
+                        TextoDica("${cs.size} rota${if (cs.size == 1) "" else "s"} · gestão ${moedaBr(cs.sumOf { (it.valor ?: 0.0) - (it.valorMotoboy ?: 0.0) })}")
                     }
                     Text(moedaBr(cs.sumOf { it.valor ?: 0.0 }), color = c.texto, fontWeight = FontWeight.Bold)
                 }
@@ -889,7 +889,7 @@ private fun ClientesCarteiraG(onVoltar: (() -> Unit)?, abas: @Composable () -> U
     }
 }
 
-/** Carteira · Extrato: cada rota com a divisão (motoboy, gestão, Dev), com busca e planilha. */
+/** Carteira · Extrato: cada rota com a divisão (motoboy e gestão), com busca e planilha. */
 @Composable
 private fun ExtratoCarteiraG(onVoltar: (() -> Unit)?, abas: @Composable () -> Unit) {
     val c = Pw.cores
@@ -910,11 +910,11 @@ private fun ExtratoCarteiraG(onVoltar: (() -> Unit)?, abas: @Composable () -> Un
         if (x.isEmpty()) { PwVazio("Nenhuma rota aqui.", icone = PwIcones.ReceiptText); return@PwPagina }
         PwBotaoVidro("Compartilhar planilha (CSV)", onClick = {
             val csv = buildString {
-                appendLine("Corrida;Quando;Cliente;Motoboy;Valor;Motoboy (R$);Gestão;Dev")
+                appendLine("Corrida;Quando;Cliente;Motoboy;Valor;Motoboy (R$);Gestão")
                 x.forEach { cor ->
                     appendLine(listOf(cor.numeroExibicao, java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale("pt", "BR")).format(java.util.Date(cor.concluidaEm ?: cor.criadaEm)),
                         clienteDaCorrida(cor, dados), cor.motoboyId?.let { dados.membro(it)?.nome } ?: cor.motoboyNomeArquivado ?: "",
-                        cor.valor ?: 0.0, cor.valorMotoboy ?: 0.0, cor.valorGestao ?: 0.0, cor.valorDev ?: 0.0).joinToString(";") { it.toString().replace(';', ',') })
+                        cor.valor ?: 0.0, cor.valorMotoboy ?: 0.0, (cor.valor ?: 0.0) - (cor.valorMotoboy ?: 0.0)).joinToString(";") { it.toString().replace(';', ',') })
                 }
             }
             tentar {
@@ -928,7 +928,7 @@ private fun ExtratoCarteiraG(onVoltar: (() -> Unit)?, abas: @Composable () -> Un
                     Column(Modifier.weight(1f)) {
                         Text("${cor.numeroExibicao} · ${clienteDaCorrida(cor, dados)}", color = c.texto, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         TextoDica("${dataHora(cor.concluidaEm ?: cor.criadaEm)} · ${cor.motoboyId?.let { dados.membro(it)?.nome } ?: cor.motoboyNomeArquivado ?: "—"}")
-                        TextoDica("Motoboy ${moedaBr(cor.valorMotoboy)} · gestão ${moedaBr(cor.valorGestao)} · Dev ${moedaBr(cor.valorDev)}")
+                        TextoDica("Motoboy ${moedaBr(cor.valorMotoboy)} · gestão ${moedaBr((cor.valor ?: 0.0) - (cor.valorMotoboy ?: 0.0))}")
                     }
                     Text(moedaBr(cor.valor), color = c.texto, fontWeight = FontWeight.Bold)
                 }
@@ -969,13 +969,13 @@ private fun PixCarteiraG(onVoltar: (() -> Unit)?, abas: @Composable () -> Unit) 
 
 /**
  * "Para onde vai esse valor": uma barra e três linhas que sempre somam o total.
- * O que fica com o gestor é o total menos motoboys e Dev (o mesmo número do site).
+ * O que fica com o gestor é o total menos os motoboys (o mesmo número do site).
  */
 @Composable
 internal fun ParaOndeVai(total: Double, motoboys: Double, dev: Double) {
     val c = Pw.cores
-    val gestor = (total - motoboys - dev).coerceAtLeast(0.0)
-    val partes = listOf(Triple("Motoboys", motoboys, c.verde), Triple("Fica com o gestor", gestor, c.ouro), Triple("Dev", dev, c.violeta))
+    val gestor = (total - motoboys).coerceAtLeast(0.0)
+    val partes = listOf(Triple("Motoboys", motoboys, c.verde), Triple("Fica com o gestor", gestor, c.ouro))
     PwCartao {
         PwRotulo("Para onde vai esse valor")
         Espaco(8)
@@ -996,7 +996,7 @@ internal fun ParaOndeVai(total: Double, motoboys: Double, dev: Double) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Total", color = c.texto2, modifier = Modifier.weight(1f)); Text(moedaBr(total), color = c.texto, fontWeight = FontWeight.Black)
         }
-        TextoDica("Motoboys + gestor + Dev = o valor das rotas. O que é \"a repassar\" a cada motoboy está logo abaixo.")
+        TextoDica("Motoboys + gestor = o valor das rotas. O que é \"a repassar\" a cada motoboy está logo abaixo.")
     }
 }
 
@@ -1039,7 +1039,7 @@ private fun ResumoCarteiraG(onVoltar: (() -> Unit)?, abas: @Composable () -> Uni
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(dados.membro(mid)?.nome ?: cs.first().motoboyNomeArquivado ?: "—", color = c.texto, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        TextoDica("${cs.size} corrida${if (cs.size == 1) "" else "s"} · faturou ${moedaBr(cs.sumOf { it.valor ?: 0.0 })} · gestão ${moedaBr(cs.sumOf { it.valorGestao ?: 0.0 })}")
+                        TextoDica("${cs.size} corrida${if (cs.size == 1) "" else "s"} · faturou ${moedaBr(cs.sumOf { it.valor ?: 0.0 })} · gestão ${moedaBr(cs.sumOf { (it.valor ?: 0.0) - (it.valorMotoboy ?: 0.0) })}")
                         TextoDica(chaves[mid]?.let { "PIX: $it" } ?: "Sem chave PIX cadastrada")
                     }
                     Spacer(Modifier.width(8.dp))
@@ -1057,7 +1057,7 @@ private fun ResumoCarteiraG(onVoltar: (() -> Unit)?, abas: @Composable () -> Uni
                 Espaco(8)
                 val nome = when { k == "—" -> "Avulso (sem nome)"; k.startsWith("avulso:") -> "${k.removePrefix("avulso:")} (avulso)"; else -> dados.empresa(k)?.nome ?: "—" }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) { Text(nome, color = c.texto, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis); TextoDica("${cs.size} corrida${if (cs.size == 1) "" else "s"} · gestão ${moedaBr(cs.sumOf { it.valorGestao ?: 0.0 })} · Dev ${moedaBr(cs.sumOf { it.valorDev ?: 0.0 })}") }
+                    Column(Modifier.weight(1f)) { Text(nome, color = c.texto, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis); TextoDica("${cs.size} corrida${if (cs.size == 1) "" else "s"} · gestão ${moedaBr(cs.sumOf { (it.valor ?: 0.0) - (it.valorMotoboy ?: 0.0) })}") }
                     Spacer(Modifier.width(8.dp))
                     Text(moedaBr(cs.sumOf { it.valor ?: 0.0 }), color = c.texto, fontWeight = FontWeight.Bold)
                 }
@@ -1071,7 +1071,7 @@ private fun ResumoCarteiraG(onVoltar: (() -> Unit)?, abas: @Composable () -> Uni
                     Column(Modifier.weight(1f)) {
                         Text("${k.numeroExibicao} · ${dados.cliente(k)}", color = c.texto, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         TextoDica("${k.concluidaEm?.let { dataHora(it) } ?: ""} · ${dados.nomeMotoboy(k) ?: "—"}")
-                        TextoDica("Motoboy ${moedaBr(k.valorMotoboy)} · gestão ${moedaBr(k.valorGestao)} · Dev ${moedaBr(k.valorDev)}")
+                        TextoDica("Motoboy ${moedaBr(k.valorMotoboy)} · gestão ${moedaBr((k.valor ?: 0.0) - (k.valorMotoboy ?: 0.0))}")
                     }
                     Spacer(Modifier.width(8.dp))
                     Text(moedaBr(k.valor), color = c.texto, fontWeight = FontWeight.Bold)
@@ -1126,14 +1126,14 @@ fun ConfiguracoesG(onVoltar: (() -> Unit)?, onAbrir: (TelaG) -> Unit = {}) {
         else TituloTela("Ajustes", "Valem para todo o sistema · salvam sozinhos", PwIcones.Settings2)
         PwCampo(busca, { busca = it }, "Buscar em todos os ajustes…")
         val termo = sem(busca.trim())
-        val nMudados = PARAMETROS.count(::mudado)
+        val nMudados = PARAMETROS_VISIVEIS.count(::mudado)
         PwInterruptor("Só o que mudei do padrão", soMudados, { soMudados = it }, descricao = if (nMudados == 0) "Tudo está no padrão." else "$nMudados ajuste${if (nMudados == 1) "" else "s"} diferente${if (nMudados == 1) "" else "s"} do padrão.")
         if (termo.isEmpty() && !soMudados) {
             // áreas (como no site): cada uma junta seções parecidas
-            PwFiltros(AREAS_CONFIG.map { a -> a.titulo to PARAMETROS.count { grupoArea[it.grupo] == a.chave && mudado(it) } }, area, { area = it; secao = null })
+            PwFiltros(AREAS_CONFIG.map { a -> a.titulo to PARAMETROS_VISIVEIS.count { grupoArea[it.grupo] == a.chave && mudado(it) } }, area, { area = it; secao = null })
             val a = AREAS_CONFIG.getOrNull(area)
             if (a != null) TextoDica(a.descricao)
-            val secoes = GRUPOS_CONFIG.filter { it.area == a?.chave && PARAMETROS.any { p -> p.grupo == it.chave } }
+            val secoes = GRUPOS_CONFIG.filter { it.area == a?.chave && PARAMETROS_VISIVEIS.any { p -> p.grupo == it.chave } }
             if (secoes.size > 1) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 com.pwexpress.core.designsystem.PwPilula("Todas", PwIcones.Lista, { secao = null }, ligada = secao == null)
                 secoes.forEach { g -> com.pwexpress.core.designsystem.PwPilula(g.titulo, PwIcones.SlidersHorizontal, { secao = if (secao == g.chave) null else g.chave }, ligada = secao == g.chave) }
@@ -1155,9 +1155,9 @@ fun ConfiguracoesG(onVoltar: (() -> Unit)?, onAbrir: (TelaG) -> Unit = {}) {
         }
         val a = AREAS_CONFIG.getOrNull(area)
         val lista = when {
-            termo.isNotEmpty() -> PARAMETROS.filter { sem("${it.rotulo} ${it.descricao} ${it.chave}").contains(termo) }.filter { !soMudados || mudado(it) }
-            soMudados -> PARAMETROS.filter(::mudado)
-            else -> PARAMETROS.filter { grupoArea[it.grupo] == a?.chave && (secao == null || it.grupo == secao) }
+            termo.isNotEmpty() -> PARAMETROS_VISIVEIS.filter { sem("${it.rotulo} ${it.descricao} ${it.chave}").contains(termo) }.filter { !soMudados || mudado(it) }
+            soMudados -> PARAMETROS_VISIVEIS.filter(::mudado)
+            else -> PARAMETROS_VISIVEIS.filter { grupoArea[it.grupo] == a?.chave && (secao == null || it.grupo == secao) }
         }
         val souDev = com.pwexpress.core.perfil.Perfis.perfil.collectAsState().value?.dev == true
         GRUPOS_CONFIG.forEach { g ->
@@ -1210,14 +1210,13 @@ private fun ExemploConfig(grupo: String, cfg: Map<String, kotlinx.serialization.
             }
         }
         "pagamento" -> {
-            val pct = cfg.numero("repasse_motoboy_pct", 67.5); val dev = cfg.numero("dev_pct", 5.0)
-            val origem = cfg.textoCfg("dev_origem", "gestor")
-            val pDev = r2(dev); val teto = r2(100 - pDev)
-            val pMoto = minOf(teto, r2(when (origem) { "total" -> (100 - pDev) * pct / 100; "proporcional" -> pct * (1 - dev / 100); else -> pct }))
+            val pct = cfg.numero("repasse_motoboy_pct", 67.5)
+            val teto = 100.0
+            val pMoto = minOf(teto, r2(pct))
             PwCartao(cor = c.ouro.copy(alpha = 0.5f)) {
                 PwRotulo("Exemplo: rota de R$ 100,00")
-                if (cfg.textoCfg("pag_modo", "zonas") == "percentual") Text("Motoboy ${moedaBr(pMoto)} · Gestor ${moedaBr(r2(100 - pMoto - pDev))} · Dev ${moedaBr(pDev)}", color = c.texto, fontWeight = FontWeight.Bold)
-                TextoDica("O motoboy nunca leva mais que a rota paga: no máximo ${moedaBr(teto)} (a rota menos o Dev), por km, zona ou percentual, com ajuste ou sem.")
+                if (cfg.textoCfg("pag_modo", "zonas") == "percentual") Text("Motoboy ${moedaBr(pMoto)} · Gestor ${moedaBr(r2(100 - pMoto))}", color = c.texto, fontWeight = FontWeight.Bold)
+                TextoDica("O motoboy nunca leva mais que a rota paga: no máximo ${moedaBr(teto)}, por km, zona ou percentual, com ajuste ou sem.")
             }
         }
         "pag_zonas" -> {

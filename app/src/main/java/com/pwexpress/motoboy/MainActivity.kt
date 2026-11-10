@@ -91,6 +91,9 @@ class MainActivity : ComponentActivity() {
                     val perfil by Perfis.perfil.collectAsState()
                     var noPerfil by remember { mutableStateOf(false) }
                     var naConfig by remember { mutableStateOf(false) }
+                    // o raio tem janela própria (atalho "Sem raio definido" / "Raio N km" no Início)
+                    var raioAberto by remember { mutableStateOf(false) }
+                    if (raioAberto) com.pwexpress.motoboy.ui.JanelaRaio(onFechar = { raioAberto = false })
                     var simulador by remember { mutableStateOf(false) }
                     var conta by remember { mutableStateOf(false) }
                     var aba by rememberSaveable { mutableStateOf("inicio") }
@@ -231,7 +234,7 @@ class MainActivity : ComponentActivity() {
                                         else -> TrackingScreen(
                                             saudacao = NomePerfil(s.email).substringBefore(" "),
                                             extras = { CartaoGanhos(onCarteira = if (comCarteira) ({ aba = "carteira" }) else null) },
-                                            chips = { com.pwexpress.feature.tracking.ui.ChipInicio(PwIcones.Radar, com.pwexpress.motoboy.ui.textoRaio(p?.raioKm, p?.raioModo ?: "posicao")) { naConfig = true } },
+                                            chips = { com.pwexpress.feature.tracking.ui.ChipInicio(PwIcones.Radar, com.pwexpress.motoboy.ui.textoRaio(p?.raioKm, p?.raioModo ?: "posicao")) { raioAberto = true } },
                                             onConfiguracoes = { naConfig = true },
                                         )
                                     }

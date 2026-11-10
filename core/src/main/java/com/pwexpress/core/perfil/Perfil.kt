@@ -46,7 +46,16 @@ data class Perfil(
     val soCliente: Boolean = false,
     /** O gestor deixa este motoboy ver a aba Holerite. */
     val holeriteVisivel: Boolean = true,
+    /** Nome da empresa (transportadora) da conta na Delibra. */
+    val organizacao: String? = null,
+    /** Dev oculto: os outros veem só "Dev", com o ícone </>. */
+    val devOculto: Boolean = false,
+    /** Líder de equipe (o gestor escolhe o que ele pode). */
+    val supervisor: Boolean = false,
+    val permissoes: Map<String, Boolean> = emptyMap(),
 ) {
+    /** Supervisor pode fazer isto? (gestor e Dev podem tudo) */
+    fun pode(acao: String, padrao: Boolean = true): Boolean = dev || !supervisor || (permissoes[acao] ?: padrao)
     /** O módulo está valendo para esta conta? (sem registro = ligado; o Dev sempre vê) */
     fun modulo(chave: String): Boolean = dev || modulos[chave] != false
 
@@ -161,6 +170,13 @@ object Perfis {
     }.recoverCatching { e -> throw if (e is java.io.IOException) Exception("Sem internet.") else e }
 
     /** Dev: troca entre o tema dourado e o vermelho (vale no site também). */
+    /** Dev: ficar oculto (aparece como "Dev" com o ícone </>). */
+    suspend fun definirOculto(sim: Boolean): Result<Unit> = tentar {
+        val r = PwCore.rpc.chamar("dev_ocultar", buildJsonObject { put("p_ocultar", sim) })
+        if (!r.ok) error("Não deu para mudar agora.")
+        _perfil.value = _perfil.value?.copy(devOculto = sim)
+    }.recoverCatching { e -> throw if (e is java.io.IOException) Exception("Sem internet.") else e }
+
     suspend fun definirCorTema(cor: String): Result<Unit> = tentar {
         val r = PwCore.rpc.chamar("definir_cor_tema", buildJsonObject { put("p_cor", cor) })
         if (!r.ok) error(if (r.corpo.contains("apenas_dev")) "Só o Dev pode usar o tema vermelho." else "Erro (${r.codigo}).")
@@ -236,6 +252,10 @@ object Perfis {
             raioLat = (o["raio"] as? JsonObject)?.let { (it["lat"] as? JsonPrimitive)?.doubleOrNull },
             raioLng = (o["raio"] as? JsonObject)?.let { (it["lng"] as? JsonPrimitive)?.doubleOrNull },
             holeriteVisivel = (o["holerite_visivel"] as? JsonPrimitive)?.booleanOrNull ?: true,
+            organizacao = ((o["organizacao"] as? JsonObject)?.get("nome") as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content,
+            devOculto = bool("dev_oculto"),
+            supervisor = bool("supervisor") && !bool("dev"),
+            permissoes = (o["permissoes"] as? JsonObject)?.mapValues { (it.value as? JsonPrimitive)?.booleanOrNull ?: false } ?: emptyMap(),
             soCliente = (o["papeis"] as? kotlinx.serialization.json.JsonArray)?.map { it.jsonPrimitive.content }?.let { p -> "cliente" in p && p.none { it in listOf("gestor", "motoboy", "dev", "supervisor") } } ?: false,
         )
     }

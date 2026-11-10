@@ -69,6 +69,8 @@ object Atualizador {
     val janela: StateFlow<Boolean> = _janela.asStateFlow()
 
     val versaoInstalada: Int get() = buildAtual
+    /** Texto curto da versão instalada (menu da conta). */
+    val versaoAtual: String get() = "build $buildAtual"
 
     /** Versão obrigatória (escolhida pelo Dev) diferente da instalada: o app inteiro fica atrás da janela. */
     private val _bloqueio = MutableStateFlow<BloqueioVersao?>(null)

@@ -153,12 +153,7 @@ fun PerfilScreen(
             PwBotaoOuro(if (salvando) "Salvando…" else "Salvar", onClick = { salvar() }, icone = PwIcones.Check, habilitado = mudou && !salvando)
         }
 
-        // ---------------------------------------------------------- conquistas (motoboy)
-        if (perfil?.motoboy == true) {
-            val stats by com.pwexpress.core.perfil.Conquistas.minhas.collectAsState()
-            LaunchedEffect(Unit) { com.pwexpress.core.perfil.Conquistas.carregar() }
-            PwCartao { com.pwexpress.core.perfil.GradeConquistas(stats) }
-        }
+        // as conquistas ficam na janela própria (menu da foto → Conquistas)
 
         // ---------------------------------------------------------- veículo (motoboy)
         if (perfil?.motoboy == true) CartaoMeuVeiculo()

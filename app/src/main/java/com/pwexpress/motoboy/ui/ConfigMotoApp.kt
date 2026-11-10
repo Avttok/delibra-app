@@ -37,6 +37,7 @@ import com.pwexpress.core.designsystem.PwBotaoVidro
 import com.pwexpress.core.designsystem.PwCabecalho
 import com.pwexpress.core.designsystem.PwCartao
 import com.pwexpress.core.designsystem.PwIcones
+import com.pwexpress.core.designsystem.PwLinhaInfo
 import com.pwexpress.core.designsystem.PwPagina
 import com.pwexpress.core.designsystem.PwRotulo
 import com.pwexpress.core.designsystem.PwSegmentado
@@ -55,15 +56,110 @@ import kotlinx.coroutines.launch
 
 private const val RAIO_MAX = 100f
 
-/** Configurações do MotoApp (menu da foto): raio de disponibilidade, aparelho, corridas novas e envio de localização. */
+/**
+ * Ajustes do MotoApp (menu da foto): saúde do aparelho num resumo, permissões, corridas novas,
+ * bateria e GPS, envio de localização e as informações do aparelho. O raio tem janela própria
+ * (toque em "Sem raio definido" / "Raio N km" no Início).
+ */
 @Composable
 fun ConfigMotoApp(onVoltar: () -> Unit, modifier: Modifier = Modifier) {
     PwPagina(modifier, padding = androidx.compose.foundation.layout.PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp)) {
-        PwCabecalho("Ajustes", onVoltar, subtitulo = "Raio, aparelho e GPS")
-        CartaoRaio()
+        PwCabecalho("Ajustes", onVoltar, subtitulo = "Aparelho, GPS e corridas")
+        ResumoAparelho()
         PainelAparelho()
         CartaoOfertas()
+        CartaoBateriaGps()
         PainelEnvio()
+        CartaoInfoAparelho()
+    }
+}
+
+/** Janela do raio de disponibilidade (aberta pelo atalho do Início ou pelo menu da foto). */
+@Composable
+fun JanelaRaio(onFechar: () -> Unit) {
+    com.pwexpress.core.designsystem.PwTelaCheia("Raio de disponibilidade", onFechar, subtitulo = "Até onde você aceita buscar uma coleta") {
+        CartaoRaio()
+    }
+}
+
+/** Resumo no topo: quantos ajustes faltam, GPS, envio e fila, num relance. */
+@Composable
+private fun ResumoAparelho() {
+    val c = Pw.cores
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val info by Tracking.info.collectAsState()
+    var perms by remember { mutableStateOf(com.pwexpress.feature.tracking.ui.Permissoes.ler(ctx)) }
+    var telaCheia by remember { mutableStateOf(com.pwexpress.feature.corridas.push.Alarme.podeTelaCheia(ctx)) }
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        perms = com.pwexpress.feature.tracking.ui.Permissoes.ler(ctx); telaCheia = com.pwexpress.feature.corridas.push.Alarme.podeTelaCheia(ctx)
+        onPauseOrDispose { }
+    }
+    val itens = listOfNotNull(perms.localizacao, perms.semRestricaoBateria, telaCheia,
+        if (android.os.Build.VERSION.SDK_INT >= 33) perms.notificacoes else null, if (android.os.Build.VERSION.SDK_INT >= 29) perms.segundoPlano else null)
+    val faltam = itens.count { !it }
+    val ok = faltam == 0
+    val cor = if (ok) c.verde else c.ouro
+    val forma = RoundedCornerShape(22.dp)
+    Column(Modifier.fillMaxWidth().clip(forma).background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(cor.copy(alpha = 0.18f), c.vidro)))
+        .border(1.dp, cor.copy(alpha = 0.45f), forma).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape).background(cor.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
+                Icon(if (ok) PwIcones.ShieldCheck else PwIcones.ShieldAlert, null, tint = cor, modifier = Modifier.size(26.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(if (ok) "Aparelho pronto" else "Falta${if (faltam == 1) "" else "m"} $faltam ajuste${if (faltam == 1) "" else "s"}", color = c.texto, fontFamily = ArchivoLargo, fontWeight = FontWeight.Black, fontSize = 19.sp)
+                Text(if (ok) "O GPS e as chamadas de corrida funcionam com a tela apagada." else "Libere abaixo para o Android não pausar o GPS nem esconder as corridas.", color = c.texto2, fontSize = 12.5.sp)
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            fun ha(t: Long?) = t?.let { val s = (System.currentTimeMillis() - it) / 1000; if (s < 60) "${s}s" else if (s < 3600) "${s / 60} min" else "${s / 3600} h" } ?: "—"
+            listOf(
+                Triple(PwIcones.Crosshair, info.ultimaPrecisao?.let { "± ${it.toInt()} m" } ?: "—", "precisão"),
+                Triple(PwIcones.Send, ha(info.ultimoEnvio), "último envio"),
+                Triple(PwIcones.Clock, info.naFila.toString(), "na fila"),
+            ).forEach { (ic, v, r) ->
+                Column(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(c.fundo2.copy(alpha = 0.6f)).padding(vertical = 10.dp, horizontal = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(ic, null, tint = c.ouro, modifier = Modifier.size(16.dp))
+                    Text(v, color = c.texto, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
+                    Text(r, color = c.texto3, fontSize = 10.5.sp, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+/** Bateria e GPS: economia de bateria e de quanto em quanto o GPS manda a posição. */
+@Composable
+private fun CartaoBateriaGps() {
+    val c = Pw.cores
+    val info by Tracking.info.collectAsState()
+    PwCartao {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(PwIcones.BatteryMedium, null, tint = c.ouro, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
+            PwRotulo("Bateria e GPS")
+        }
+        Spacer(Modifier.height(6.dp))
+        com.pwexpress.core.designsystem.PwInterruptor("Economia de bateria", info.economia, { Tracking.definirEconomia(it) }, icone = PwIcones.BatteryLow,
+            descricao = if (info.economia) "GPS a cada ${com.pwexpress.feature.tracking.Intervalos.corridaMs(true) / 1000} s em corrida: gasta menos, o mapa do gestor atualiza mais devagar."
+                else "GPS a cada ${com.pwexpress.feature.tracking.Intervalos.corridaMs(false) / 1000} s em corrida: posição mais certa para o gestor e o cliente.")
+        PwLinhaInfo(PwIcones.Radio, "Agora", info.modo.rotulo)
+    }
+}
+
+/** O aparelho e o app (o mesmo que o Dev vê no console). */
+@Composable
+private fun CartaoInfoAparelho() {
+    val c = Pw.cores
+    PwCartao {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(PwIcones.Smartphone, null, tint = c.ouro, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
+            PwRotulo("Este aparelho")
+        }
+        Spacer(Modifier.height(6.dp))
+        PwLinhaInfo(PwIcones.Smartphone, "Modelo", "${android.os.Build.MANUFACTURER.replaceFirstChar { it.uppercase() }} ${android.os.Build.MODEL}")
+        PwLinhaInfo(PwIcones.Info, "Android", "${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})")
+        PwLinhaInfo(PwIcones.Download, "Versão do app", com.pwexpress.core.update.Atualizador.versaoAtual)
     }
 }
 

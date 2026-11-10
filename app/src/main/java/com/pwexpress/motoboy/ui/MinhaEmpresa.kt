@@ -64,6 +64,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import java.io.ByteArrayOutputStream
 
+private fun com.pwexpress.core.network.HttpResposta.json(): kotlinx.serialization.json.JsonElement? =
+    corpo.takeIf { it.isNotBlank() && it != "null" }?.let { runCatching { kotlinx.serialization.json.Json.parseToJsonElement(it) }.getOrNull() }?.takeIf { it !is JsonNull }
+
 private fun JsonObject.t(k: String) = (this[k] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
 private fun JsonObject.n(k: String) = (this[k] as? JsonPrimitive)?.doubleOrNull ?: 0.0
 

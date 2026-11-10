@@ -1,6 +1,8 @@
 package com.pwexpress.feature.gestor.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -212,7 +214,7 @@ private fun JanelaPedido(p: PedidoG, empresa: String?, onFechar: () -> Unit) {
             } ?: TextoDica("Sem orçamento.")
             Spacer(Modifier.size(8.dp))
             Text("Calculado: ${moedaBr(p.valorCalculado)}" + (if (p.valorAjuste != 0.0) " · ajuste ${if (p.valorAjuste > 0) "+" else "−"}${moedaBr(kotlin.math.abs(p.valorAjuste))}" else "") +
-                (p.ajusteMotivo?.takeIf { p.valorAjuste != 0.0 }?.let { " ($it)" } ?: "") + " · Dev ${moedaBr(p.valorDev)} · " +
+                (p.ajusteMotivo?.takeIf { p.valorAjuste != 0.0 }?.let { " ($it)" } ?: "") + " · " +
                 when { p.cobranca == "credito" -> if (p.faturaId != null) "já na fatura" else "entra na próxima fatura"; p.pagamentoStatus == "pago" -> "pago (${p.pagamentoMetodo ?: ""})"; else -> "pagamento antecipado pendente" },
                 color = c.texto2, fontSize = 13.sp)
             Spacer(Modifier.size(6.dp))
@@ -249,8 +251,15 @@ private fun JanelaPedido(p: PedidoG, empresa: String?, onFechar: () -> Unit) {
         p.recusaMotivo?.let { TextoDica("Motivo da recusa: $it") }
 
         if (p.status == "recebido") {
+            var segurar by com.pwexpress.core.designsystem.lembrarLigado("aprovar_segurando", false)
+            com.pwexpress.core.designsystem.PwInterruptor("Segurar as rotas antes de soltar", segurar, { segurar = it }, icone = PwIcones.Hand,
+                descricao = if (segurar) "Aprova e monta as rotas, mas elas esperam você mudar a ordem, separar ou juntar e soltar." else "Aprova e as rotas seguem sozinhas para os motoboys.")
             PwBotaoOuro(if (ocupado) "Aprovando…" else "Aprovar" + if (mudou) " com ${moedaBr(valorNum)}" else "", onClick = {
-                rodar(if (p.cobranca == "pre_pago" && p.pagamentoStatus == "pendente") "Aprovado. Cliente pré-pago: a rota sai quando o pagamento for confirmado." else "Aprovado: vai para as rotas.") { Gestao.revisarPedido(p.id, "aprovar", if (mudou) valorNum else null, motivo.ifBlank { null }) }
+                if (segurar) rodar("Aprovado. As rotas estão montadas e seguras: ajuste e solte.", fechar = false) {
+                    (if (mudou) Gestao.revisarPedido(p.id, "ajustar", valorNum, motivo.ifBlank { null }) else Result.success(Unit))
+                        .mapCatching { Gestao.rpcJson("aprovar_e_montar", kotlinx.serialization.json.buildJsonObject { put("p_pedido", p.id) }).getOrThrow(); Unit }
+                }
+                else rodar(if (p.cobranca == "pre_pago" && p.pagamentoStatus == "pendente") "Aprovado. Cliente pré-pago: a rota sai quando o pagamento for confirmado." else "Aprovado: vai para as rotas.") { Gestao.revisarPedido(p.id, "aprovar", if (mudou) valorNum else null, motivo.ifBlank { null }) }
             }, icone = PwIcones.Check, habilitado = !ocupado)
         }
         if (p.status in setOf("recebido", "aprovado")) {
@@ -275,38 +284,106 @@ private fun JanelaPedido(p: PedidoG, empresa: String?, onFechar: () -> Unit) {
     }
 }
 
-/** Peças das rotas automáticas no detalhe: soltar para os motoboys e o pagamento do motoboy. */
+/** Ícone de cada modelo de pagamento. */
+internal val ICONE_MODO = mapOf("zonas" to PwIcones.Radar, "rota" to PwIcones.Ruler, "percentual" to PwIcones.Percent, "por_entrega" to PwIcones.Package, "fixo" to PwIcones.Coins, "combinado" to PwIcones.Layers)
+
+/** Botão "mover" de uma entrega: abre um menu com as outras rotas abertas e "rota nova". */
+@Composable
+internal fun MenuMoverEntrega(outras: List<Pair<String, String>>, podeSeparar: Boolean, habilitado: Boolean, onEscolher: (String?) -> Unit) {
+    var aberto by remember { mutableStateOf(false) }
+    Box {
+        PwBotaoIcone(PwIcones.ArrowRightLeft, "Mover esta entrega", { aberto = true }, tamanho = 32.dp, habilitado = habilitado)
+        androidx.compose.material3.DropdownMenu(aberto, { aberto = false }, containerColor = Pw.cores.fundo2) {
+            if (podeSeparar) androidx.compose.material3.DropdownMenuItem(
+                text = { Text("Separar numa rota nova", color = Pw.cores.texto) }, leadingIcon = { Icon(PwIcones.Split, null, tint = Pw.cores.ouro) },
+                onClick = { aberto = false; onEscolher(null) })
+            outras.forEach { (id, nome) ->
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text("Mover para $nome", color = Pw.cores.texto) }, leadingIcon = { Icon(PwIcones.Route, null, tint = Pw.cores.texto2) },
+                    onClick = { aberto = false; onEscolher(id) })
+            }
+        }
+    }
+}
+
+private data class ModoDespacho(val chave: String, val nome: String, val dica: String, val icone: androidx.compose.ui.graphics.vector.ImageVector)
+private val MODOS_DESPACHO = listOf(
+    ModoDespacho("quadro", "Quadro", "Todos veem; o primeiro que pegar leva.", PwIcones.Users),
+    ModoDespacho("melhor_primeiro", "Melhor primeiro", "Só o mais indicado recebe; se não aceitar, vai ao quadro.", PwIcones.Crown),
+    ModoDespacho("cascata", "Cascata", "A oferta passa de um em um, do mais perto ao mais longe.", PwIcones.Shuffle),
+    ModoDespacho("direto", "Direto", "Você escolhe quem recebe a oferta.", PwIcones.Send),
+)
+
+/**
+ * Peças das rotas automáticas no detalhe: despacho (escolha o modo e solte), estender a rota de quem está
+ * rodando, mover entregas e o pagamento do motoboy (prévia editável antes de soltar).
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 internal fun BlocoRotaG(corrida: com.pwexpress.feature.gestor.data.CorridaG, ocupado: Boolean, acao: (suspend () -> Result<Unit>) -> Unit) {
     val c = Pw.cores
     val dados by Gestao.dados.collectAsState()
     val aberta = corrida.motoboyId == null && corrida.status in setOf("montada", "agendada", "aguardando_motoboy", "sem_motoboy")
     if (aberta) {
-        var moto by remember { mutableStateOf<String?>(null) }
+        var modo by remember(corrida.id) { mutableStateOf(if (corrida.modoDespacho in MODOS_DESPACHO.map { it.chave }) corrida.modoDespacho ?: "cascata" else "cascata") }
+        var moto by remember(corrida.id) { mutableStateOf(corrida.sugeridoMotoboyId) }
         PwCartao(cor = c.ouro.copy(alpha = 0.5f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                com.pwexpress.core.designsystem.PwRotulo(if (corrida.status == "montada") "Rota montada: solte para os motoboys" else "Despacho")
-                Spacer(Modifier.width(8.dp))
-                com.pwexpress.core.designsystem.PwDica("Como soltar a rota", "Quadro: todos veem e o primeiro que pegar leva. Melhor primeiro: só o mais indicado recebe a oferta; se não aceitar, vai para o quadro. Cascata: a oferta passa de um em um, do mais perto ao mais longe. Direto: o escolhido recebe a oferta.")
+                Icon(PwIcones.Send, null, tint = c.ouro, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
+                Text(if (corrida.status == "montada") "Soltar para os motoboys" else "Despacho", color = c.texto, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.weight(1f))
             }
-            corrida.sugeridoMotoboyId?.let { TextoDica("Melhor agora: ${dados.membro(it)?.nome ?: "motoboy"}") }
             if (corrida.modoDespacho == "quadro" && corrida.status != "montada") TextoDica("No quadro${corrida.quadroDesde?.let { " desde ${hora(it)}" } ?: ""}: todos veem, o primeiro que pegar leva.")
+            if (corrida.agendadaPara != null) TextoDica("Agendada para ${dataHora(corrida.agendadaPara)}: quem aceitar fica com a reserva.")
             Espaco(8)
-            PwBotaoOuro("Quadro (todos veem)", onClick = { acao { Gestao.liberarRota(corrida.id, "quadro") } }, icone = PwIcones.Users, habilitado = !ocupado)
-            if (corrida.agendadaPara != null) TextoDica("Agendada para ${dataHora(corrida.agendadaPara)}: quem aceitar a oferta fica com a reserva (não começa agora).")
-            run {
-                Espaco(6)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PwBotaoVidro("Melhor primeiro", onClick = { acao { Gestao.liberarRota(corrida.id, "melhor_primeiro") } }, icone = PwIcones.Crown, modifier = Modifier.weight(1f))
-                    PwBotaoVidro("Cascata", onClick = { acao { Gestao.liberarRota(corrida.id, "cascata") } }, icone = PwIcones.Shuffle, modifier = Modifier.weight(1f))
+            // os 4 modos lado a lado (2 por linha), cada um com ícone e uma frase
+            MODOS_DESPACHO.chunked(2).forEach { linha ->
+                Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    linha.forEach { m ->
+                        val sel = modo == m.chave
+                        val forma = RoundedCornerShape(16.dp)
+                        Column(
+                            Modifier.weight(1f).heightIn(min = 96.dp).clip(forma).background(if (sel) c.ouro.copy(alpha = 0.14f) else c.vidro)
+                                .border(if (sel) 1.6.dp else 1.dp, if (sel) c.ouro else c.borda, forma).clickable { modo = m.chave }.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(m.icone, null, tint = if (sel) c.ouro else c.texto2, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(m.nome, color = c.texto, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            }
+                            Text(m.dica, color = c.texto3, fontSize = 11.5.sp, lineHeight = 14.sp)
+                        }
+                    }
                 }
             }
-            Espaco(8)
-            com.pwexpress.core.designsystem.PwSelecao(
-                "Entregar direto para", dados.equipe.filter { it.motoboy && it.modoTeste == corrida.teste }.map { it.id to ((if (it.id == corrida.sugeridoMotoboyId) "★ " else "") + it.nome) }, moto, { moto = it },
-            )
-            Espaco(6)
-            PwBotaoVidro("Enviar oferta para o escolhido", onClick = { moto?.let { m -> acao { Gestao.liberarRota(corrida.id, null, m) } } }, icone = PwIcones.Send, modifier = Modifier.fillMaxWidth())
+            if (modo == "direto") {
+                val candidatos = dados.equipe.filter { it.motoboy && it.modoTeste == corrida.teste }
+                    .sortedWith(compareBy({ it.id != corrida.sugeridoMotoboyId }, { dados.posicao(it.id)?.status != "disponivel" }, { it.nome }))
+                com.pwexpress.core.designsystem.PwRotulo("Quem recebe")
+                Espaco(4)
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    candidatos.forEach { m ->
+                        val sel = moto == m.id
+                        val st = dados.posicao(m.id)?.status
+                        val forma = RoundedCornerShape(99.dp)
+                        Row(Modifier.clip(forma).background(if (sel) c.ouro.copy(alpha = 0.16f) else c.vidro).border(1.dp, if (sel) c.ouro else c.borda, forma)
+                            .clickable { moto = m.id }.padding(start = 4.dp, end = 12.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            com.pwexpress.core.designsystem.PwAvatar(m.nome, m.foto, tamanho = 26.dp)
+                            Spacer(Modifier.width(6.dp))
+                            if (m.id == corrida.sugeridoMotoboyId) { Icon(PwIcones.Star, "Melhor agora", tint = c.ouro, modifier = Modifier.size(13.dp)); Spacer(Modifier.width(3.dp)) }
+                            Text(m.nome.substringBefore(" "), color = c.texto, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            Spacer(Modifier.width(6.dp))
+                            Box(Modifier.size(7.dp).clip(androidx.compose.foundation.shape.CircleShape).background(corMotoboy(st, c)))
+                        }
+                    }
+                }
+                Espaco(8)
+            } else corrida.sugeridoMotoboyId?.let { TextoDica("Melhor agora: ${dados.membro(it)?.nome ?: "motoboy"}") }
+            val nomeModo = MODOS_DESPACHO.first { it.chave == modo }.nome
+            PwBotaoOuro(if (modo == "direto") "Enviar para ${moto?.let { dados.membro(it)?.nome?.substringBefore(" ") } ?: "…"}" else "Soltar · $nomeModo", onClick = {
+                if (modo == "direto") moto?.let { m -> acao { Gestao.liberarRota(corrida.id, null, m) } }
+                else acao { Gestao.liberarRota(corrida.id, modo) }
+            }, icone = MODOS_DESPACHO.first { it.chave == modo }.icone, habilitado = !ocupado && (modo != "direto" || moto != null))
         }
     }
 
@@ -320,8 +397,8 @@ internal fun BlocoRotaG(corrida: com.pwexpress.feature.gestor.data.CorridaG, ocu
             var escolhido by remember(corrida.id) { mutableStateOf<String?>(null) }
             PwCartao {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    com.pwexpress.core.designsystem.PwRotulo("Estender a rota de quem está em corrida")
-                    Spacer(Modifier.width(8.dp))
+                    Icon(PwIcones.Merge, null, tint = c.ouro, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
+                    Text("Estender a rota de quem está rodando", color = c.texto, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.weight(1f))
                     com.pwexpress.core.designsystem.PwDica("Extensão de rota", "As paradas desta rota vão para o fim da rota de um motoboy que já está rodando (o mais perto da coleta aparece primeiro). O valor das duas soma e o motoboy nunca ganha menos do que já ia ganhar. \"Perguntar\" manda uma oferta; \"Estender direto\" já junta.")
                 }
                 Espaco(6)
@@ -338,16 +415,25 @@ internal fun BlocoRotaG(corrida: com.pwexpress.feature.gestor.data.CorridaG, ocu
         }
     }
 
+    // mover entregas: uma linha por entrega, com o botão de mover (menu)
     if (aberta && corrida.entregas > 0) {
         val outras = dados.corridas.filter { it.id != corrida.id && it.teste == corrida.teste && it.motoboyId == null && it.status in setOf("montada", "agendada", "aguardando_motoboy", "sem_motoboy") }
         PwCartao {
-            com.pwexpress.core.designsystem.PwRotulo("Mover entregas")
-            TextoDica("Separe uma entrega numa rota nova ou junte com outra rota aberta.")
-            corrida.paradas.filter { !it.coleta }.forEach { p ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(PwIcones.ArrowRightLeft, null, tint = c.ouro, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
+                Text("Entregas desta rota", color = c.texto, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.weight(1f))
+            }
+            TextoDica("Toque no botão de cada entrega para separar numa rota nova ou mandar para outra rota aberta.")
+            corrida.paradas.filter { !it.coleta }.sortedBy { it.ordem }.forEach { p ->
                 Espaco(6)
-                Text("${p.ordem + 1}. ${p.endereco.substringBefore(",")}", color = Pw.cores.texto, fontSize = 13.5.sp, maxLines = 1)
-                com.pwexpress.core.designsystem.PwSelecao("", listOf<Pair<String?, String>>(null to "Para uma rota nova") + outras.map { it.id to "Para a rota ${it.numeroExibicao}" }, "—",
-                    { destino -> acao { Gestao.moverEntrega(p.id, destino) } }, vazio = "Mover…")
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.vidro).padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(24.dp).clip(androidx.compose.foundation.shape.CircleShape).background(c.texto), contentAlignment = Alignment.Center) {
+                        Text("${p.ordem + 1}", color = c.fundo, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Text(p.endereco.substringBefore(","), color = c.texto, fontSize = 13.5.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    MenuMoverEntrega(outras.map { it.id to "Rota ${it.numeroExibicao}" }, podeSeparar = corrida.entregas > 1, habilitado = !ocupado) { destino -> acao { Gestao.moverEntrega(p.id, destino) } }
+                }
             }
         }
     }
@@ -356,9 +442,13 @@ internal fun BlocoRotaG(corrida: com.pwexpress.feature.gestor.data.CorridaG, ocu
     var ajuste by remember(corrida.id) { mutableStateOf(numeroBr(corrida.pagAjuste)) }
     var motivo by remember(corrida.id) { mutableStateOf(corrida.pagAjusteMotivo.orEmpty()) }
     PwCartao {
-        com.pwexpress.core.designsystem.PwRotulo("Pagamento do motoboy" + if (corrida.motoboyId == null) " (prévia)" else "")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(PwIcones.HandCoins, null, tint = c.ouro, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
+            Text("Pagamento do motoboy" + if (corrida.motoboyId == null) " (prévia)" else "", color = c.texto, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.weight(1f))
+        }
         Espaco(4)
         LinhasCalculo(calc)
+        if (aberta) PagamentoEditavelG(corrida, ocupado, acao)
         if (corrida.motoboyId != null) {
             Espaco(8)
             PwCampo(ajuste, { ajuste = it }, "Ajuste (+/−)", teclado = KeyboardType.Text, prefixo = "R$ ")
@@ -371,6 +461,52 @@ internal fun BlocoRotaG(corrida: com.pwexpress.feature.gestor.data.CorridaG, ocu
             Espaco(6)
             Text("A pagar: ${moedaBr(corrida.valorMotoboy)}", color = c.texto, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
+    }
+}
+
+/** Antes de soltar: mudar o modelo e os parâmetros do pagamento desta rota, com prévia antes de salvar. */
+@Composable
+private fun PagamentoEditavelG(corrida: com.pwexpress.feature.gestor.data.CorridaG, ocupado: Boolean, acao: (suspend () -> Result<Unit>) -> Unit) {
+    val c = Pw.cores
+    var aberto by remember(corrida.id) { mutableStateOf(false) }
+    val salvas = remember(corrida.id) { mutableStateOf<kotlinx.serialization.json.JsonObject?>(null) }
+    val regras = remember(corrida.id) { androidx.compose.runtime.mutableStateMapOf<String, kotlinx.serialization.json.JsonElement>() }
+    var previa by remember(corrida.id) { mutableStateOf<kotlinx.serialization.json.JsonObject?>(null) }
+    androidx.compose.runtime.LaunchedEffect(corrida.id, aberto) {
+        if (!aberto || salvas.value != null) return@LaunchedEffect
+        val r = Gestao.rpcJson("previa_pagamento_rota", kotlinx.serialization.json.buildJsonObject { put("p_corrida", corrida.id) }).getOrNull() as? kotlinx.serialization.json.JsonObject
+        val atuais = (r?.get("regras_rota") as? kotlinx.serialization.json.JsonObject) ?: kotlinx.serialization.json.JsonObject(emptyMap())
+        salvas.value = atuais; regras.clear(); regras.putAll(atuais)
+    }
+    val chave = kotlinx.serialization.json.JsonObject(regras.toMap()).toString()
+    val mudou = salvas.value != null && kotlinx.serialization.json.JsonObject(regras.toMap()) != salvas.value
+    androidx.compose.runtime.LaunchedEffect(chave) {
+        if (!mudou) { previa = null; return@LaunchedEffect }
+        kotlinx.coroutines.delay(400)
+        previa = Gestao.rpcJson("previa_pagamento_rota", kotlinx.serialization.json.buildJsonObject { put("p_corrida", corrida.id); put("p_regras", kotlinx.serialization.json.JsonObject(regras.toMap())) }).getOrNull() as? kotlinx.serialization.json.JsonObject
+    }
+    Espaco(8)
+    PwBotaoVidro(if (aberto) "Fechar" else "Mudar como paga antes de soltar", onClick = { aberto = !aberto }, icone = PwIcones.SlidersHorizontal, modifier = Modifier.fillMaxWidth())
+    if (!aberto) return
+    TextoDica("Vale só para esta rota, para quem pegar, por cima do cadastro do motoboy.")
+    val modos = listOf("zonas" to "Zonas", "rota" to "Por km", "percentual" to "Percentual", "por_entrega" to "Por entrega", "fixo" to "Fixo")
+    val atual = (regras["pag_modo"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: corrida.pagCalculo?.str("modo")
+    Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        modos.forEach { (k, r) -> PwPilula(r, ICONE_MODO[k] ?: PwIcones.Wallet, { regras["pag_modo"] = kotlinx.serialization.json.JsonPrimitive(k) }, ligada = atual == k) }
+    }
+    EditorRegrasG(PARAMETROS.filter { it.grupo in GRUPOS_PAG && !it.soDev && it.chave != "dev_origem" }, regras, { k, v -> if (v == null) regras.remove(k) else regras[k] = v })
+    previa?.let { pv ->
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.ouro.copy(alpha = 0.08f)).border(1.dp, c.ouro.copy(alpha = 0.4f), RoundedCornerShape(14.dp)).padding(10.dp)) {
+            com.pwexpress.core.designsystem.PwRotulo("Com as mudanças")
+            LinhasCalculo(pv)
+        }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        PwBotaoOuro("Salvar pagamento", onClick = { acao { Gestao.rpcJson("definir_regras_rota", kotlinx.serialization.json.buildJsonObject { put("p_corrida", corrida.id); put("p_regras", kotlinx.serialization.json.JsonObject(regras.toMap())) }).map { salvas.value = kotlinx.serialization.json.JsonObject(regras.toMap()); Unit } } },
+            icone = PwIcones.Check, habilitado = mudou && !ocupado, modifier = Modifier.weight(1f))
+        if ((salvas.value?.size ?: 0) > 0) PwBotaoIcone(PwIcones.Trash2, "Voltar às regras de sempre", {
+            acao { Gestao.rpcJson("definir_regras_rota", kotlinx.serialization.json.buildJsonObject { put("p_corrida", corrida.id); put("p_regras", kotlinx.serialization.json.JsonObject(emptyMap())) }).map { salvas.value = kotlinx.serialization.json.JsonObject(emptyMap()); regras.clear(); Unit } }
+        }, tamanho = 48.dp)
     }
 }
 
@@ -444,10 +580,11 @@ internal fun LinhasCalculo(calc: kotlinx.serialization.json.JsonObject) {
         }
     }
     val limitado = s("limitado") == "true"
-    val avisoTeto = "Limitado a ${moedaBr(n("teto"))}: o motoboy nunca leva mais que a rota paga (valor da rota menos a parte do Dev)."
+    val avisoTeto = "Limitado a ${moedaBr(n("teto"))}: o motoboy nunca leva mais do que a rota paga."
     if (s("modo") == "percentual") {
-        val origem = when (s("dev_origem")) { "total" -> " · Dev sai antes de dividir"; "proporcional" -> " · Dev sai das duas partes"; "gestor" -> " · Dev sai da parte do gestor"; else -> "" }
-        Linha("Percentual: ${numeroBr(n("pct") ?: 0.0)}% da rota$origem", moedaBr(n("total")), true)
+        Linha("Valor da rota", moedaBr(n("valor_rota")))
+        Linha("Parte do motoboy", "${numeroBr(n("pct") ?: 0.0)}%")
+        Linha("O motoboy recebe", moedaBr(n("total")), true)
         if (limitado) TextoDica(avisoTeto)
         return
     }
@@ -759,9 +896,13 @@ private fun EditarOrcamentoG(pedido: String, o: kotlinx.serialization.json.JsonO
 private fun PacotesPontoG(itens: List<com.pwexpress.feature.gestor.data.ItemPedidoG>, categorias: List<com.pwexpress.feature.gestor.data.CategoriaG>, coleta: Boolean) {
     val c = Pw.cores
     var aberto by remember(itens) { mutableStateOf<Int?>(null) }
-    Spacer(Modifier.size(4.dp))
+    Spacer(Modifier.size(2.dp))
+    // iguais (mesma categoria, descrição e destino) viram um só: "5× Documentos"
+    data class Grupo(val i: Int, val qtd: Int)
+    val grupos = itens.withIndex().groupBy { (_, x) -> Triple(x.categoriaId, x.descricao, if (coleta) x.coletaId else x.entregaId) }
+        .values.map { g -> Grupo(g.first().index, g.sumOf { it.value.quantidade }) }
     androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        itens.forEachIndexed { i, it2 ->
+        grupos.forEach { gr -> val i = gr.i; val it2 = itens[i]
             val k = categorias.firstOrNull { it.id == it2.categoriaId }
             val todas = if (coleta) it2.coletaId == null else it2.entregaId == null
             val forma = androidx.compose.foundation.shape.RoundedCornerShape(99.dp)
@@ -770,8 +911,8 @@ private fun PacotesPontoG(itens: List<com.pwexpress.feature.gestor.data.ItemPedi
                 .clickable { aberto = if (aberto == i) null else i }.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(iconeDoNome(k?.icone), null, tint = if (k?.perigoso == true) c.vermelho else c.ouro, modifier = Modifier.size(15.dp))
                 Spacer(Modifier.width(6.dp))
-                Text((if (it2.quantidade > 1) "${it2.quantidade}× " else "") + it2.descricao, color = c.texto, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                if (todas) { Spacer(Modifier.width(4.dp)); Text("todas", color = c.texto3, fontSize = 10.5.sp) }
+                Text((if (gr.qtd > 1) "${gr.qtd}× " else "") + it2.descricao, color = c.texto, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                if (todas) { Spacer(Modifier.width(4.dp)); Icon(PwIcones.Layers, "Vale para todas as entregas", tint = c.texto3, modifier = Modifier.size(12.dp)) }
             }
         }
     }
@@ -803,6 +944,7 @@ internal fun RotasDoPedidoG(pedidoId: String, status: String, chave: String) {
     var ocupado by remember { mutableStateOf(false) }
     var erro by remember { mutableStateOf<String?>(null) }
     var versao by remember { mutableIntStateOf(0) }
+    var revisando by remember(pedidoId) { mutableStateOf(false) }
     androidx.compose.runtime.LaunchedEffect(pedidoId, chave, versao) {
         Gestao.rpcJson("previa_rotas_pedido", kotlinx.serialization.json.buildJsonObject { put("p_pedido", pedidoId) })
             .onSuccess { dados = it as? kotlinx.serialization.json.JsonObject; erro = null }
@@ -831,8 +973,12 @@ internal fun RotasDoPedidoG(pedidoId: String, status: String, chave: String) {
         if (previa) TextoDica("Nada foi gravado ainda: é como o sistema montaria agora.")
         if (previa && status == "recebido") {
             Espaco(6)
-            PwBotaoOuro("Aprovar e montar para ajustar", onClick = { rodar("Aprovado. As rotas estão montadas e seguras: ajuste e solte.", rpc("aprovar_e_montar") { put("p_pedido", pedidoId) }) },
-                icone = PwIcones.Sparkles, habilitado = !ocupado)
+            if (!revisando) PwBotaoOuro("Revisar rota", onClick = { revisando = true }, icone = PwIcones.SlidersHorizontal, habilitado = !ocupado)
+            else Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.ouro.copy(alpha = 0.1f)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(PwIcones.SlidersHorizontal, null, tint = c.ouro, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(8.dp))
+                Text("Revisando: escolha como o motoboy vai ser pago. A prévia muda na hora; aprove no botão do fim da janela.", color = c.texto, fontSize = 12.5.sp, modifier = Modifier.weight(1f))
+                PwBotaoIcone(PwIcones.X, "Parar de revisar", { revisando = false }, tamanho = 30.dp)
+            }
         }
         sug?.let { sg ->
             val acoes = (sg["acoes"] as? kotlinx.serialization.json.JsonObject)?.mapNotNull { (k, v) ->
@@ -851,7 +997,7 @@ internal fun RotasDoPedidoG(pedidoId: String, status: String, chave: String) {
         if (rotas.size > 1) { Espaco(6); com.pwexpress.core.designsystem.PwFiltros(rotas.mapIndexed { i, r -> (if (previa) "Rota ${i + 1}" else "#${r.str("numero")}") to 0 }, aberta.coerceAtMost(rotas.lastIndex), { aberta = it }) }
         val r = rotas[aberta.coerceAtMost(rotas.lastIndex)]
         val editaveis = rotas.filter { !previa && it.str("status") in EDITAVEIS }
-        androidx.compose.runtime.key(r.str("id"), versao) { CartaoRotaG(r, previa, editaveis.filter { it.str("id") != r.str("id") }, sug, ocupado, ::rodar, ::rpc) }
+        androidx.compose.runtime.key(r.str("id"), versao) { CartaoRotaG(r, previa, editaveis.filter { it.str("id") != r.str("id") }, sug, ocupado, ::rodar, ::rpc, pedidoId, revisando) }
     }
 }
 
@@ -859,10 +1005,13 @@ internal fun RotasDoPedidoG(pedidoId: String, status: String, chave: String) {
 private fun CartaoRotaG(
     r: kotlinx.serialization.json.JsonObject, previa: Boolean, outras: List<kotlinx.serialization.json.JsonObject>, sug: kotlinx.serialization.json.JsonObject?, ocupado: Boolean,
     rodar: (String, suspend () -> Result<*>) -> Unit, rpc: (String, kotlinx.serialization.json.JsonObjectBuilder.() -> Unit) -> (suspend () -> Result<*>),
+    pedidoId: String = "", revisando: Boolean = false,
 ) {
     val c = Pw.cores
     val id = r.str("id") ?: return
     val editavel = !previa && r.str("status") in EDITAVEIS
+    // na prévia, "Revisar rota" deixa mudar o pagamento (guardado no pedido, passa para a rota quando nascer)
+    val mudaPagamento = editavel || (previa && revisando)
     val original = (r["paradas"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it as? kotlinx.serialization.json.JsonObject }.orEmpty()
     val paradas = remember(id) { androidx.compose.runtime.mutableStateListOf<kotlinx.serialization.json.JsonObject>().apply { addAll(original) } }
     val regrasSalvas = (r["pag_regras"] as? kotlinx.serialization.json.JsonObject) ?: kotlinx.serialization.json.JsonObject(emptyMap())
@@ -879,6 +1028,8 @@ private fun CartaoRotaG(
         previaPag = Gestao.rpcJson("previa_pagamento_rota", kotlinx.serialization.json.buildJsonObject { put("p_corrida", id); put("p_regras", kotlinx.serialization.json.JsonObject(regras.toMap())) }).getOrNull() as? kotlinx.serialization.json.JsonObject
     }
     val entregas = paradas.count { it.str("tipo") == "entrega" }
+    // pagamento por zonas: cada entrega mostra o próprio raio no mapa
+    val raioZona = (previaPag ?: r.obj("pagamento"))?.let { pg -> pg.obj("zona") ?: (pg["partes"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? kotlinx.serialization.json.JsonObject)?.obj("zona") }?.firstOrNull() }?.dbl("raio_m")
     Espaco(8)
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
@@ -892,9 +1043,11 @@ private fun CartaoRotaG(
     val forma = RoundedCornerShape(16.dp)
     Box(Modifier.fillMaxWidth().height(200.dp).clip(forma).border(1.dp, c.borda, forma)) {
         com.pwexpress.core.mapa.PwMapa(
-            paradas = paradas.mapNotNull { x -> x.dbl("lat")?.let { la -> x.dbl("lng")?.let { lo -> com.pwexpress.core.mapa.PinoMapa(la, lo, x.str("tipo") == "coleta", false, false) } } },
+            paradas = paradas.mapIndexedNotNull { i, x -> x.dbl("lat")?.let { la -> x.dbl("lng")?.let { lo ->
+                com.pwexpress.core.mapa.PinoMapa(la, lo, x.str("tipo") == "coleta", false, false, numero = i + 1,
+                    raioM = if (x.str("tipo") == "entrega") raioZona else null) } } },
             rota = if (mudouOrdem) null else r.str("rota_planejada"), minhaPosicao = null, modifier = Modifier.fillMaxWidth().height(200.dp),
-            enquadrar = id + paradas.size,
+            enquadrar = id + paradas.size, tituloTelaCheia = if (previa) "Prévia da rota" else "Rota #${r.str("numero")}",
         )
     }
     Espaco(6)
@@ -912,14 +1065,12 @@ private fun CartaoRotaG(
             if (editavel) {
                 PwBotaoIcone(PwIcones.ChevronUp, "Subir", { if (i > 0) { val t = paradas[i]; paradas[i] = paradas[i - 1]; paradas[i - 1] = t } }, tamanho = 32.dp, habilitado = i > 0)
                 PwBotaoIcone(PwIcones.ChevronDown, "Descer", { if (i < paradas.lastIndex) { val t = paradas[i]; paradas[i] = paradas[i + 1]; paradas[i + 1] = t } }, tamanho = 32.dp, habilitado = i < paradas.lastIndex)
-                if (x.str("tipo") == "entrega" && entregas > 1)
-                    PwBotaoIcone(PwIcones.Split, "Separar numa rota nova", { rodar("Entrega separada numa rota nova.", rpc("mover_entrega") { put("p_parada", x.str("id")); put("p_destino", kotlinx.serialization.json.JsonNull) }) }, tamanho = 32.dp, habilitado = !ocupado)
+                if (x.str("tipo") == "entrega" && (entregas > 1 || outras.isNotEmpty()))
+                    MenuMoverEntrega(outras.map { o -> o.str("id")!! to "Rota #${o.str("numero")}" }, podeSeparar = entregas > 1, habilitado = !ocupado) { dest ->
+                        rodar(if (dest == null) "Entrega separada numa rota nova." else "Entrega movida.", rpc("mover_entrega") { put("p_parada", x.str("id")); if (dest == null) put("p_destino", kotlinx.serialization.json.JsonNull) else put("p_destino", dest) })
+                    }
             }
         }
-        if (editavel && x.str("tipo") == "entrega" && outras.isNotEmpty())
-            com.pwexpress.core.designsystem.PwSelecao("", outras.map { o -> o.str("id") to "Mover para a rota #${o.str("numero")}" }, null as String?, { dest ->
-                rodar("Entrega movida.", rpc("mover_entrega") { put("p_parada", x.str("id")); put("p_destino", dest) })
-            }, vazio = "Mover esta entrega…")
     }
     if (editavel && mudouOrdem) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         PwBotaoOuro("Salvar a ordem", onClick = { rodar("Ordem salva.", rpc("ordenar_paradas") { put("p_corrida", id); put("p_ordem", kotlinx.serialization.json.JsonArray(paradas.map { kotlinx.serialization.json.JsonPrimitive(it.str("id")) })) }) },
@@ -946,24 +1097,36 @@ private fun CartaoRotaG(
         Espaco(4)
         (previaPag ?: r.obj("pagamento"))?.let { LinhasCalculo(it) } ?: TextoDica("Sem cálculo ainda.")
     }
-    if (editavel) {
+    if (mudaPagamento) {
         Espaco(8)
-        PwBotaoVidro((if (verRegras) "Esconder" else "Mudar") + " as regras de pagamento desta rota" + if (regrasSalvas.isNotEmpty()) " (${regrasSalvas.size})" else "",
+        PwBotaoVidro((if (verRegras || (previa && revisando)) "Esconder" else "Mudar") + " como o motoboy é pago" + if (regrasSalvas.isNotEmpty()) " (${regrasSalvas.size})" else "",
             onClick = { verRegras = !verRegras }, icone = PwIcones.SlidersHorizontal, modifier = Modifier.fillMaxWidth())
-        if (verRegras) {
-            TextoDica("Valem só para esta rota, para quem pegar. Mude e veja a prévia acima antes de salvar.")
+        if (verRegras || (previa && revisando)) {
+            TextoDica(if (previa) "Vale para a rota deste pedido, para quem pegar, por cima do cadastro do motoboy. Salve e a prévia mostra o valor novo."
+                else "Valem só para esta rota, para quem pegar, por cima do cadastro do motoboy. Mude e veja a prévia acima antes de salvar.")
+            // modelo em um toque (os parâmetros ficam logo abaixo)
+            val modos = listOf("zonas" to "Zonas", "rota" to "Por km", "percentual" to "Percentual", "por_entrega" to "Por entrega", "fixo" to "Fixo")
+            val atualModo = (regras["pag_modo"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: (r.obj("pagamento")?.str("modo"))
+            Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                modos.forEach { (k, rot) -> PwPilula(rot, ICONE_MODO[k] ?: PwIcones.Wallet, { regras["pag_modo"] = kotlinx.serialization.json.JsonPrimitive(k) }, ligada = atualModo == k) }
+            }
             (sug?.get("regras_comuns") as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it as? kotlinx.serialization.json.JsonObject }?.forEach { rc ->
                 PwPilula("Usar as de costume (${rc.long("vezes")}×)", PwIcones.Sparkles, { regras.clear(); rc.obj("regras")?.let { regras.putAll(it) } })
             }
             EditorRegrasG(PARAMETROS.filter { it.grupo in GRUPOS_PAG && !it.soDev && it.chave != "dev_origem" }, regras, { k, v -> if (v == null) regras.remove(k) else regras[k] = v })
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PwBotaoOuro("Salvar regras", onClick = { rodar("Regras desta rota salvas.", rpc("definir_regras_rota") { put("p_corrida", id); put("p_regras", kotlinx.serialization.json.JsonObject(regras.toMap())) }) },
-                    icone = PwIcones.Check, habilitado = mudouRegras && !ocupado, modifier = Modifier.weight(1f))
-                if (regrasSalvas.isNotEmpty()) PwBotaoVidro("Voltar às de sempre", onClick = {
-                    rodar("A rota volta às regras de sempre.", rpc("definir_regras_rota") { put("p_corrida", id); put("p_regras", kotlinx.serialization.json.JsonObject(emptyMap())) })
-                }, icone = PwIcones.RotateCcw, modifier = Modifier.weight(1f))
+                PwBotaoOuro("Salvar pagamento", onClick = {
+                    if (previa) rodar("Pagamento da rota salvo. A prévia já mostra o valor novo.", rpc("definir_regras_rota_pedido") { put("p_pedido", pedidoId); put("p_regras", kotlinx.serialization.json.JsonObject(regras.toMap())) })
+                    else rodar("Regras desta rota salvas.", rpc("definir_regras_rota") { put("p_corrida", id); put("p_regras", kotlinx.serialization.json.JsonObject(regras.toMap())) })
+                }, icone = PwIcones.Check, habilitado = mudouRegras && !ocupado, modifier = Modifier.weight(1f))
+                if (regrasSalvas.isNotEmpty()) PwBotaoIcone(PwIcones.Trash2, "Voltar às regras de sempre", {
+                    if (previa) rodar("O pagamento volta ao de sempre.", rpc("definir_regras_rota_pedido") { put("p_pedido", pedidoId); put("p_regras", kotlinx.serialization.json.JsonObject(emptyMap())) })
+                    else rodar("A rota volta às regras de sempre.", rpc("definir_regras_rota") { put("p_corrida", id); put("p_regras", kotlinx.serialization.json.JsonObject(emptyMap())) })
+                }, tamanho = 48.dp, habilitado = !ocupado)
             }
         }
+    }
+    if (editavel) {
         if (outras.isNotEmpty()) {
             Espaco(6)
             com.pwexpress.core.designsystem.PwSelecao("", outras.map { o -> o.str("id") to "Juntar com a rota #${o.str("numero")}" }, null as String?, { dest ->

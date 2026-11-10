@@ -88,6 +88,8 @@ object PwNotificacoes {
     /** Logo (PW + entregador) num círculo escuro: ícone grande das notificações. Violeta no modo teste. */
     fun logoRedonda(ctx: Context): Bitmap? {
         val teste = modoTeste
+        // empresa com ícone próprio: as notificações usam o dela (no modo teste continua o violeta)
+        if (!teste) com.pwexpress.core.marca.MarcaEmpresa.iconeRedondo()?.let { return it }
         logos[teste]?.let { return it }
         val res = if (teste) R.drawable.pwex_marca_violeta else R.drawable.pwex_marca_ouro
         val fonte = runCatching { BitmapFactory.decodeResource(ctx.resources, res) }.getOrNull() ?: return null

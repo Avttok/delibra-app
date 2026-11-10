@@ -85,6 +85,13 @@ data class Ganhos(
 )
 
 object Perfis {
+    /** Ícone e nome da empresa vêm junto com o perfil: o app troca o Delibra por eles. */
+    private fun publicarMarca(o: kotlinx.serialization.json.JsonElement) {
+        val org = ((o as? JsonObject)?.get("organizacao") as? JsonObject)
+        fun t(k: String) = (org?.get(k) as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
+        com.pwexpress.core.marca.MarcaEmpresa.atualizar(t("nome")?.let { com.pwexpress.core.marca.Marca(it, t("logo"), t("cor")) })
+    }
+
 
     private val _perfil = MutableStateFlow<Perfil?>(null)
     val perfil: StateFlow<Perfil?> = _perfil.asStateFlow()
@@ -97,7 +104,7 @@ object Perfis {
         if (PwCore.auth.sessao.value == null) return
         tentar {
             val r = PwCore.rpc.chamar("meu_perfil", JsonObject(emptyMap()))
-            if (r.ok) r.json()?.let { _perfil.value = it.paraPerfil() }
+            if (r.ok) r.json()?.let { _perfil.value = it.paraPerfil(); publicarMarca(it) }
             val g = PwCore.rpc.chamar("meus_ganhos", JsonObject(emptyMap()))
             if (g.ok) g.json()?.jsonObject?.let { o ->
                 _ganhos.value = Ganhos(
@@ -135,7 +142,7 @@ object Perfis {
             url?.let { put("p_foto_url", it) }
         })
         if (!r.ok) error(if (r.corpo.contains("nome_invalido")) "O nome deve ter entre 2 e 60 letras." else "Erro ao salvar (${r.codigo}).")
-        r.json()?.let { _perfil.value = it.paraPerfil() }
+        r.json()?.let { _perfil.value = it.paraPerfil(); publicarMarca(it) }
         Unit
     }.recoverCatching { e -> throw if (e is java.io.IOException) Exception("Sem internet.") else e }
 

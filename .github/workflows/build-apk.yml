@@ -26,15 +26,35 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Compilar APK
+      # Chave de assinatura (secrets do repositório). Sem ela o build segue com a chave de desenvolvimento.
+      - name: Preparar assinatura digital
+        env:
+          KS_B64: ${{ secrets.DELIBRA_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/delibra-release.jks"
+            echo "DELIBRA_KEYSTORE=$RUNNER_TEMP/delibra-release.jks" >> "$GITHUB_ENV"
+            echo "Assinando com a chave de produção da Delibra."
+          else
+            echo "::warning::Secret DELIBRA_KEYSTORE_B64 ausente: APK assinado com a chave de desenvolvimento."
+          fi
+
+      - name: Compilar APK assinado
+        env:
+          DELIBRA_KEYSTORE_SENHA: ${{ secrets.DELIBRA_KEYSTORE_SENHA }}
+          DELIBRA_KEY_ALIAS: ${{ secrets.DELIBRA_KEY_ALIAS }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleRelease --stacktrace
 
-      - name: Renomear APK
+      - name: Conferir assinatura e renomear APK
         run: |
           mkdir -p saida
-          cp app/build/outputs/apk/debug/app-debug.apk "saida/Delibra-motoboy-build${GITHUB_RUN_NUMBER}.apk"
+          APK=app/build/outputs/apk/release/app-release.apk
+          AS=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$AS" verify --verbose --print-certs "$APK" | grep -E "Verified using|Signer #1 certificate (DN|SHA-256)"
+          cp "$APK" "saida/Delibra-motoboy-build${GITHUB_RUN_NUMBER}.apk"
+          rm -f "$RUNNER_TEMP/delibra-release.jks"
 
       - uses: actions/upload-artifact@v4
         with:

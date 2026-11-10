@@ -1,5 +1,13 @@
 package com.pwexpress.motoboy.ui
 
+import androidx.compose.runtime.remember
+
+import androidx.compose.ui.graphics.drawscope.rotate
+
+import androidx.compose.ui.graphics.graphicsLayer
+
+import androidx.compose.ui.draw.drawBehind
+
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -91,10 +99,40 @@ fun JanelaAtualizacao() {
         val giro = rememberInfiniteTransition(label = "giro")
         val angulo by giro.animateFloat(0f, 360f, infiniteRepeatable(tween(5200, easing = LinearEasing)), label = "angulo")
         val pulso by giro.animateFloat(0.9f, 1.06f, infiniteRepeatable(tween(1600), RepeatMode.Reverse), label = "pulso")
+        // busca: cometa rápido + ondas de radar saindo da logo
+        val cometa by giro.animateFloat(0f, 360f, infiniteRepeatable(tween(1100, easing = LinearEasing)), label = "cometa")
+        val onda by giro.animateFloat(0f, 1f, infiniteRepeatable(tween(2200, easing = LinearEasing)), label = "onda")
+        // fundo: aurora que passeia e partículas subindo
+        val tempo by giro.animateFloat(0f, 1f, infiniteRepeatable(tween(14000, easing = LinearEasing)), label = "tempo")
+        val flutua by giro.animateFloat(-6f, 6f, infiniteRepeatable(tween(2600, easing = androidx.compose.animation.core.FastOutSlowInEasing), RepeatMode.Reverse), label = "flutua")
+        val verificando = estado == EstadoAtualizacao.Verificando
+        val emDia = estado == EstadoAtualizacao.EmDia && !obrigatoria
+        // "em dia": o anel fica verde e solta uma onda uma vez
+        val pronto = remember { androidx.compose.animation.core.Animatable(0f) }
+        androidx.compose.runtime.LaunchedEffect(emDia) { if (emDia) { pronto.snapTo(0f); pronto.animateTo(1f, tween(1400, easing = androidx.compose.animation.core.FastOutSlowInEasing)) } else pronto.snapTo(0f) }
+        val verde = Color(0xFF34D399)
 
         Box(
             Modifier.fillMaxSize().background(c.fundo)
-                .background(Brush.radialGradient(listOf(c.ouro.copy(alpha = 0.30f), c.ouro.copy(alpha = 0.06f), Color.Transparent), radius = 1400f, center = Offset(540f, 620f))),
+                .drawBehind {
+                    val w = size.width; val h = size.height
+                    val a = tempo * 2 * Math.PI
+                    // aurora: dois brilhos (dourado e um mais claro) passeando devagar
+                    val p1 = Offset((w * (0.5f + 0.32f * kotlin.math.sin(a).toFloat())), h * (0.30f + 0.08f * kotlin.math.cos(a * 2).toFloat()))
+                    val p2 = Offset((w * (0.5f + 0.30f * kotlin.math.cos(a + 1.3).toFloat())), h * (0.62f + 0.10f * kotlin.math.sin(a + 0.7).toFloat()))
+                    drawCircle(Brush.radialGradient(listOf((if (emDia) verde else c.ouro).copy(alpha = 0.30f), Color.Transparent), p1, w * 0.85f), w * 0.85f, p1)
+                    drawCircle(Brush.radialGradient(listOf(c.ouroClaro.copy(alpha = 0.14f), Color.Transparent), p2, w * 0.7f), w * 0.7f, p2)
+                    // partículas douradas subindo
+                    for (i in 0 until 26) {
+                        val semente = (i * 7919) % 1000 / 1000f
+                        val vel = 0.6f + ((i * 3571) % 100) / 100f
+                        val y = h - ((tempo * vel * 3f + semente) % 1f) * h
+                        val x = w * ((semente * 13.7f + kotlin.math.sin((tempo * 6.28f * vel + i).toDouble()).toFloat() * 0.03f) % 1f)
+                        val raio = (1.2f + (i % 4)) * density
+                        val alfa = (0.15f + 0.5f * kotlin.math.sin((y / h) * Math.PI).toFloat()).coerceIn(0f, 0.65f)
+                        drawCircle(c.ouroClaro.copy(alpha = alfa), raio, Offset(x, y))
+                    }
+                },
         ) {
             Column(
                 Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 20.dp),
@@ -103,20 +141,44 @@ fun JanelaAtualizacao() {
             ) {
                 Spacer(Modifier.height(8.dp))
                 // logo no centro: anel fechado com brilho que gira devagar; no download, o anel vira o progresso
-                Box(Modifier.size(210.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(270.dp), contentAlignment = Alignment.Center) {
                     val grad = Brush.sweepGradient(listOf(c.ouroEscuro, c.ouroClaro, c.ouro, c.ouroEscuro))
+                    // ondas de radar (buscando) ou a onda verde de "em dia"
+                    Canvas(Modifier.size(270.dp)) {
+                        val r0 = 105.dp.toPx(); val rMax = size.minDimension / 2
+                        if (verificando) for (k in 0..1) {
+                            val t = (onda + k * 0.5f) % 1f
+                            drawCircle(c.ouro.copy(alpha = 0.5f * (1f - t)), r0 + (rMax - r0) * t, style = Stroke(2.dp.toPx() * (1.5f - t)))
+                        }
+                        if (pronto.value in 0.001f..0.999f) {
+                            val t = pronto.value
+                            drawCircle(verde.copy(alpha = 0.7f * (1f - t)), r0 + (rMax - r0) * t, style = Stroke(5.dp.toPx() * (1.2f - t)))
+                        }
+                    }
                     Canvas(Modifier.size(210.dp).rotate(if (baixando) -90f else angulo)) {
                         val esp = 7.dp.toPx()
-                        if (baixando) {
-                            drawCircle(c.borda, style = Stroke(esp))
-                            drawArc(grad, 0f, 360f * anim, false, style = Stroke(esp, cap = StrokeCap.Round))
-                        } else {
-                            drawCircle(grad, style = Stroke(esp))
+                        when {
+                            baixando -> {
+                                drawCircle(c.borda, style = Stroke(esp))
+                                drawArc(grad, 0f, 360f * anim, false, style = Stroke(esp, cap = StrokeCap.Round))
+                            }
+                            verificando -> {
+                                drawCircle(c.borda, style = Stroke(esp))
+                                rotate(cometa - angulo) { drawArc(Brush.sweepGradient(listOf(Color.Transparent, c.ouroClaro, c.ouro)), 0f, 110f, false, style = Stroke(esp, cap = StrokeCap.Round)) }
+                            }
+                            emDia -> drawCircle(Brush.sweepGradient(listOf(verde, c.ouroClaro, verde)), style = Stroke(esp))
+                            else -> drawCircle(grad, style = Stroke(esp))
                         }
                     }
                     Box(Modifier.size(170.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                        .background(Brush.radialGradient(listOf(c.ouro.copy(alpha = 0.22f * pulso), Color.Transparent))))
-                    PwSeloLogo(132.dp)
+                        .background(Brush.radialGradient(listOf((if (emDia) verde else c.ouro).copy(alpha = 0.22f * pulso), Color.Transparent))))
+                    Box(Modifier.graphicsLayer { translationY = flutua * density }) { PwSeloLogo(132.dp) }
+                    if (emDia) Box(Modifier.align(Alignment.BottomEnd).padding(end = 52.dp, bottom = 52.dp).size(44.dp).graphicsLayer { scaleX = pronto.value.coerceAtLeast(0.01f); scaleY = scaleX }
+                        .clip(androidx.compose.foundation.shape.CircleShape).background(verde), contentAlignment = Alignment.Center) {
+                        Icon(PwIcones.Check, "Em dia", tint = Color(0xFF052E1A), modifier = Modifier.size(24.dp))
+                    }
+                    if (baixando) Text("${(anim * 100).toInt()}%", color = c.texto, fontFamily = ArchivoLargo, fontWeight = FontWeight.Black, fontSize = 15.sp,
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp).clip(RoundedCornerShape(99.dp)).background(c.fundo2).padding(horizontal = 12.dp, vertical = 4.dp))
                 }
                 if (obrigatoria) PwSelo("ATUALIZAÇÃO OBRIGATÓRIA", c.ouro, icone = PwIcones.ShieldCheck)
 
@@ -211,12 +273,31 @@ private fun Notas(notas: String) {
     }
 }
 
+/**
+ * Barra de progresso. Sem fração (buscando): um trecho dourado desliza de um lado ao outro sem parar.
+ * Com fração: enche, com um brilho passando por cima para mostrar que está vivo.
+ */
 @Composable
 private fun Barra(fracao: Float?) {
     val c = Pw.cores
-    Box(Modifier.widthIn(max = 420.dp).fillMaxWidth().height(10.dp).clip(RoundedCornerShape(99.dp)).background(c.borda)) {
-        if (fracao != null) Box(Modifier.fillMaxWidth(fracao.coerceIn(0.02f, 1f)).height(10.dp).clip(RoundedCornerShape(99.dp)).background(c.gradOuro))
-    }
+    val t = rememberInfiniteTransition(label = "barra")
+    val corre by t.animateFloat(-0.4f, 1.1f, infiniteRepeatable(tween(1300, easing = androidx.compose.animation.core.FastOutSlowInEasing)), label = "corre")
+    val brilho by t.animateFloat(-0.3f, 1.3f, infiniteRepeatable(tween(1600, easing = LinearEasing)), label = "brilho")
+    Box(Modifier.widthIn(max = 420.dp).fillMaxWidth().height(10.dp).clip(RoundedCornerShape(99.dp)).background(c.borda)
+        .drawBehind {
+            val w = size.width; val h = size.height
+            if (fracao == null) {
+                val larg = w * 0.32f
+                drawRoundRect(Brush.horizontalGradient(listOf(Color.Transparent, c.ouro, c.ouroClaro, c.ouro, Color.Transparent), startX = corre * w, endX = corre * w + larg),
+                    topLeft = Offset(corre * w, 0f), size = androidx.compose.ui.geometry.Size(larg, h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2))
+            } else {
+                val cheio = w * fracao.coerceIn(0.02f, 1f)
+                drawRoundRect(c.gradOuro, size = androidx.compose.ui.geometry.Size(cheio, h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2))
+                val x = brilho * cheio
+                drawRoundRect(Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.45f), Color.Transparent), startX = x - 40f, endX = x + 40f),
+                    size = androidx.compose.ui.geometry.Size(cheio, h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2))
+            }
+        })
 }
 
 /** Sem a permissão de instalar, mostra o atalho para liberar. */

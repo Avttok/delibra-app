@@ -13,6 +13,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -70,7 +72,41 @@ fun ConfigMotoApp(onVoltar: () -> Unit, modifier: Modifier = Modifier) {
         CartaoOfertas()
         CartaoBateriaGps()
         PainelEnvio()
+        CartaoIconeEmpresa()
         CartaoInfoAparelho()
+    }
+}
+
+/** A empresa tem ícone próprio: o motoboy põe o atalho com ele na tela inicial do celular. */
+@Composable
+private fun CartaoIconeEmpresa() {
+    val c = Pw.cores
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val marca by com.pwexpress.core.marca.MarcaEmpresa.marca.collectAsState()
+    val versao by com.pwexpress.core.marca.MarcaEmpresa.versaoIcone.collectAsState()
+    val escopo = rememberCoroutineScope()
+    val m = marca?.takeIf { it.logoUrl != null } ?: return
+    val pode = remember(versao) { com.pwexpress.core.marca.MarcaEmpresa.podeFixar(ctx) }
+    PwCartao {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(PwIcones.House, null, tint = c.ouro, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
+            PwRotulo("Ícone na tela inicial")
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            com.pwexpress.core.designsystem.PwSeloLogo(52.dp)
+            Spacer(Modifier.width(12.dp))
+            Text("Coloque o ícone da ${m.nome} na tela do celular. Ele abre o app direto.", color = c.texto2, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(10.dp))
+        PwBotaoOuro(if (pode) "Adicionar à tela inicial" else "Baixando o ícone…", icone = PwIcones.ImagePlus, altura = 50.dp, habilitado = pode,
+            onClick = {
+                escopo.launch {
+                    val ok = com.pwexpress.core.marca.MarcaEmpresa.fixarNaTelaInicial(ctx)
+                    if (ok) PwToast.mostrar("Confirme no aviso do celular para colocar o ícone.", titulo = "Ícone da ${m.nome}")
+                    else PwToast.mostrar("Este celular não deixa adicionar atalhos.", TipoAviso.ERRO)
+                }
+            })
     }
 }
 

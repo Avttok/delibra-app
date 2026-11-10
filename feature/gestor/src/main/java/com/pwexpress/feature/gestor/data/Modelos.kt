@@ -88,7 +88,17 @@ data class MembroG(
     val soCliente get() = "cliente" in papeis && !gestor && !motoboy && !dev
 }
 
-data class PosicaoG(val id: String, val status: String, val lat: Double?, val lng: Double?, val posicaoEm: Long?, val modoTeste: Boolean, val bateria: Int?, val precisaoM: Double?, val economia: Boolean = false)
+data class PosicaoG(val id: String, val status: String, val lat: Double?, val lng: Double?, val posicaoEm: Long?, val modoTeste: Boolean, val bateria: Int?, val precisaoM: Double?, val economia: Boolean = false,
+    /** Raio de disponibilidade (km; 0 = sem raio) e de onde ele conta (posição atual ou ponto fixo). */
+    val raioKm: Double? = null, val raioLat: Double? = null, val raioLng: Double? = null) {
+    /** Centro e raio (km) para desenhar no mapa, se houver. */
+    val raio: Pair<Pair<Double, Double>, Double>? get() {
+        val km = raioKm ?: return null
+        if (km <= 0) return null
+        val la = raioLat ?: lat ?: return null; val lo = raioLng ?: lng ?: return null
+        return (la to lo) to km
+    }
+}
 
 /** Ponto da trilha (últimas 12 h). */
 data class PontoTrilha(val sessao: String?, val status: String, val lat: Double, val lng: Double, val quando: Long = 0, val corridaId: String? = null)
@@ -217,7 +227,8 @@ fun JsonObject.paraMembroG() = MembroG(
     repassePct = dbl("repasse_pct"), bloqueado = bool("bloqueado"), ultimoAcesso = iso(str("ultimo_acesso")),
 )
 
-fun JsonObject.paraPosicaoG() = PosicaoG(str("id")!!, str("status") ?: "offline", dbl("lat"), dbl("lng"), iso(str("posicao_em")), bool("modo_teste"), int("bateria"), dbl("precisao_m"), bool("modo_economia"))
+fun JsonObject.paraPosicaoG() = PosicaoG(str("id")!!, str("status") ?: "offline", dbl("lat"), dbl("lng"), iso(str("posicao_em")), bool("modo_teste"), int("bateria"), dbl("precisao_m"), bool("modo_economia"),
+    dbl("raio_km"), if (str("raio_modo") == "fixo") dbl("raio_lat") else null, if (str("raio_modo") == "fixo") dbl("raio_lng") else null)
 
 fun JsonObject.paraEmpresaG() = EmpresaG(
     id = str("id")!!, nome = str("nome").orEmpty(), cnpj = str("cnpj"), razaoSocial = str("razao_social"), nomeFantasia = str("nome_fantasia"),

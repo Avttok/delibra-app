@@ -140,7 +140,7 @@ fun CorridaScreen(corrida: Corrida, admin: Boolean = false, modifier: Modifier =
             // feito (pelas ruas, do servidor) + onde estou agora; a fazer: daqui até as paradas que faltam
             val feito = com.pwexpress.core.mapa.rememberTrilhaCorrida(corrida.id, ativa = true)
             val eu = posicao?.let { it.lat to it.lng }
-            PwMapa(
+            PwMapa(maximizavel = false,
                 paradas = pinos,
                 rota = corrida.rotaPlanejada,
                 minhaPosicao = eu,

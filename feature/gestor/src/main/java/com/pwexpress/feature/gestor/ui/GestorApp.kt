@@ -134,6 +134,8 @@ fun GestorApp(
             if (atual == null) topo()
             faixa?.invoke()
             // motoboy pedindo para cancelar: aparece em todas as telas até alguém responder
+            // emergência: em todas as telas, até alguém marcar "Resolvido"
+            FaixaEmergenciasG(onAbrirCorrida = { abrir(TelaG.Corrida(it)) })
             if (atual !is TelaG.Corrida) FaixaChamadosG(onAbrir = { abrir(TelaG.Corrida(it)) })
             Box(Modifier.weight(1f)) {
                 when (atual) {

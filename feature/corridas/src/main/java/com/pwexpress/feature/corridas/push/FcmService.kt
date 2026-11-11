@@ -68,6 +68,15 @@ class FcmService : FirebaseMessagingService() {
                 runBlocking { withTimeoutOrNull(8_000) { Corridas.sincronizarAgora() } }
             }
             "chamado_respondido" -> {
+                if (message.data["pular"] == "true") {
+                    val titulo = message.data["titulo"] ?: "Resposta do gestor"
+                    val texto = message.data["texto"].orEmpty()
+                    val liberou = titulo.contains("liberada", ignoreCase = true)
+                    PwNotificacoes.cartao(applicationContext, 4121, PwNotificacoes.CANAL_AVISOS, titulo, texto, if (liberou) PwNotificacoes.GRAD_VERDE else PwNotificacoes.GRAD_OURO, icone = if (liberou) "check" else "alerta")
+                    PwDestaque.mostrar(titulo, texto, if (liberou) EstiloDestaque.ONLINE else EstiloDestaque.EXTENSAO, duracaoMs = 6_000)
+                    runBlocking { withTimeoutOrNull(8_000) { Corridas.sincronizarAgora() } }
+                    return
+                }
                 val aprovado = message.data["aprovado"] == "true"
                 val titulo = message.data["titulo"] ?: if (aprovado) "Cancelamento aprovado" else "Cancelamento negado"
                 val texto = message.data["texto"] ?: if (aprovado) "A rota saiu de você. Pode parar." else "Siga com a rota como combinado."
@@ -84,8 +93,23 @@ class FcmService : FirebaseMessagingService() {
                     if (fim) PwNotificacoes.GRAD_VERDE else PwNotificacoes.GRAD_VERMELHO, icone = if (fim) "check" else "alerta")
                 runBlocking { withTimeoutOrNull(6_000) { com.pwexpress.core.perfil.Perfis.carregar() } }
             }
-            // avisos do gestor: motoboy pedindo para cancelar, motoboy suspenso
-            "chamado_cancelar", "motoboy_suspenso" -> {
+            "parada_liberada" -> {
+                val titulo = message.data["titulo"] ?: "Parada liberada"
+                val texto = message.data["texto"] ?: "Pode confirmar de onde está."
+                PwNotificacoes.cartao(applicationContext, 4122, PwNotificacoes.CANAL_AVISOS, titulo, texto, PwNotificacoes.GRAD_VERDE, icone = "check")
+                PwDestaque.mostrar(titulo, texto, EstiloDestaque.ONLINE, duracaoMs = 6_000)
+                runBlocking { withTimeoutOrNull(8_000) { Corridas.sincronizarAgora() } }
+            }
+            // emergência de um motoboy: o aviso mais forte que o app tem
+            "emergencia" -> {
+                val idN = 4700 + ((message.data["emergencia_id"] ?: "").hashCode() and 0xFF)
+                PwNotificacoes.cartao(applicationContext, idN, PwNotificacoes.CANAL_AVISOS,
+                    message.data["titulo"] ?: "EMERGÊNCIA", message.data["texto"] ?: "Um motoboy apertou o botão de emergência.", PwNotificacoes.GRAD_VERMELHO,
+                    abrir = PwNotificacoes.abrirApp(applicationContext, idN, "gestor:emergencia"), icone = "alerta")
+                PwDestaque.mostrar(message.data["titulo"] ?: "EMERGÊNCIA", message.data["texto"], EstiloDestaque.CANCELADA, duracaoMs = 12_000)
+            }
+            // avisos do gestor: motoboy pedindo para cancelar ou liberar parada, motoboy suspenso, nota ruim, rota fechada sem sinal
+            "chamado_cancelar", "motoboy_suspenso", "chamado_pular", "avaliacao_ruim", "corrida_fechada_auto" -> {
                 val corrida = message.data["corrida_id"].orEmpty()
                 val idN = 4500 + ((message.data["chamado_id"] ?: corrida).hashCode() and 0xFF)
                 PwNotificacoes.cartao(applicationContext, idN, PwNotificacoes.CANAL_AVISOS,

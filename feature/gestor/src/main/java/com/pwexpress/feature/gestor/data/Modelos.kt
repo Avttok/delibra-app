@@ -50,6 +50,12 @@ data class ParadaG(
     val codigo: String? = null, val janelaDe: String? = null, val janelaAte: String? = null,
     /** Pedido de onde veio a parada (rotas montadas de pedidos). */
     val pedidoId: String? = null,
+    /** Você liberou: o motoboy confirma de onde estiver. */
+    val liberadaLocal: Boolean = false,
+    /** Feita sem internet (veio depois com a hora certa). */
+    val feitaOffline: Boolean = false,
+    /** A rota fechou sozinha e esta etapa espera o app mandar os dados. */
+    val confirmacaoPendente: Boolean = false,
 )
 
 data class CorridaG(
@@ -69,6 +75,8 @@ data class CorridaG(
     /** Rotas automáticas (roteirizador). */
     val origem: String = "manual", val sugeridoMotoboyId: String? = null, val modoDespacho: String? = null, val quadroDesde: Long? = null,
     val pagCalculo: JsonObject? = null, val pagAjuste: Double = 0.0, val pagAjusteMotivo: String? = null, val perigoso: Boolean = false,
+    /** Fechou sozinha (motoboy sem sinal): espera o app mandar as etapas. */
+    val aguardandoConfirmacao: Boolean = false,
 ) {
     val automatica get() = origem == "roteirizador"
     val entregas get() = paradas.count { !it.coleta }
@@ -140,6 +148,7 @@ fun JsonObject.paraParadaG() = ParadaG(
     exigeFoto = boolOuNulo("exige_foto"), exigeNome = boolOuNulo("exige_nome"), exigeAssinatura = boolOuNulo("exige_assinatura"), exigeCodigo = boolOuNulo("exige_codigo"),
     codigo = str("codigo"), janelaDe = str("janela_de")?.take(5), janelaAte = str("janela_ate")?.take(5),
     pedidoId = str("pedido_id"),
+    liberadaLocal = bool("liberada_local"), feitaOffline = bool("feita_offline"), confirmacaoPendente = bool("confirmacao_pendente"),
 )
 
 /** true/false do JSON, ou null quando vazio. */
@@ -163,6 +172,7 @@ fun JsonObject.paraCorridaG() = CorridaG(
     paradas = arr("paradas").map { it.paraParadaG() }.sortedBy { it.ordem },
     origem = str("origem") ?: "manual", sugeridoMotoboyId = str("sugerido_motoboy_id"), modoDespacho = str("modo_despacho"), quadroDesde = iso(str("quadro_desde")),
     pagCalculo = obj("pag_calculo"), pagAjuste = dbl("pag_ajuste") ?: 0.0, pagAjusteMotivo = str("pag_ajuste_motivo"), perigoso = bool("tem_perigoso"),
+    aguardandoConfirmacao = bool("aguardando_confirmacao"),
 )
 
 // ------------------------------------------------------------------ pedidos (do site do cliente e do gestor)

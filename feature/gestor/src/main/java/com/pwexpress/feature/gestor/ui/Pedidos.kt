@@ -1272,7 +1272,7 @@ private fun CartaoRotaG(
             (sug?.get("regras_comuns") as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it as? kotlinx.serialization.json.JsonObject }?.forEach { rc ->
                 PwPilula("Usar as de costume (${rc.long("vezes")}×)", PwIcones.Sparkles, { regras.clear(); rc.obj("regras")?.let { regras.putAll(it) } })
             }
-            EditorRegrasG(paramsPag(regras, corrida.pagCalculo?.str("modo")), regras, { k, v -> if (v == null) regras.remove(k) else regras[k] = v })
+            EditorRegrasG(paramsPag(regras, r.obj("pagamento")?.str("modo")), regras, { k, v -> if (v == null) regras.remove(k) else regras[k] = v })
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PwBotaoOuro("Salvar pagamento", onClick = {
                     if (previa) rodar("Pagamento da rota salvo. A prévia já mostra o valor novo.", rpc("definir_regras_rota_pedido") { put("p_pedido", pedidoId); put("p_regras", kotlinx.serialization.json.JsonObject(regras.toMap())) })

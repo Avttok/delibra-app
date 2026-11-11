@@ -7,6 +7,7 @@ import android.graphics.RectF
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -104,7 +105,11 @@ private fun desenhar(fonte: Bitmap, a: Ajuste, lado: Int = 512): Bitmap {
  * vira transparente). A prévia mostra no escuro com o brilho da cor da empresa.
  */
 @Composable
-fun EditorIconeApp(original: Bitmap, cor: String?, nome: String, escalaInicial: Float, onCancelar: () -> Unit, onPronto: (ByteArray, Float) -> Unit) {
+fun EditorIconeApp(
+    original: Bitmap, cor: String?, nome: String, escalaInicial: Float, onCancelar: () -> Unit,
+    onPronto: (png: ByteArray, escala: Float, brilhoCor: String?, brilho: Float) -> Unit,
+    brilhoCorInicial: String? = null, brilhoInicial: Float = 0.55f, fonteNome: String? = null,
+) {
     val c = Pw.cores
     // trabalha numa cópia de até 1024 px (rápido e com qualidade de sobra para 512)
     val fonte = remember(original) {
@@ -114,12 +119,14 @@ fun EditorIconeApp(original: Bitmap, cor: String?, nome: String, escalaInicial: 
     var a by remember { mutableStateOf(Ajuste(tirarFundo = !temTransparencia(fonte))) }
     var previa by remember { mutableStateOf<Bitmap?>(null) }
     var escala by remember { mutableFloatStateOf(escalaInicial) }
+    var brilhoCor by remember { mutableStateOf(brilhoCorInicial) }
+    var forca by remember { mutableFloatStateOf(brilhoInicial) }
     var dxS by remember { mutableFloatStateOf(0f) }; var dyS by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(a) {
         delay(80)
         previa = withContext(Dispatchers.Default) { desenhar(fonte, a, 384) }
     }
-    val brilho = cor?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() } ?: c.ouro
+    val brilho = (brilhoCor ?: cor)?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() } ?: c.ouro
     val cores = SliderDefaults.colors(thumbColor = c.ouro, activeTrackColor = c.ouro, inactiveTrackColor = c.bordaForte)
 
     PwJanela("Ajustar o ícone", onCancelar) {
@@ -128,19 +135,37 @@ fun EditorIconeApp(original: Bitmap, cor: String?, nome: String, escalaInicial: 
             .border(1.dp, c.borda, RoundedCornerShape(18.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val lado = (22 * escala).dp
-            Box(Modifier.size(lado).drawBehind { drawCircle(Brush.radialGradient(listOf(brilho.copy(alpha = 0.55f), brilho.copy(alpha = 0.18f), Color.Transparent), center, size.minDimension * 0.62f), size.minDimension * 0.62f, center) }) {
+            Box(Modifier.size(lado).drawBehind { drawCircle(Brush.radialGradient(listOf(brilho.copy(alpha = forca), brilho.copy(alpha = forca * 0.33f), Color.Transparent), center, size.minDimension * 0.62f), size.minDimension * 0.62f, center) }) {
                 previa?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize()) }
             }
-            Text(nome, color = Color(0xFFF5F2EA), fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold, fontFamily = com.pwexpress.core.designsystem.Archivo,
+            Text(nome, color = Color(0xFFF5F2EA), fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,
+                fontFamily = fonteNome?.let { com.pwexpress.core.designsystem.FonteApp.de(it).familia } ?: com.pwexpress.core.designsystem.Archivo,
                 fontSize = 21.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             Box(Modifier.size(34.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.06f)))
             Box(Modifier.size(34.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.06f)))
         }
         Text("Tamanho no topo", color = c.texto2, fontSize = 13.sp)
         Slider(escala, { escala = it }, valueRange = 0.8f..2.6f, colors = cores)
+        // brilho atrás da logo: cor e força
+        Text("Cor do brilho", color = c.texto2, fontSize = 13.sp)
+        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+        androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val opcoes = listOf(null, "#D4AF37", "#F3D77E", "#FFFFFF", "#EF4444", "#F472B6", "#A78BFA", "#3B82F6", "#22D3EE", "#34D399", "#FB923C", "#FACC15")
+            opcoes.forEach { hex ->
+                val cc = hex?.let { Color(android.graphics.Color.parseColor(it)) } ?: (cor?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() } ?: c.ouro)
+                val ativo = brilhoCor == hex
+                Box(Modifier.size(34.dp).clip(androidx.compose.foundation.shape.CircleShape).background(cc)
+                    .border(if (ativo) 3.dp else 1.dp, if (ativo) c.texto else c.bordaForte, androidx.compose.foundation.shape.CircleShape)
+                    .clickable { brilhoCor = hex }, contentAlignment = androidx.compose.ui.Alignment.Center) {
+                    if (hex == null) Text("A", color = Color.Black, fontSize = 11.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                }
+            }
+        }
+        Text("Força do brilho", color = c.texto2, fontSize = 13.sp)
+        Slider(forca, { forca = it }, valueRange = 0f..1f, colors = cores)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(Modifier.weight(1.5f).aspectRatio(1f).clip(RoundedCornerShape(26.dp)).background(Color(0xFF0B0B0D)).border(1.dp, c.borda, RoundedCornerShape(26.dp))
-                .drawBehind { drawCircle(Brush.radialGradient(listOf(brilho.copy(alpha = 0.5f), brilho.copy(alpha = 0.15f), Color.Transparent), center, size.minDimension * 0.55f), size.minDimension * 0.55f, center) }) {
+                .drawBehind { drawCircle(Brush.radialGradient(listOf(brilho.copy(alpha = forca), brilho.copy(alpha = forca * 0.3f), Color.Transparent), center, size.minDimension * 0.55f), size.minDimension * 0.55f, center) }) {
                 previa?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize()) }
             }
             Box(Modifier.weight(1f).aspectRatio(1f).clip(RoundedCornerShape(20.dp)).background(Color(0xFFF2F2F2))) {
@@ -164,7 +189,7 @@ fun EditorIconeApp(original: Bitmap, cor: String?, nome: String, escalaInicial: 
             PwBotaoVidro("Voltar", onClick = { a = Ajuste(tirarFundo = !temTransparencia(fonte)) }, icone = PwIcones.RotateCcw, modifier = Modifier.weight(1f).height(52.dp))
             PwBotaoOuro("Salvar", onClick = {
                 val png = ByteArrayOutputStream().also { desenhar(fonte, a, 512).compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
-                onPronto(png, escala)
+                onPronto(png, escala, brilhoCor, forca)
             }, icone = PwIcones.Check, altura = 52.dp, modifier = Modifier.weight(1f))
         }
     }

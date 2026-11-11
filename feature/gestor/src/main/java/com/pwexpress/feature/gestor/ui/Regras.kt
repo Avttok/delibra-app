@@ -179,7 +179,7 @@ internal fun EditorRegrasG(params: List<Param>, valores: Map<String, JsonElement
         }
     }
     com.pwexpress.core.designsystem.PwInterruptor("Só as exceções", soExc, { soExc = it }, descricao = "${params.count { it.chave in valores }} regra(s) diferentes do padrão")
-    var lista = if (termo.isNotEmpty()) params.filter { sem("${it.rotulo} ${it.descricao}").contains(termo) }
+    var lista = if (termo.isNotEmpty()) params.filter { com.pwexpress.core.busca.combina(termo, it.rotulo, it.descricao) }
         else params.filter { (area.isEmpty() || grupoArea[it.grupo] == area) && (secao.isEmpty() || it.grupo == secao) }
     if (soExc) lista = lista.filter { it.chave in valores }
     if (lista.isEmpty()) { PwVazio(if (soExc) "Nenhuma exceção aqui: tudo usa o padrão." else "Nenhuma regra encontrada.", icone = PwIcones.Search); return }

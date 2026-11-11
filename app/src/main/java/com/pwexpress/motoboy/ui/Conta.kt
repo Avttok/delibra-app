@@ -114,6 +114,7 @@ fun JanelaConta(
     var conquistas by remember { mutableStateOf(false) }
     var raio by remember { mutableStateOf(false) }
     var empresa by remember { mutableStateOf(false) }
+    var fonte by remember { mutableStateOf(false) }
     val ehMotoboy = painel == Painel.MOTOBOY && perfil?.motoboy == true
     com.pwexpress.core.designsystem.PwTelaCheia("Sua conta", onFechar) {
         // cabeçalho: foto grande, nome, e-mail, empresa e o cargo principal (toque edita o perfil)
@@ -130,7 +131,7 @@ fun JanelaConta(
                     Text(email, color = c.texto3, fontSize = 12.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     perfil?.organizacao?.let { Text(it, color = c.ouro, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     Spacer(Modifier.height(6.dp))
-                    PwSelosCargo(perfil?.dev == true, perfil?.gestor == true && perfil?.dev != true, perfil?.motoboy == true)
+                    PwSelosCargo(perfil?.dev == true, perfil?.gestor == true && perfil?.dev != true && perfil?.supervisor != true, perfil?.motoboy == true, supervisor = perfil?.supervisor == true)
                 }
                 Icon(PwIcones.Pencil, "Editar perfil", tint = c.texto3, modifier = Modifier.size(18.dp))
             }
@@ -164,6 +165,7 @@ fun JanelaConta(
             if (perfil?.dev == true) add(Bloco(PwIcones.Layers, "Modo Dev", c.dev, sub = "Trocar de empresa", onClick = { onFechar(); ModoDevApp.abrir() }))
             if (!mono) add(Bloco(if (escuro) PwIcones.Moon else PwIcones.Sun, if (escuro) "Tema noturno" else "Tema claro", ligado = escuro,
                 onClick = { TemaApp.definir(if (escuro) PreferenciaTema.CLARO else PreferenciaTema.ESCURO) }))
+            add(Bloco(PwIcones.Type, "Fonte", sub = com.pwexpress.core.designsystem.Fontes.atual.value.rotulo.substringBefore(" ("), onClick = { fonte = true }))
             if (perfil?.dev == true) add(Bloco(PwIcones.Palette, "Tema vermelho", c.dev, ligado = vermelho, onClick = {
                 val lig = !vermelho
                 TemaApp.definirVermelho(lig)
@@ -198,8 +200,9 @@ fun JanelaConta(
         }
         PwErro(erro)
         GrupoMenu("Cores do app") { EscolherCores(estilo) }
-        // easter egg, igual ao rodapé do site
-        Row(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+        // easter egg, só na PW Express (igual ao rodapé do site)
+        val marcaPw by com.pwexpress.core.marca.MarcaEmpresa.marca.collectAsState()
+        if (marcaPw?.let { "${it.nome} ${it.nomeApp.orEmpty()}".contains("PW", ignoreCase = true) } == true) Row(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Text("Um projeto de irmão para irmão!", color = c.texto3, fontSize = 11.5.sp, fontFamily = Archivo)
             Spacer(Modifier.width(5.dp))
             CoracaoBatendo()
@@ -208,6 +211,21 @@ fun JanelaConta(
     if (conquistas) com.pwexpress.core.perfil.JanelaConquistas(onFechar = { conquistas = false })
     if (raio) JanelaRaio(onFechar = { raio = false })
     if (empresa) JanelaMinhaEmpresa(onFechar = { empresa = false })
+    if (fonte) com.pwexpress.core.designsystem.PwJanela("Fonte do app", { fonte = false }) {
+        Text("Vale só para você, neste aparelho.", color = c.texto3, fontSize = 13.sp)
+        com.pwexpress.core.designsystem.FonteApp.entries.forEach { f ->
+            val ativo = f == com.pwexpress.core.designsystem.Fontes.atual.value
+            val forma = RoundedCornerShape(16.dp)
+            Row(Modifier.fillMaxWidth().clip(forma).background(if (ativo) c.ouro.copy(alpha = 0.12f) else c.vidro).border(1.dp, if (ativo) c.ouro else c.borda, forma)
+                .clickable { com.pwexpress.core.designsystem.Fontes.definir(f) }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(f.rotulo, fontFamily = f.familia, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = c.texto)
+                    Text("Rotas, entregas e ganhos de hoje", fontFamily = f.familia, fontSize = 13.sp, color = c.texto2)
+                }
+                if (ativo) Icon(PwIcones.Check, "Escolhida", tint = c.ouro, modifier = Modifier.size(20.dp))
+            }
+        }
+    }
 }
 
 /** Um bloco do menu: atalho, ou liga/desliga quando `ligado` não é null. */
@@ -311,7 +329,9 @@ private fun EscolherCores(atual: com.pwexpress.core.designsystem.EstiloTema) {
             Text(atual.rotulo, color = c.texto3, fontSize = 12.5.sp)
         }
         Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        // todas as cores e degradês, em linhas que quebram sozinhas
+        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+        androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             com.pwexpress.core.designsystem.EstiloTema.entries.forEach { e ->
                 val ativo = e == atual
                 val anel by androidx.compose.animation.core.animateDpAsState(if (ativo) 3.dp else 1.dp, label = "anel")
@@ -320,7 +340,9 @@ private fun EscolherCores(atual: com.pwexpress.core.designsystem.EstiloTema) {
                         .border(anel, if (ativo) c.ouro else c.bordaForte, androidx.compose.foundation.shape.CircleShape)
                         .clickable { com.pwexpress.core.designsystem.TemaApp.definirEstilo(e) }
                         .padding(5.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                        .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(e.fundoAmostra, e.fundoAmostra, e.amostra, e.amostra), start = androidx.compose.ui.geometry.Offset.Zero, end = androidx.compose.ui.geometry.Offset.Infinite)),
+                        .background(androidx.compose.ui.graphics.Brush.linearGradient(
+                            if (e.noturno != null) e.noturno.map { Color(it) } else listOf(e.fundoAmostra, e.fundoAmostra, e.amostra, e.amostra),
+                            start = androidx.compose.ui.geometry.Offset.Zero, end = androidx.compose.ui.geometry.Offset.Infinite)),
                     contentAlignment = Alignment.Center,
                 ) {
                     if (ativo) Icon(PwIcones.Check, e.rotulo, tint = if (e == com.pwexpress.core.designsystem.EstiloTema.PRETO_NO_BRANCO) Color.White else Color.Black, modifier = Modifier.size(16.dp))

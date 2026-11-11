@@ -105,6 +105,17 @@ class MainActivity : ComponentActivity() {
                     // depois de entrar, espera o perfil (papéis) antes de decidir o lado do app
                     var esperouPerfil by remember { mutableStateOf(false) }
                     LaunchedEffect(sessao?.email) { esperouPerfil = false; delay(8_000); esperouPerfil = true }
+                    // splash: segura na logo até puxar o essencial (perfil + dados do painel do gestor)
+                    var dadosProntos by remember { mutableStateOf(false) }
+                    LaunchedEffect(sessao?.email, perfil != null) {
+                        val pf = perfil ?: return@LaunchedEffect
+                        if (dadosProntos) return@LaunchedEffect
+                        kotlinx.coroutines.withTimeoutOrNull(7_000) {
+                            if (pf.gestor) Gestao.atualizar()
+                            if (pf.motoboy) { Corridas.carregarRotas(); Corridas.carregarPlanejadas() }
+                        }
+                        dadosProntos = true
+                    }
 
                     LaunchedEffect(abrirAba.value) { abrirAba.value?.let {
                         if (it == "planejadas" || it == "rotas") { aba = "corridas"; painel = Painel.MOTOBOY; naConfig = false }
@@ -165,6 +176,7 @@ class MainActivity : ComponentActivity() {
 
                     when {
                         s == null -> LoginScreen(conteudo)
+                        (p == null || !dadosProntos) && !esperouPerfil -> com.pwexpress.motoboy.ui.SplashMarca(if (p == null) "Carregando sua conta…" else "Preparando tudo…")
                         p == null && !esperouPerfil -> Box(conteudo.fillMaxSize(), contentAlignment = Alignment.Center) {
                             androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 com.pwexpress.core.designsystem.PwLogoGrande(170.dp)

@@ -143,9 +143,16 @@ fun LoginScreen(modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(12.dp))
+            var verSenha by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
             OutlinedTextField(
                 value = senha, onValueChange = { senha = it }, label = { Text("Senha") }, singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (verSenha) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    androidx.compose.material3.IconButton(onClick = { verSenha = !verSenha }) {
+                        androidx.compose.material3.Icon(if (verSenha) com.pwexpress.core.designsystem.PwIcones.EyeOff else com.pwexpress.core.designsystem.PwIcones.Eye,
+                            if (verSenha) "Esconder a senha" else "Ver a senha", tint = c.texto3)
+                    }
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { entrar() }),
                 modifier = Modifier.fillMaxWidth().focusRequester(focoSenha),

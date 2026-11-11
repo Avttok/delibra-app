@@ -219,7 +219,11 @@ private fun BotaoStatus(modo: Modo, onAlternar: () -> Unit, onToque: () -> Unit,
     val escala = escalaToque * (1f + 0.07f * kotlin.math.sin(Math.PI * onda.value).toFloat())
     val tam = 236.dp
     // ícones desenhados no radar: a moto que gira por fora e os itens que os clientes pedem
-    val pintorMoto = androidx.compose.ui.graphics.vector.rememberVectorPainter(PwIcones.Moto)
+    // o veículo cadastrado gira em volta do anel (padrão: moto)
+    val veiculo by com.pwexpress.core.perfil.Perfis.veiculo.collectAsState()
+    val pintorMoto = androidx.compose.ui.graphics.vector.rememberVectorPainter(when (veiculo) {
+        "carro" -> PwIcones.Car; "bicicleta" -> PwIcones.Bicycle; "van" -> PwIcones.Truck; else -> PwIcones.Moto
+    })
     val pintoresItens = listOf(PwIcones.FileText, PwIcones.Package, PwIcones.ShoppingBag, PwIcones.Pill, PwIcones.Key, PwIcones.Boxes)
         .map { androidx.compose.ui.graphics.vector.rememberVectorPainter(it) }
     val ouroMarca = Pw.cores.ouro
@@ -281,16 +285,14 @@ private fun BotaoStatus(modo: Modo, onAlternar: () -> Unit, onToque: () -> Unit,
                     }
                     if (l > 0f) rotate(giro, centro) {
                         drawCircle(Brush.sweepGradient(listOf(cor2.copy(alpha = 0.15f * l), cor.copy(alpha = l), cor3.copy(alpha = l), cor2.copy(alpha = 0.15f * l)), centro), rAnel, style = Stroke(esp))
-                        // brilho na ponta da aurora
-                        drawCircle(cor3.copy(alpha = 0.30f * l), esp * 1.2f, Offset(centro.x + rAnel, centro.y))
                     }
                     // a moto anda por FORA do anel, como numa pista, apontando para onde vai
                     if (l > 0f) {
-                        val t = 22.dp.toPx()
-                        val rMoto = rAnel + esp / 2f + 12.dp.toPx()
+                        val t = 26.dp.toPx()
+                        val rMoto = rAnel + esp / 2f + 14.dp.toPx()
                         val ang = Math.toRadians(giro.toDouble())
                         val pc = Offset(centro.x + rMoto * kotlin.math.cos(ang).toFloat(), centro.y + rMoto * kotlin.math.sin(ang).toFloat())
-                        drawCircle(Brush.radialGradient(listOf(ouroMarca.copy(alpha = 0.35f * l), Color.Transparent), pc, t), t, pc)
+                        drawCircle(Brush.radialGradient(listOf(ouroMarca.copy(alpha = 0.22f * l), Color.Transparent), pc, t * 0.9f), t * 0.9f, pc)
                         rotate(giro + 90f, pc) {
                             translate(pc.x - t / 2f, pc.y - t / 2f) {
                                 with(pintorMoto) { draw(androidx.compose.ui.geometry.Size(t, t), alpha = l, colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(ouroMarca)) }
@@ -331,13 +333,14 @@ private fun BotaoStatus(modo: Modo, onAlternar: () -> Unit, onToque: () -> Unit,
                         // o que os clientes pedem (documento, pacote, sacola, remédio, chave, caixas) acende quando o radar passa
                         listOf(0.58f to 30f, 0.66f to 95f, 0.62f to 160f, 0.70f to 215f, 0.60f to 265f, 0.72f to 320f).forEachIndexed { i, (dist, ang) ->
                             val idade = (((radar - ang) % 360f) + 360f) % 360f / 360f // 0 logo depois do radar passar
-                            val a = (1f - idade).let { it * it } * 0.95f
+                            // acende quando o radar passa e some rápido (bem antes de ele voltar)
+                            val a = ((0.38f - idade) / 0.38f).coerceIn(0f, 1f).let { it * it } * 0.95f
                             val rad = Math.toRadians(ang.toDouble())
                             val p = Offset(center.x + r * dist * kotlin.math.cos(rad).toFloat(), center.y + r * dist * kotlin.math.sin(rad).toFloat())
                             val t = 15.dp.toPx() * (0.85f + 0.25f * a)
                             drawCircle(cor.copy(alpha = a * 0.28f), 11.dp.toPx(), p)
                             translate(p.x - t / 2f, p.y - t / 2f) {
-                                with(pintoresItens[i % pintoresItens.size]) { draw(androidx.compose.ui.geometry.Size(t, t), alpha = 0.12f + a * 0.88f, colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(cor3)) }
+                                with(pintoresItens[i % pintoresItens.size]) { draw(androidx.compose.ui.geometry.Size(t, t), alpha = a, colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(cor3)) }
                             }
                         }
                         drawCircle(cor.copy(alpha = 0.10f), r * 0.66f, style = Stroke(1.dp.toPx()))

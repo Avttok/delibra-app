@@ -209,10 +209,11 @@ fun PwSeloLogo(tamanho: Dp, modifier: Modifier = Modifier, descricao: String? = 
     val url = empresa?.logoUrl
     if (!delibra && url != null) {
         // logo da empresa solta (sem caixa), com um brilho da cor da empresa por trás, como a PW era
-        val corMarca = empresa?.cor?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() } ?: Pw.cores.ouro
+        val corMarca = (empresa?.brilhoCor ?: empresa?.cor)?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() } ?: Pw.cores.ouro
+        val forca = empresa?.brilho ?: 0.55f
         Box(modifier.size(tamanho), contentAlignment = Alignment.Center) {
             Box(Modifier.matchParentSize().drawBehind {
-                drawCircle(Brush.radialGradient(listOf(corMarca.copy(alpha = 0.55f), corMarca.copy(alpha = 0.18f), Color.Transparent), center, size.minDimension * 0.62f),
+                drawCircle(Brush.radialGradient(listOf(corMarca.copy(alpha = forca), corMarca.copy(alpha = forca * 0.33f), Color.Transparent), center, size.minDimension * 0.62f),
                     size.minDimension * 0.62f, center)
             })
             coil.compose.AsyncImage(url, empresa?.nome ?: descricao, Modifier.fillMaxSize().padding(tamanho * 0.04f),
@@ -222,8 +223,10 @@ fun PwSeloLogo(tamanho: Dp, modifier: Modifier = Modifier, descricao: String? = 
         return
     }
     val marca = Pw.cores.marca
-    val res = when (marca) { Marca.VIOLETA -> R.drawable.pwex_marca_violeta; Marca.VERMELHO -> R.drawable.pwex_marca_vermelho; Marca.AZUL -> R.drawable.pwex_marca_azul; Marca.VERDE -> R.drawable.pwex_marca_verde; Marca.BRANCO -> R.drawable.pwex_marca_branco; Marca.PRETO -> R.drawable.pwex_marca_preto; Marca.OURO -> R.drawable.pwex_marca_ouro }
-    Image(painterResource(res), descricao, modifier.size(tamanho), contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+    val res = when (marca) { Marca.VIOLETA -> R.drawable.pwex_marca_violeta; Marca.VERMELHO -> R.drawable.pwex_marca_vermelho; Marca.AZUL -> R.drawable.pwex_marca_azul; Marca.VERDE -> R.drawable.pwex_marca_verde; Marca.BRANCO -> R.drawable.pwex_marca_branco; Marca.PRETO -> R.drawable.pwex_marca_preto; Marca.OURO -> R.drawable.pwex_marca_ouro; Marca.TINTA -> R.drawable.pwex_marca_branco }
+    // cores novas: a logo branca pintada com a cor do tema
+    Image(painterResource(res), descricao, modifier.size(tamanho), contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+        colorFilter = if (marca == Marca.TINTA) androidx.compose.ui.graphics.ColorFilter.tint(Pw.cores.ouro, androidx.compose.ui.graphics.BlendMode.Modulate) else null)
 }
 
 /** Logo + o nome "delibra". Com `soSelo`, só o desenho. */
@@ -244,7 +247,8 @@ fun PwLogo(modifier: Modifier = Modifier, tamanho: Int = 26, soSelo: Boolean = f
         Text(
             propria ?: "delibra",
             color = c.texto,
-            fontFamily = Archivo,
+            // fonte do nome escolhida pelo gestor (Minha empresa); senão a do app
+            fontFamily = empresa?.fonte?.let { FonteApp.de(it).familia } ?: Archivo,
             fontWeight = FontWeight.ExtraBold,
             fontSize = (tamanho * 0.95f).sp,
             letterSpacing = (-tamanho * 0.03f).sp,

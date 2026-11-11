@@ -89,12 +89,17 @@ object Perfis {
     private fun publicarMarca(o: kotlinx.serialization.json.JsonElement) {
         val org = ((o as? JsonObject)?.get("organizacao") as? JsonObject)
         fun t(k: String) = (org?.get(k) as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
-        com.pwexpress.core.marca.MarcaEmpresa.atualizar(t("nome")?.let { com.pwexpress.core.marca.Marca(it, t("logo"), t("cor"), t("nome_app"), t("logo_escala")?.toFloatOrNull() ?: 1.9f) })
+        com.pwexpress.core.marca.MarcaEmpresa.atualizar(t("nome")?.let { com.pwexpress.core.marca.Marca(it, t("logo"), t("cor"), t("nome_app"), t("logo_escala")?.toFloatOrNull() ?: 1.9f,
+            t("brilho_cor"), t("brilho")?.toFloatOrNull() ?: 0.55f, t("fonte"), t("logo_original")) })
     }
 
 
     private val _perfil = MutableStateFlow<Perfil?>(null)
     val perfil: StateFlow<Perfil?> = _perfil.asStateFlow()
+
+    /** Veículo cadastrado (moto, carro, bicicleta, van, outro): o ícone que gira no botão online. */
+    private val _veiculo = MutableStateFlow("moto")
+    val veiculo: StateFlow<String> = _veiculo.asStateFlow()
 
     private val _ganhos = MutableStateFlow<Ganhos?>(null)
     val ganhos: StateFlow<Ganhos?> = _ganhos.asStateFlow()
@@ -105,6 +110,10 @@ object Perfis {
         tentar {
             val r = PwCore.rpc.chamar("meu_perfil", JsonObject(emptyMap()))
             if (r.ok) r.json()?.let { _perfil.value = it.paraPerfil(); publicarMarca(it) }
+            PwCore.auth.sessao.value?.userId?.let { uid ->
+                val v = PwCore.rpc.rest("GET", "/rest/v1/motoboys?select=veiculo_tipo&id=eq.$uid")
+                if (v.ok) (v.json() as? kotlinx.serialization.json.JsonArray)?.firstOrNull()?.let { (it as? JsonObject)?.get("veiculo_tipo") as? JsonPrimitive }?.content?.let { _veiculo.value = it }
+            }
             val g = PwCore.rpc.chamar("meus_ganhos", JsonObject(emptyMap()))
             if (g.ok) g.json()?.jsonObject?.let { o ->
                 _ganhos.value = Ganhos(

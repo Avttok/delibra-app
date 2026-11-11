@@ -923,8 +923,8 @@ private fun EditarOrcamentoG(pedido: String, o: kotlinx.serialization.json.JsonO
     }
     PwErro(erro)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        PwBotaoVidro("Cancelar", onClick = onFechar, modifier = Modifier.weight(1f))
-        PwBotaoOuro(if (salvando) "Salvando…" else "Salvar cálculo", onClick = {
+        PwBotaoVidro("Cancelar", onClick = onFechar, modifier = Modifier.weight(1f).height(52.dp))
+        PwBotaoOuro(if (salvando) "Salvando…" else "Salvar", altura = 52.dp, onClick = {
             salvando = true
             escopo.launch {
                 Gestao.editarOrcamento(pedido, kotlinx.serialization.json.buildJsonArray {
@@ -1136,14 +1136,15 @@ private fun CartaoRotaG(
         Text("Valor da rota", color = c.texto2, modifier = Modifier.weight(1f))
         Text(moedaBr(r.dbl("valor")), color = c.texto, fontWeight = FontWeight.Black, fontSize = 18.sp)
     }
-    if (r.dbl("valor_manual") != null) TextoDica("Escolhido à mão")
+    if (r.dbl("valor_manual") != null) TextoDica("Valor fixo")
     if (editavel) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        PwCampo(valorTxt, { valorTxt = it }, "Valor à mão (vazio = soma dos pedidos)", teclado = KeyboardType.Decimal, prefixo = "R$ ", modifier = Modifier.weight(1f))
+        PwCampo(valorTxt, { valorTxt = it }, "Fixo", teclado = KeyboardType.Decimal, prefixo = "R$ ", modifier = Modifier.weight(1f))
         val vn = valorTxt.trim().takeIf { it.isNotEmpty() }?.replace(".", "")?.replace(",", ".")?.toDoubleOrNull()
         PwBotaoVidro(if (valorTxt.isBlank()) "Usar a soma" else "Salvar", onClick = {
             rodar(if (vn == null) "Valor volta a ser a soma dos pedidos." else "Valor da rota salvo.", rpc("definir_valor_rota") { put("p_corrida", id); if (vn != null) put("p_valor", vn) else put("p_valor", kotlinx.serialization.json.JsonNull) })
-        }, habilitado = !ocupado && (valorTxt.isBlank() || vn != null))
+        }, habilitado = !ocupado && (valorTxt.isBlank() || vn != null), modifier = Modifier.padding(top = 8.dp).height(56.dp))
     }
+    if (editavel && valorTxt.isBlank()) TextoDica("Vazio: a rota vale a soma dos pedidos.")
     Espaco(8)
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.vidro).padding(12.dp)) {
         PwRotulo("O motoboy que pegar recebe" + if (previaPag != null) " (prévia com as mudanças)" else "")

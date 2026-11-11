@@ -84,28 +84,35 @@ object MarcaEmpresa {
         }
     }
 
-    /** Ícone redondo (círculo) para o ícone grande das notificações. */
-    fun iconeRedondo(lado: Int = 192): Bitmap? {
-        val b = icone ?: return null
+    private fun corMarca(): Int = runCatching { android.graphics.Color.parseColor(_marca.value?.cor ?: "#D4AF37") }.getOrDefault(0xFFD4AF37.toInt())
+
+    /** Fundo escuro com o brilho da cor da empresa e a logo inteira por cima (sem cortar). */
+    private fun comBrilho(b: Bitmap, lado: Int, dentro: Float, redondo: Boolean): Bitmap {
         val saida = Bitmap.createBitmap(lado, lado, Bitmap.Config.ARGB_8888)
-        val p = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-        val m = android.graphics.Matrix().apply { setRectToRect(RectF(0f, 0f, b.width.toFloat(), b.height.toFloat()), RectF(0f, 0f, lado.toFloat(), lado.toFloat()), android.graphics.Matrix.ScaleToFit.CENTER) }
-        p.shader = BitmapShader(b, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).apply { setLocalMatrix(m) }
-        Canvas(saida).drawCircle(lado / 2f, lado / 2f, lado / 2f, p)
+        val tela = Canvas(saida)
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        val meio = lado / 2f
+        p.color = 0xFF0B0B0D.toInt()
+        if (redondo) tela.drawCircle(meio, meio, meio, p) else tela.drawRect(0f, 0f, lado.toFloat(), lado.toFloat(), p)
+        val cor = corMarca()
+        p.shader = android.graphics.RadialGradient(meio, meio, lado * 0.48f,
+            intArrayOf((cor and 0x00FFFFFF) or 0x88000000.toInt(), (cor and 0x00FFFFFF) or 0x2A000000, cor and 0x00FFFFFF), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+        tela.drawCircle(meio, meio, lado * 0.48f, p)
+        p.shader = null
+        val area = lado * dentro
+        val esc = minOf(area / b.width, area / b.height)
+        val w = b.width * esc; val h = b.height * esc
+        tela.drawBitmap(b, null, RectF(meio - w / 2, meio - h / 2, meio + w / 2, meio + h / 2), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
         return saida
     }
+
+    /** Ícone redondo para o ícone grande das notificações. */
+    fun iconeRedondo(lado: Int = 192): Bitmap? = icone?.let { comBrilho(it, lado, 0.72f, redondo = true) }
 
     /** Ícone "adaptável" (com margem de segurança) para o atalho da tela inicial. */
     private fun iconeAtalho(): Bitmap? {
         val b = icone ?: app?.let { runCatching { BitmapFactory.decodeResource(it.resources, com.pwexpress.core.R.drawable.pwex_marca_ouro) }.getOrNull() } ?: return null
-        val lado = 432; val dentro = (lado * 0.66f).toInt()
-        val saida = Bitmap.createBitmap(lado, lado, Bitmap.Config.ARGB_8888)
-        val tela = Canvas(saida)
-        val fundo = runCatching { android.graphics.Color.parseColor(_marca.value?.cor ?: "#0B0B0D") }.getOrDefault(0xFF0B0B0D.toInt())
-        tela.drawColor(fundo)
-        val off = (lado - dentro) / 2f
-        tela.drawBitmap(b, null, RectF(off, off, off + dentro, off + dentro), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
-        return saida
+        return comBrilho(b, 432, 0.6f, redondo = false)
     }
 
     fun podeFixar(ctx: Context) = (icone != null || _marca.value?.logoUrl == null) && _marca.value?.propria == true && ShortcutManagerCompat.isRequestPinShortcutSupported(ctx)

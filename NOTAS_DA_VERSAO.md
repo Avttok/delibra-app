@@ -3,6 +3,10 @@
 **Importante:** esta versão vem com a assinatura digital nova. Se o celular disser que não dá para atualizar, desinstale a versão antiga e instale esta (só desta vez).
 
 **Novidades desta versão**
+- Corrigido: o botão de camadas do mapa fechava o app.
+- **Editor do ícone** em Minha empresa: zoom, posição, margem e "tirar o fundo" (o branco vira transparente).
+- A logo da empresa aparece solta, sem caixa branca, com brilho da cor da empresa (topo, atualização, notificações e atalho).
+- Botões lado a lado do mesmo tamanho; "Valor à mão" virou **Fixo**.
 - **Modo Dev**: selo flutuante para ver o app como Tudo, Em branco ou uma empresa.
 - Sua conta toda em blocos de 2 colunas; liga/desliga mostram o estado.
 - "Como chegou no valor" desenhado pelas ruas (o gestor pode escolher linha reta em Ajustes → Distância do orçamento).

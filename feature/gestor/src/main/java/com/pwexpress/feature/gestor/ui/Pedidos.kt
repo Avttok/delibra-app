@@ -157,9 +157,11 @@ private fun CartaoPedido(p: PedidoG, empresa: String?, onClick: () -> Unit) {
             color = c.texto3, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
         val esperaPag = p.cobranca == "pre_pago" && p.pagamentoStatus == "pendente" && p.status !in setOf("cancelado", "recusado", "concluido")
-        if (p.urgente || esperaPag) {
+        val pago = p.pagamentoStatus == "pago"
+        if (p.urgente || esperaPag || pago) {
             Spacer(Modifier.size(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (pago) PwSelo("PAGO", c.verde, icone = PwIcones.BadgeCheck)
                 if (p.urgente) PwSelo("URGENTE", c.vermelho, icone = PwIcones.Flame)
                 if (esperaPag) PwSelo("Aguardando pagamento", androidx.compose.ui.graphics.Color(0xFF38BDF8), icone = PwIcones.Wallet)
             }
@@ -190,6 +192,7 @@ private fun JanelaPedido(p: PedidoG, empresa: String?, onFechar: () -> Unit) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             PwSelo(StatusPedido.rotulo[p.status] ?: p.status, if (p.status == "recebido") c.ouro else c.texto3)
             PwSelo(if (p.planejado) "Planejado" else "Agora", if (p.planejado) c.azul else c.ouro)
+            if (p.pagamentoStatus == "pago") PwSelo("PAGO", c.verde, icone = PwIcones.BadgeCheck)
             if (p.urgente) PwSelo("URGENTE", c.vermelho, icone = PwIcones.Flame)
             PwSelo(if (p.cobranca == "credito") "Crédito (fatura)" else "Pré-pago", c.texto2)
             Spacer(Modifier.weight(1f))

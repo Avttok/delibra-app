@@ -34,11 +34,19 @@ class SupabaseHttp(private val baseUrl: String, private val apiKey: String) {
             }
             r
         }
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .callTimeout(60, TimeUnit.SECONDS)
+        // conexões paradas há mais de 25 s não são reaproveitadas (o celular em repouso derruba a conexão
+        // sem avisar e a próxima chamada ficava presa esperando o tempo limite)
+        .connectionPool(okhttp3.ConnectionPool(5, 25, TimeUnit.SECONDS))
+        .pingInterval(20, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .writeTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .callTimeout(45, TimeUnit.SECONDS)
         .build()
+
+    /** O app voltou para a tela ou a rede mudou: descarta conexões velhas (a próxima abre uma nova na hora). */
+    fun renovarConexoes() { runCatching { client.connectionPool.evictAll() } }
 
     private val tipoJson = "application/json; charset=utf-8".toMediaType()
 

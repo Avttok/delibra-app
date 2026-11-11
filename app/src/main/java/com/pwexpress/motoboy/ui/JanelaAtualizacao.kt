@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -93,7 +94,9 @@ fun JanelaAtualizacao() {
         onDismissRequest = { if (podeFechar) Atualizador.fecharJanela() },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false, dismissOnClickOutside = false, dismissOnBackPress = podeFechar),
     ) {
-        if (obrigatoria) BackHandler { /* não sai: versão obrigatória */ }
+        var verNotas by remember { androidx.compose.runtime.mutableStateOf(false) }
+        if (obrigatoria && !verNotas) BackHandler { /* não sai: versão obrigatória */ }
+        if (verNotas) BackHandler { verNotas = false }
         val fracao = (estado as? EstadoAtualizacao.Baixando)?.fracao ?: if (estado is EstadoAtualizacao.Instalando) 1f else 0f
         val anim by animateFloatAsState(fracao, label = "progresso")
         val giro = rememberInfiniteTransition(label = "giro")
@@ -222,7 +225,9 @@ fun JanelaAtualizacao() {
                                 Titulo(if (obrigatoria) "Atualize para continuar" else "Há uma nova versão")
                                 Texto(if (obrigatoria) "Enquanto não atualizar, o app fica parado: nada de rotas nem localização."
                                       else "Leva só um minuto e o app continua de onde parou.")
-                                Notas(v.notas)
+                                // notas da versão num painel próprio (texto formatado)
+                                if (v.notas.isNotBlank()) PwBotaoVidro("Ver o que há de novo", onClick = { verNotas = true }, icone = PwIcones.Sparkles,
+                                    modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth())
                                 Instalar(ctx)
                                 PwBotaoOuro("Atualizar agora", onClick = { Atualizador.baixar() }, icone = PwIcones.Download, altura = 58.dp, modifier = Modifier.widthIn(max = 420.dp))
                                 if (podeFechar) PwBotaoVidro("Depois", onClick = { Atualizador.fecharJanela() }, modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth())
@@ -231,6 +236,12 @@ fun JanelaAtualizacao() {
                         }
                     }
                 }
+            }
+            val notasV = ((estado as? EstadoAtualizacao.Disponivel)?.versao ?: bloqueio?.versao)?.notas.orEmpty()
+            androidx.compose.animation.AnimatedVisibility(verNotas && notasV.isNotBlank(), Modifier.align(Alignment.BottomCenter),
+                enter = androidx.compose.animation.slideInVertically { it } + androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.slideOutVertically { it } + androidx.compose.animation.fadeOut()) {
+                PainelNotas(notasV, onFechar = { verNotas = false }, onAtualizar = { verNotas = false; Atualizador.baixar() })
             }
         }
     }
@@ -246,24 +257,33 @@ private fun Texto(t: String) {
     Text(t, color = Pw.cores.texto2, fontFamily = Archivo, fontSize = 15.sp, lineHeight = 21.sp, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 420.dp))
 }
 
+/** Painel das notas da versão: sobe de baixo, ocupa quase a tela, com o texto formatado. */
 @Composable
-private fun Notas(notas: String) {
-    if (notas.isBlank()) return
+private fun PainelNotas(notas: String, onFechar: () -> Unit, onAtualizar: () -> Unit) {
     val c = Pw.cores
-    val forma = RoundedCornerShape(20.dp)
+    val forma = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     Column(
-        Modifier.widthIn(max = 460.dp).fillMaxWidth().heightIn(max = 260.dp).clip(forma)
-            .background(Brush.verticalGradient(listOf(c.ouro.copy(alpha = 0.12f), c.vidroSutil)))
-            .border(1.dp, Brush.linearGradient(listOf(c.ouro.copy(alpha = 0.55f), c.borda)), forma)
-            .verticalScroll(rememberScrollState()).padding(16.dp),
+        Modifier.fillMaxWidth().fillMaxHeight(0.86f).clip(forma).background(c.fundo2)
+            .border(1.dp, Brush.verticalGradient(listOf(c.ouro.copy(alpha = 0.6f), c.borda)), forma)
+            .navigationBarsPadding(),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(PwIcones.Sparkles, null, tint = c.ouro, modifier = Modifier.size(15.dp))
-            Spacer(Modifier.width(6.dp))
-            Text("O QUE HÁ DE NOVO", color = c.ouro, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
+        Box(Modifier.fillMaxWidth().padding(top = 10.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(width = 44.dp, height = 5.dp).clip(RoundedCornerShape(99.dp)).background(c.bordaForte))
         }
-        Spacer(Modifier.height(8.dp))
-        Text(notas, color = c.texto, fontSize = 14.sp, lineHeight = 21.sp)
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(c.gradOuro), contentAlignment = Alignment.Center) {
+                Icon(PwIcones.Sparkles, null, tint = c.sobreOuro, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("O que há de novo", style = TextStyle(brush = c.gradOuro, fontFamily = ArchivoLargo, fontWeight = FontWeight.Black, fontSize = 22.sp))
+                Text("Tudo o que muda nesta versão", color = c.texto3, fontSize = 12.5.sp)
+            }
+            com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.X, "Fechar", onFechar)
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(c.borda))
+        com.pwexpress.core.designsystem.PwMarkdown(notas, Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 14.dp))
+        Box(Modifier.padding(16.dp)) { PwBotaoOuro("Atualizar agora", onClick = onAtualizar, icone = PwIcones.Download, altura = 54.dp) }
     }
 }
 

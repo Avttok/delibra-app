@@ -369,7 +369,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        // voltou do repouso: conexões velhas fora, e o login já renova em segundo plano (sem esperar a 1ª tela)
+        PwCore.http.renovarConexoes()
         if (PwCore.auth.sessao.value != null) {
+            lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) { runCatching { PwCore.auth.tokenValido() } }
             Tracking.retomarSeAtivo()
             Corridas.sincronizar()
         }

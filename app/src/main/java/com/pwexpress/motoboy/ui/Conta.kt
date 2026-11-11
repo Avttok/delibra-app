@@ -154,7 +154,6 @@ fun JanelaConta(
         val escuro = c.escuro
         val estilo by TemaApp.estilo.collectAsState()
         val mono = estilo == com.pwexpress.core.designsystem.EstiloTema.PRETO_NO_BRANCO || estilo == com.pwexpress.core.designsystem.EstiloTema.BRANCO_NO_PRETO
-        val vermelho by TemaApp.vermelho.collectAsState()
         val info by com.pwexpress.feature.tracking.Tracking.info.collectAsState()
         var oculto by remember { mutableStateOf(perfil?.devOculto == true) }
         val ctxAjuda = androidx.compose.ui.platform.LocalContext.current
@@ -174,24 +173,12 @@ fun JanelaConta(
             add(Bloco(PwIcones.SlidersHorizontal, "Ajustes", onClick = onConfiguracoes))
             if (ehMotoboy) add(Bloco(PwIcones.Radar, "Raio", onClick = { raio = true }))
             if (perfil?.dev == true || (perfil?.gestor == true && perfil?.supervisor != true)) add(Bloco(PwIcones.Landmark, "Minha empresa", onClick = { empresa = true }))
-            if (perfil?.dev == true) add(Bloco(PwIcones.CodeXml, "Console Dev", c.dev, onClick = onDev))
-            if (perfil?.dev == true) add(Bloco(PwIcones.Layers, "Modo Dev", c.dev, sub = "Trocar de empresa", onClick = { onFechar(); ModoDevApp.abrir() }))
             if (!mono) add(Bloco(if (escuro) PwIcones.Moon else PwIcones.Sun, if (escuro) "Tema noturno" else "Tema claro", ligado = escuro,
                 onClick = { TemaApp.definir(if (escuro) PreferenciaTema.CLARO else PreferenciaTema.ESCURO) }))
             add(Bloco(PwIcones.Type, "Fonte", sub = com.pwexpress.core.designsystem.Fontes.atual.value.rotulo.substringBefore(" ("), onClick = { fonte = true }))
-            if (perfil?.dev == true) add(Bloco(PwIcones.Palette, "Tema vermelho", c.dev, ligado = vermelho, onClick = {
-                val lig = !vermelho
-                TemaApp.definirVermelho(lig)
-                escopo.launch { Perfis.definirCorTema(if (lig) "vermelho" else "ouro").onFailure { TemaApp.definirVermelho(!lig); PwToast.mostrar(it.message ?: "Erro", TipoAviso.ERRO) } }
-            }))
             if (perfil?.gestor == true && perfil?.modulo("modo_teste") != false) add(Bloco(PwIcones.FlaskConical, "Modo teste", c.violeta, ligado = teste, onClick = { alternarTeste(!teste) }))
             if (ehMotoboy) add(Bloco(PwIcones.BatteryLow, "Economia", sub = if (info.economia) "GPS mais espaçado" else "GPS normal", ligado = info.economia,
                 onClick = { com.pwexpress.feature.tracking.Tracking.definirEconomia(!info.economia) }))
-            if (perfil?.dev == true) add(Bloco(if (oculto) PwIcones.EyeOff else PwIcones.Eye, "Ficar oculto", c.dev, ligado = oculto, onClick = {
-                val lig = !oculto
-                oculto = lig
-                escopo.launch { Perfis.definirOculto(lig).onFailure { oculto = !lig; PwToast.mostrar(it.message ?: "Erro", TipoAviso.ERRO) } }
-            }))
             add(Bloco(PwIcones.Info, "Ajuda", sub = "Passo a passo", onClick = {
                 runCatching { ctxAjuda.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
                     android.net.Uri.parse(com.pwexpress.core.config.PwConfig.siteUrl + "/ajuda?p=" + if (painel == Painel.GESTOR) "gestor" else "motoboy"))) }
@@ -212,6 +199,26 @@ fun JanelaConta(
             }
         }
         PwErro(erro)
+        // Dev: tudo o que é só dele num grupo próprio (vermelho), sem misturar com os atalhos de todos
+        if (perfil?.dev == true) GrupoMenu("Dev") {
+            val devs = listOf(
+                Bloco(PwIcones.CodeXml, "Console", c.dev, sub = "Empresas e sistema", onClick = onDev),
+                Bloco(PwIcones.Layers, "Modo Dev", c.dev, sub = "Trocar de empresa", onClick = { onFechar(); ModoDevApp.abrir() }),
+                Bloco(if (oculto) PwIcones.EyeOff else PwIcones.Eye, "Ficar oculto", c.dev, sub = if (oculto) "Os outros veem só \"Dev\"" else "Nome e foto visíveis", ligado = oculto, onClick = {
+                    val lig = !oculto
+                    oculto = lig
+                    escopo.launch { Perfis.definirOculto(lig).onFailure { oculto = !lig; PwToast.mostrar(it.message ?: "Erro", TipoAviso.ERRO) } }
+                }),
+            )
+            Column(Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                devs.chunked(2).forEach { linha ->
+                    Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        linha.forEach { b -> BlocoAtalho(b, Modifier.weight(1f).fillMaxHeight()) }
+                        if (linha.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+        }
         GrupoMenu("Cores do app") { EscolherCores(estilo) }
         // easter egg, só na PW Express (igual ao rodapé do site)
         val marcaPw by com.pwexpress.core.marca.MarcaEmpresa.marca.collectAsState()

@@ -74,7 +74,6 @@ object PwIcones {
     val PlugZap: ImageVector by lazy { icone("plug-zap", "M6.3 20.3a2.4 2.4 0 0 0 3.4 0L12 18l-6-6-2.3 2.3a2.4 2.4 0 0 0 0 3.4Z", "m2 22 3-3", "M7.5 13.5 10 11", "M10.5 16.5 13 14", "m18 3-4 4h6l-4 4") }
     val Link2: ImageVector by lazy { icone("link-2", "M9 17H7A5 5 0 0 1 7 7h2", "M15 7h2a5 5 0 1 1 0 10h-2", "M8 12h8") }
     val Gavel: ImageVector by lazy { icone("gavel", "m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999", "M15.973 4.027 20 8", "M12.5 6.5 17.5 11.5", "m8 8 6-6", "m16 16 6-6", "M9 9l6 6") }
-    val Hand: ImageVector by lazy { icone("hand", "M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2", "M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2", "M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8", "M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15") }
     val UserX: ImageVector by lazy { icone("user-x", "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", "M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z", "m17 8 5 5", "m22 8-5 5") }
     val Clock: ImageVector by lazy { icone("clock", "M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0", "M12 6v6l4 2") }
     val ArrowUpFromLine: ImageVector by lazy { icone("arrow-up-from-line", "m18 9-6-6-6 6", "M12 3v14", "M5 21h14") }

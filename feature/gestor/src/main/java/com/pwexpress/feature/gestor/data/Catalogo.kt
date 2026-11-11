@@ -76,6 +76,8 @@ val GRUPOS_CONFIG = listOf(
     Grupo("rastreio", "Link de rastreio", "Uma página para quem recebe acompanhar a entrega, sem precisar de conta.", "clientes"),
     Grupo("jogo", "Moedas do jogo", "Quanto cada coisa rende de moedas no joguinho e o limite de velocidade para jogar.", "motoboys"),
     Grupo("auditoria", "Histórico de mudanças", "Quem mudou o quê: pedidos, rotas, regras, clientes e zonas.", "sistema"),
+    Grupo("integracoes", "Integrações e dinheiro", "Qual provedor recebe, quando o dinheiro libera, quem paga as taxas, devoluções, licença, e-mail e WhatsApp. Os módulos ficam prontos e desligados até conectar.", "sistema"),
+    Grupo("notafiscal", "Nota fiscal", "Emissão automática ou manual (o certificado é opcional: só para quem quer emitir).", "clientes"),
     Grupo("plataforma", "Plataforma", "Endereço do site, verificação em dois passos e cadastro de empresas novas.", "sistema"),
 )
 
@@ -388,4 +390,15 @@ val PARAMETROS = listOf(
     Param("dev_chat_audio_max_s", "chat", "Tempo máximo do áudio", "A gravação para sozinha nesse tempo.", null, "numero", false, 60.0, "s", 5.0, 600.0, 5.0, listOf(), null, listOf(), listOf(), true, null),
     Param("dev_chat_audio_dias", "chat", "Áudios ficam guardados por", "Depois disso o áudio some (a mensagem fica). 0 = sempre.", null, "numero", false, 30.0, "dias", 0.0, 3650.0, 1.0, listOf(), null, listOf(), listOf(), true, null),
     Param("dev_chat_retencao_dias", "chat", "Conversas ficam guardadas por", "Mensagens mais antigas são apagadas todo dia. 0 = sempre. Exporte antes no ícone de download da conversa.", null, "numero", false, 0.0, "dias", 0.0, 3650.0, 30.0, listOf(), null, listOf(), listOf(), true, null),
+    Param("dev_pag_provedor", "integracoes", "Quem recebe os pagamentos", "", null, "escolha", false, 0.0, null, null, null, 1.0, listOf(), "mercadopago", listOf("mercadopago" to "Mercado Pago (split)", "asaas" to "Asaas (divide em três)"), listOf(), true, null),
+    Param("dev_pag_liberacao_dias", "integracoes", "Dinheiro libera em", "Prazo para o valor ficar disponível depois de pago.", null, "escolha", false, 0.0, null, null, null, 1.0, listOf(), "7", listOf("0" to "Na hora", "1" to "1 dia", "2" to "2 dias", "7" to "7 dias", "14" to "14 dias", "30" to "30 dias"), listOf(), true, null),
+    Param("dev_pag_taxa_quem", "integracoes", "Quem paga a taxa do provedor", "", null, "escolha", false, 0.0, null, null, null, 1.0, listOf(), "empresa", listOf("empresa" to "A empresa", "dividir" to "Dividir", "plataforma" to "A plataforma"), listOf("cliente"), true, null),
+    Param("dev_licenca_modo", "integracoes", "Como a empresa paga a plataforma", "", null, "escolha", false, 0.0, null, null, null, 1.0, listOf(), "split", listOf("split" to "Parte de cada pagamento", "fatura_mensal" to "Fatura mensal (PIX/cartão)", "fatura_anual" to "Fatura anual (PIX/cartão)"), listOf(), true, null),
+    Param("dev_devolucao_gestor_decide", "integracoes", "Gestor decide a devolução", "Ligado: em pedido pago e cancelado, o gestor escolhe como devolver. Desligado: vale a regra abaixo para todos.", null, "booleano", true, 0.0, null, null, null, 1.0, listOf(), null, listOf(), listOf(), true, null),
+    Param("devolucao_padrao", "integracoes", "Pedido pago e cancelado", "", null, "escolha", false, 0.0, null, null, null, 1.0, listOf(), "total", listOf("total" to "Devolve tudo", "taxa" to "Devolve menos uma taxa", "nada_coletado" to "Devolve só se nada foi coletado", "manual" to "Decido em cada pedido"), listOf("cliente"), false, null),
+    Param("devolucao_taxa", "integracoes", "Taxa de cancelamento", "Quando a devolução é “menos uma taxa”.", null, "numero", false, 0.0, "R\$", 0.0, 500.0, 0.5, listOf(), null, listOf(), listOf("cliente"), false, null),
+    Param("dev_email_provedor", "integracoes", "E-mail", "", null, "escolha", false, 0.0, null, null, null, 1.0, listOf(), "nenhum", listOf("nenhum" to "Desligado", "resend" to "Resend"), listOf(), true, null),
+    Param("dev_whatsapp_provedor", "integracoes", "WhatsApp", "", null, "escolha", false, 0.0, null, null, null, 1.0, listOf(), "nenhum", listOf("nenhum" to "Desligado", "meta" to "WhatsApp da Meta"), listOf(), true, null),
+    Param("dev_nf_provedor", "notafiscal", "Emissor de nota fiscal", "", null, "escolha", false, 0.0, null, null, null, 1.0, listOf(), "nenhum", listOf("nenhum" to "Desligado", "focus" to "Focus NFe", "plugnotas" to "PlugNotas", "nfeio" to "NFE.io", "enotas" to "eNotas"), listOf(), true, null),
+    Param("nf_emissao", "notafiscal", "Quando emitir", "", null, "escolha", false, 0.0, null, null, null, 1.0, listOf(), "manual", listOf("manual" to "Quando eu clicar em Emitir", "pago" to "Sozinha, quando o pedido for pago", "entregue" to "Sozinha, quando for entregue"), listOf("cliente"), false, null),
 )

@@ -287,7 +287,7 @@ object Atualizador {
         if (pct == ultimoPct) return
         ultimoPct = pct
         val n = PwNotificacoes.base(ctx, PwNotificacoes.CANAL_ATUALIZACAO)
-            .setContentTitle("Baixando a atualização do Delibra")
+            .setContentTitle("Baixando a atualização do app")
             .setContentText("${lido / 1_048_576} de ${total / 1_048_576} MB · $pct%")
             .setProgress(100, pct, total <= 0)
             .setOngoing(true)

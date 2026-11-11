@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -103,7 +104,7 @@ private fun desenhar(fonte: Bitmap, a: Ajuste, lado: Int = 512): Bitmap {
  * vira transparente). A prévia mostra no escuro com o brilho da cor da empresa.
  */
 @Composable
-fun EditorIconeApp(original: Bitmap, cor: String?, onCancelar: () -> Unit, onPronto: (ByteArray) -> Unit) {
+fun EditorIconeApp(original: Bitmap, cor: String?, nome: String, escalaInicial: Float, onCancelar: () -> Unit, onPronto: (ByteArray, Float) -> Unit) {
     val c = Pw.cores
     // trabalha numa cópia de até 1024 px (rápido e com qualidade de sobra para 512)
     val fonte = remember(original) {
@@ -112,6 +113,7 @@ fun EditorIconeApp(original: Bitmap, cor: String?, onCancelar: () -> Unit, onPro
     }
     var a by remember { mutableStateOf(Ajuste(tirarFundo = !temTransparencia(fonte))) }
     var previa by remember { mutableStateOf<Bitmap?>(null) }
+    var escala by remember { mutableFloatStateOf(escalaInicial) }
     var dxS by remember { mutableFloatStateOf(0f) }; var dyS by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(a) {
         delay(80)
@@ -121,6 +123,21 @@ fun EditorIconeApp(original: Bitmap, cor: String?, onCancelar: () -> Unit, onPro
     val cores = SliderDefaults.colors(thumbColor = c.ouro, activeTrackColor = c.ouro, inactiveTrackColor = c.bordaForte)
 
     PwJanela("Ajustar o ícone", onCancelar) {
+        // prévia do topo do app, no tamanho escolhido
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Brush.verticalGradient(listOf(Color(0xFF1A1608), Color(0xFF0B0B0D))))
+            .border(1.dp, c.borda, RoundedCornerShape(18.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val lado = (22 * escala).dp
+            Box(Modifier.size(lado).drawBehind { drawCircle(Brush.radialGradient(listOf(brilho.copy(alpha = 0.55f), brilho.copy(alpha = 0.18f), Color.Transparent), center, size.minDimension * 0.62f), size.minDimension * 0.62f, center) }) {
+                previa?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize()) }
+            }
+            Text(nome, color = Color(0xFFF5F2EA), fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold, fontFamily = com.pwexpress.core.designsystem.Archivo,
+                fontSize = 21.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Box(Modifier.size(34.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.06f)))
+            Box(Modifier.size(34.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.06f)))
+        }
+        Text("Tamanho no topo", color = c.texto2, fontSize = 13.sp)
+        Slider(escala, { escala = it }, valueRange = 0.8f..2.6f, colors = cores)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(Modifier.weight(1.5f).aspectRatio(1f).clip(RoundedCornerShape(26.dp)).background(Color(0xFF0B0B0D)).border(1.dp, c.borda, RoundedCornerShape(26.dp))
                 .drawBehind { drawCircle(Brush.radialGradient(listOf(brilho.copy(alpha = 0.5f), brilho.copy(alpha = 0.15f), Color.Transparent), center, size.minDimension * 0.55f), size.minDimension * 0.55f, center) }) {
@@ -147,7 +164,7 @@ fun EditorIconeApp(original: Bitmap, cor: String?, onCancelar: () -> Unit, onPro
             PwBotaoVidro("Voltar", onClick = { a = Ajuste(tirarFundo = !temTransparencia(fonte)) }, icone = PwIcones.RotateCcw, modifier = Modifier.weight(1f).height(52.dp))
             PwBotaoOuro("Salvar", onClick = {
                 val png = ByteArrayOutputStream().also { desenhar(fonte, a, 512).compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
-                onPronto(png)
+                onPronto(png, escala)
             }, icone = PwIcones.Check, altura = 52.dp, modifier = Modifier.weight(1f))
         }
     }

@@ -3,15 +3,14 @@
 **Importante:** esta versão vem com a assinatura digital nova. Se o celular disser que não dá para atualizar, desinstale a versão antiga e instale esta (só desta vez).
 
 **Novidades desta versão**
-- Corrigido: o botão de camadas do mapa fechava o app.
-- **Editor do ícone** em Minha empresa: zoom, posição, margem e "tirar o fundo" (o branco vira transparente).
-- A logo da empresa aparece solta, sem caixa branca, com brilho da cor da empresa (topo, atualização, notificações e atalho).
-- Botões lado a lado do mesmo tamanho; "Valor à mão" virou **Fixo**.
-- **Modo Dev**: selo flutuante para ver o app como Tudo, Em branco ou uma empresa.
-- Sua conta toda em blocos de 2 colunas; liga/desliga mostram o estado.
-- "Como chegou no valor" desenhado pelas ruas (o gestor pode escolher linha reta em Ajustes → Distância do orçamento).
-- Notificações em cartões coloridos com ícone de cada tipo.
-- Mais espaço entre cartões, botões e textos; nomes no mapa não se encavalam.
+- **Editar percurso**: na rota, toque nas ruas por onde o motoboy deve passar; o caminho é refeito e o motoboy vê o traçado novo.
+- **Raio da mesma zona** direto na rota (− / +), sem ir em Ajustes.
+- **Console Dev**: abas Empresas (criar empresa já com o gestor, plano, nome do app) e Faturamento.
+- Editor do ícone com **prévia do topo** e **tamanho da logo no topo**.
+- Dev com "Ficar oculto" some de todas as listas (equipe, mapa, contatos do chat).
+- Holerite do motoboy não dá mais erro; mensagens de erro agora em português claro.
+- Botões lado a lado do mesmo tamanho; "Fica com o gestor" virou "Gestor".
+- O console Dev mostra as versões da Delibra (não mais as da PW Express).
 
 **Sua marca no app**
 - A empresa pode ter **ícone e nome do app próprios**: aparecem no lugar de "Delibra" no topo, nas telas de entrada e nas notificações.

@@ -101,8 +101,8 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
         carregou = true
     }
 
-    suspend fun salvarLogo(url: String?): Boolean {
-        val r = PwCore.rpc.chamar("salvar_minha_organizacao", buildJsonObject { put("p", buildJsonObject { put("logo_url", url ?: "") }) })
+    suspend fun salvarLogo(url: String?, escala: Float? = null): Boolean {
+        val r = PwCore.rpc.chamar("salvar_minha_organizacao", buildJsonObject { put("p", buildJsonObject { put("logo_url", url ?: ""); escala?.let { put("logo_escala", it) } }) })
         if (r.ok) { Perfis.carregar(); versao++ }
         return r.ok
     }
@@ -115,7 +115,7 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
             if (editando == null) PwToast.mostrar("Não deu para abrir esta imagem.", TipoAviso.ERRO)
         }
     }
-    fun enviar(png: ByteArray) {
+    fun enviar(png: ByteArray, escala: Float) {
         val id = org?.t("id") ?: return
         editando = null
         enviando = true
@@ -124,14 +124,15 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
                 val caminho = "$id/icone-${System.currentTimeMillis()}.png"
                 val up = PwCore.rpc.enviarArquivo("marcas", caminho, png, "image/png")
                 if (!up.ok) error("envio ${up.codigo}")
-                salvarLogo("${PwConfig.supabaseUrl}/storage/v1/object/public/marcas/$caminho")
+                salvarLogo("${PwConfig.supabaseUrl}/storage/v1/object/public/marcas/$caminho", escala)
             }.getOrDefault(false)
             enviando = false
             if (ok) PwToast.mostrar("O app e o site já usam o ícone novo.", titulo = "Ícone da empresa")
             else PwToast.mostrar("Não deu para salvar o ícone. Tente outra imagem.", TipoAviso.ERRO)
         }
     }
-    editando?.let { b -> EditorIconeApp(b, marca?.cor ?: org?.t("cor"), onCancelar = { editando = null }, onPronto = ::enviar); return }
+    editando?.let { b -> EditorIconeApp(b, marca?.cor ?: org?.t("cor"), marca?.nomeExibido ?: org?.t("nome_app") ?: org?.t("nome") ?: "Delibra",
+        org?.t("logo_escala")?.toFloatOrNull() ?: 1.9f, onCancelar = { editando = null }, onPronto = ::enviar); return }
 
     PwJanela("Minha empresa", onFechar) {
         if (!carregou) { PwCarregando(); return@PwJanela }

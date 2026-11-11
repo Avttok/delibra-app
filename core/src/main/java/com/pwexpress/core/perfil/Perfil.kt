@@ -89,7 +89,7 @@ object Perfis {
     private fun publicarMarca(o: kotlinx.serialization.json.JsonElement) {
         val org = ((o as? JsonObject)?.get("organizacao") as? JsonObject)
         fun t(k: String) = (org?.get(k) as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
-        com.pwexpress.core.marca.MarcaEmpresa.atualizar(t("nome")?.let { com.pwexpress.core.marca.Marca(it, t("logo"), t("cor"), t("nome_app")) })
+        com.pwexpress.core.marca.MarcaEmpresa.atualizar(t("nome")?.let { com.pwexpress.core.marca.Marca(it, t("logo"), t("cor"), t("nome_app"), t("logo_escala")?.toFloatOrNull() ?: 1.9f) })
     }
 
 

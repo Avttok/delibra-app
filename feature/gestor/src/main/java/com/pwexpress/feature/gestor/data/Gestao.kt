@@ -285,10 +285,11 @@ object Gestao {
         }).exigirOk(::traduzir); Unit
     }
 
-    suspend fun criarConta(nome: String, email: String, senha: String, papeis: List<String>, repasse: Double?, empresaId: String? = null): Result<String> = acao {
+    suspend fun criarConta(nome: String, email: String, senha: String, papeis: List<String>, repasse: Double?, empresaId: String? = null, organizacaoId: String? = null): Result<String> = acao {
         PwCore.rpc.site("/api/equipe/criar", buildJsonObject {
             put("nome", nome); put("email", email); put("senha", senha)
             empresaId?.let { put("empresa_id", it) }
+            organizacaoId?.let { put("organizacao_id", it) }
             put("papeis", buildJsonArray { papeis.forEach { add(JsonPrimitive(it)) } })
             put("repasse", repasse?.let { JsonPrimitive(it) } ?: JsonNull)
         }).exigirOk(::traduzir).objeto()?.str("id") ?: ""

@@ -308,7 +308,7 @@ private fun Instalar(ctx: android.content.Context) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth()) {
         Icon(PwIcones.ShieldCheck, null, tint = c.ouro, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
-        Text("Libere “Instalar apps desconhecidos” para o Delibra.", color = c.texto2, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Text("Libere “Instalar apps desconhecidos” para este app.", color = c.texto2, fontSize = 13.sp, modifier = Modifier.weight(1f))
     }
     PwBotaoVidro("Abrir permissão", onClick = { Atualizador.abrirPermissaoInstalar(ctx) }, icone = PwIcones.Settings2, modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth())
 }

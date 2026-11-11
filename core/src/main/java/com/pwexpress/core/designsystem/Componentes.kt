@@ -120,7 +120,7 @@ fun PwBotaoOuro(
     modifier: Modifier = Modifier,
     icone: ImageVector? = null,
     habilitado: Boolean = true,
-    altura: Dp = 58.dp,
+    altura: Dp = 52.dp,
     tamanhoTexto: Int = 17,
 ) {
     val c = Pw.cores
@@ -160,7 +160,7 @@ fun PwBotaoVidro(
     val tinta = cor ?: c.texto
     Row(
         modifier
-            .heightIn(min = 46.dp)
+            .heightIn(min = 52.dp)
             .alpha(if (habilitado) 1f else 0.5f)
             .clip(forma)
             .background(c.vidroSutil)
@@ -237,7 +237,9 @@ fun PwLogo(modifier: Modifier = Modifier, tamanho: Int = 26, soSelo: Boolean = f
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         val empresa by com.pwexpress.core.marca.MarcaEmpresa.marca.collectAsState()
         val propria = empresa?.nomeExibido
-        PwSeloLogo((tamanho * 1.35f).dp, descricao = propria ?: "Delibra")
+        // logo da empresa no tamanho que o dono escolheu no editor (prévia do topo)
+        val escala = if (empresa?.logoUrl != null) empresa?.escala ?: 1.9f else 1.35f
+        PwSeloLogo((tamanho * escala).dp, descricao = propria ?: "Delibra")
         Spacer(Modifier.width((tamanho * 0.3f).dp))
         Text(
             propria ?: "delibra",

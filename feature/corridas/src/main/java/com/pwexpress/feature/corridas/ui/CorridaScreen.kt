@@ -291,6 +291,8 @@ fun CorridaScreen(
                     Text("Obs.: $it", color = c.ouro)
                 }
             }
+            // imprevisto: pedir ao gestor para cancelar (some se ele desligou)
+            PedirCancelamentoCorrida(corrida.id)
         }
     }
 }

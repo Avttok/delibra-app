@@ -17,6 +17,8 @@ import com.pwexpress.motoboy.ui.ToursApp
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.LaunchedEffect
@@ -77,11 +79,20 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // celular: sempre em pé. Óculos (Meta Quest) e telas grandes: janela livre, o app se ajusta.
+        val oculos = android.os.Build.MANUFACTURER.equals("Oculus", true) || android.os.Build.MANUFACTURER.equals("Meta", true) ||
+            packageManager.hasSystemFeature("oculus.software.handtracking") || packageManager.hasSystemFeature("com.oculus.feature.PASSTHROUGH")
+        val grande = resources.configuration.smallestScreenWidthDp >= 600
+        if (!oculos && !grande) requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         abrirAba.value = intent?.getStringExtra("pwex_abrir")
         val prefs = getSharedPreferences("pwex_painel", Context.MODE_PRIVATE)
         setContent {
             PwTheme {
                 PwFundo {
+                  // janela larga (óculos VR, tablet, paisagem): o conteúdo fica numa coluna central legível
+                  androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                   val larga = maxWidth > 760.dp
+                   Box(if (larga) Modifier.fillMaxHeight().widthIn(max = 720.dp) else Modifier.fillMaxSize()) {
                     val sessao by PwCore.auth.sessao.collectAsState()
                     val oferta by Corridas.oferta.collectAsState()
                     val ativa by Corridas.ativa.collectAsState()
@@ -96,7 +107,12 @@ class MainActivity : ComponentActivity() {
                     if (raioAberto) com.pwexpress.motoboy.ui.JanelaRaio(onFechar = { raioAberto = false })
                     var simulador by remember { mutableStateOf(false) }
                     var conta by remember { mutableStateOf(false) }
-                    var aba by rememberSaveable { mutableStateOf("inicio") }
+                    // rota/pedido aberto do chat (motoboy) e perfil de alguém (de qualquer lugar)
+                    var rotaChat by remember { mutableStateOf<Pair<String, String>?>(null) }
+                    rotaChat?.let { (t, i) -> com.pwexpress.feature.corridas.ui.RotaCompartilhadaTela(t, i, onFechar = { rotaChat = null }) }
+                    val perfilAberto by com.pwexpress.core.perfil.PerfilAberto.id.collectAsState()
+                    perfilAberto?.let { pid -> com.pwexpress.core.perfil.PerfilPublicoTela(pid, onFechar = { com.pwexpress.core.perfil.PerfilAberto.id.value = null }) }
+                    var aba by com.pwexpress.core.designsystem.lembrarPagina("motoboy_aba", "inicio")
                     var painel by remember { mutableStateOf(runCatching { Painel.valueOf(prefs.getString("painel", "MOTOBOY")!!) }.getOrDefault(Painel.MOTOBOY)) }
                     val scope = rememberCoroutineScope()
                     val ciclo = LocalLifecycleOwner.current
@@ -238,6 +254,11 @@ class MainActivity : ComponentActivity() {
                                         "pedido" -> { com.pwexpress.core.chat.Chat.abrir.value = false; GestorNav.abrirPedido(id) }
                                     }
                                 }
+                                else if (id != null) when (an.tipo) {
+                                    // motoboy: vê a rota/pedido como no quadro e responde se pode; pessoa abre o perfil
+                                    "rota", "pedido" -> { rotaChat = an.tipo to id }
+                                    "pessoa" -> { com.pwexpress.core.perfil.PerfilAberto.abrir(id) }
+                                }
                                 if (an.tipo == "local" && an.lat != null && an.lng != null) runCatching {
                                     ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("geo:${an.lat},${an.lng}?q=${an.lat},${an.lng}")))
                                 }
@@ -275,7 +296,10 @@ class MainActivity : ComponentActivity() {
                                         "carteira" -> com.pwexpress.feature.corridas.ui.CarteiraScreen()
                                         else -> TrackingScreen(
                                             saudacao = NomePerfil(s.email).substringBefore(" "),
-                                            extras = { CartaoGanhos(onCarteira = if (comCarteira) ({ aba = "carteira" }) else null) },
+                                            extras = {
+                                                com.pwexpress.feature.corridas.ui.AvisoSuspensao()
+                                                CartaoGanhos(onCarteira = if (comCarteira) ({ aba = "carteira" }) else null)
+                                            },
                                             chips = { com.pwexpress.feature.tracking.ui.ChipInicio(PwIcones.Radar, com.pwexpress.motoboy.ui.textoRaio(p?.raioKm, p?.raioModo ?: "posicao")) { raioAberto = true } },
                                             onConfiguracoes = { naConfig = true },
                                         )
@@ -331,6 +355,8 @@ class MainActivity : ComponentActivity() {
                     BackHandler(enabled = PwTour.aberto) { PwTour.fechar() }
                     PwTourCamada()
                     com.pwexpress.core.designsystem.PwToasts(Modifier.align(Alignment.BottomCenter))
+                   }
+                  }
                 }
             }
         }

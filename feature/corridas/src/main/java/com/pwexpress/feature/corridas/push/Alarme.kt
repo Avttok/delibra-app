@@ -49,7 +49,7 @@ object Alarme {
     }
 
     /** Aviso discreto: sem som, sem vibrar, sem acender a tela. */
-    fun avisarSilencioso(ctx: Context, texto: String, titulo: String = com.pwexpress.core.marca.MarcaEmpresa.marca.value?.nomeExibido ?: "Delibra") {
+    fun avisarSilencioso(ctx: Context, texto: String, titulo: String = com.pwexpress.core.marca.MarcaEmpresa.marca.value?.nomePara("notificacoes") ?: "Delibra") {
         PwNotificacoes.aviso(ctx, NOTIF_VOLTOU, PwNotificacoes.CANAL_SILENCIOSO, titulo, texto, silencioso = true)
     }
 

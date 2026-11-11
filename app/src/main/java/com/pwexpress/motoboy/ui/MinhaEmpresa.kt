@@ -10,6 +10,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -95,6 +98,9 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
     var nomeApp by remember { mutableStateOf("") }
     var nomeTopo by remember { mutableStateOf("") }
     var salvandoNome by remember { mutableStateOf(false) }
+    // nome em cada lugar (vazio = o nome do app)
+    val nomes = remember { androidx.compose.runtime.mutableStateMapOf<String, String>() }
+    var nomesOrig by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
     LaunchedEffect(versao) {
         runCatching {
@@ -102,6 +108,8 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
             org = if (o.ok) o.json() as? JsonObject else null
             nomeApp = org?.t("nome_app").orEmpty()
             nomeTopo = org?.t("nome_topo").orEmpty()
+            val n = (org?.get("nomes") as? JsonObject)?.mapNotNull { (k, v) -> (v as? kotlinx.serialization.json.JsonPrimitive)?.content?.let { k to it } }?.toMap().orEmpty()
+            nomes.clear(); nomes.putAll(n); nomesOrig = n
             val p = PwCore.rpc.chamar("meu_plano", JsonObject(emptyMap()))
             plano = if (p.ok) p.json() as? JsonObject else null
         }
@@ -191,8 +199,57 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
             Spacer(Modifier.height(10.dp))
-            PwLinhaInfo(PwIcones.PanelTop, "No topo, ao lado da logo", topoTxt)
-            PwLinhaInfo(PwIcones.Bell, "Atalho, avisos e títulos", appTxt)
+            fun nomeEm(k: String) = nomes[k]?.trim()?.takeIf { it.isNotEmpty() } ?: appTxt
+            // os outros lugares onde a marca aparece (deslize para o lado)
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                val formaP = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+                // notificação
+                Column(Modifier.width(250.dp).clip(formaP).background(c.fundo2).border(1.dp, c.borda, formaP).padding(12.dp)) {
+                    Text("Notificação", color = c.texto3, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        PwSeloLogo(30.dp); Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text(nomeEm("notificacoes"), color = c.texto, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1)
+                            Text("Corrida nova! 3 entregas · R$ 24,00", color = c.texto2, fontSize = 12.sp, maxLines = 1)
+                        }
+                    }
+                }
+                // tela de entrada
+                Column(Modifier.width(150.dp).clip(formaP).background(c.fundo).border(1.dp, c.borda, formaP).padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Entrada", color = c.texto3, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    PwSeloLogo(54.dp)
+                    Spacer(Modifier.height(6.dp))
+                    Text(nomeEm("entrada").uppercase(), color = c.texto2, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Light, maxLines = 1)
+                }
+                // atalho na tela inicial
+                Column(Modifier.width(120.dp).clip(formaP).background(c.fundo2).border(1.dp, c.borda, formaP).padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Tela inicial", color = c.texto3, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    Box(Modifier.size(52.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp)).background(c.fundo), contentAlignment = Alignment.Center) { PwSeloLogo(40.dp) }
+                    Spacer(Modifier.height(6.dp))
+                    Text(nomeEm("atalho").take(14), color = c.texto, fontSize = 11.sp, maxLines = 1)
+                }
+                // site do cliente
+                Column(Modifier.width(220.dp).clip(formaP).background(c.fundo2).border(1.dp, c.borda, formaP).padding(12.dp)) {
+                    Text("Site do cliente", color = c.texto3, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        PwSeloLogo(26.dp); Spacer(Modifier.width(6.dp))
+                        Text(nomeEm("cliente"), color = c.texto, fontFamily = fonte.familia, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, maxLines = 1)
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text("Fazer pedido · Acompanhar", color = c.texto3, fontSize = 11.sp)
+                }
+                // mensagem de acesso / extrato
+                Column(Modifier.width(220.dp).clip(formaP).background(c.fundo2).border(1.dp, c.borda, formaP).padding(12.dp)) {
+                    Text("Acesso e extratos", color = c.texto3, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    Text(nomeEm("documentos"), color = c.texto, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("E-mail: joao@…\nSenha: ••••••", color = c.texto2, fontSize = 12.sp)
+                }
+            }
         }
 
         // ------------------------------------------------ ícone
@@ -225,6 +282,17 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
             com.pwexpress.core.designsystem.PwCampo(nomeTopo, { nomeTopo = it.take(30) }, "Texto ao lado da logo (topo)", Modifier.fillMaxWidth(),
                 dica = "Se a logo já tem parte do nome (ex.: PW), escreva só o resto (Express). Vazio = o nome do app")
             Spacer(Modifier.height(12.dp))
+            var porLugar by remember { mutableStateOf(nomes.isNotEmpty()) }
+            com.pwexpress.core.designsystem.PwInterruptor("Nome diferente em cada lugar", porLugar, { porLugar = it; if (!it) nomes.clear() },
+                descricao = if (porLugar) "Vazio = usa o nome do app." else "Todos usam o nome do app.", icone = PwIcones.Layers)
+            if (porLugar) LUGARES_NOME.forEach { (k, rot, ic) ->
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(ic, null, tint = c.texto3, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(8.dp))
+                    com.pwexpress.core.designsystem.PwCampo(nomes[k].orEmpty(), { v -> if (v.isEmpty()) nomes.remove(k) else nomes[k] = v.take(40) }, rot, Modifier.weight(1f), dica = appTxt)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
             Text("Fonte do texto do topo", color = c.texto2, fontSize = 13.sp)
             Spacer(Modifier.height(6.dp))
             com.pwexpress.core.designsystem.FonteApp.entries.chunked(2).forEach { par ->
@@ -242,7 +310,8 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
                     if (par.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
-            val mudou = nomeApp.trim() != (o.t("nome_app") ?: "") || nomeTopo.trim() != (o.t("nome_topo") ?: "") || fonte != atualF
+            val mudou = nomeApp.trim() != (o.t("nome_app") ?: "") || nomeTopo.trim() != (o.t("nome_topo") ?: "") || fonte != atualF ||
+                nomes.filterValues { it.isNotBlank() }.mapValues { it.value.trim() } != nomesOrig
             PwBotaoOuro(if (salvandoNome) "Salvando…" else "Salvar", icone = PwIcones.Check, altura = 50.dp, habilitado = mudou && !salvandoNome, modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     val v = nomeApp.trim()
@@ -251,6 +320,7 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
                     escopo.launch {
                         val r = PwCore.rpc.chamar("salvar_minha_organizacao", buildJsonObject { put("p", buildJsonObject {
                             put("nome_app", v); put("nome_topo", nomeTopo.trim())
+                            put("nomes", buildJsonObject { nomes.forEach { (k, n) -> if (n.isNotBlank()) put(k, n.trim()) } })
                             put("fonte", if (fonte == com.pwexpress.core.designsystem.FonteApp.ARCHIVO) "" else fonte.name)
                         }) })
                         salvandoNome = false
@@ -360,3 +430,14 @@ private fun RecebimentosApp() {
         teste?.let { Spacer(Modifier.height(6.dp)); Text(it, color = c.texto2, fontSize = 12.sp) }
     }
 }
+
+
+/** Lugares onde a empresa pode ter um nome próprio (chave, rótulo, ícone). */
+private val LUGARES_NOME = listOf(
+    Triple("entrada", "Tela de entrada e abertura", PwIcones.DoorOpen),
+    Triple("notificacoes", "Notificações e avisos", PwIcones.Bell),
+    Triple("atalho", "Atalho na tela inicial", PwIcones.Smartphone),
+    Triple("cliente", "Site do cliente", PwIcones.Store),
+    Triple("documentos", "Acessos, extratos e documentos", PwIcones.FileText),
+    Triple("chat", "Chat", PwIcones.MessageCircle),
+)

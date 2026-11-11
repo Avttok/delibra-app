@@ -298,9 +298,10 @@ private fun MapaBase(
     // o "i" dos créditos do mapa fica acima dos painéis e barras de cada tela (não cobre botões)
     LaunchedEffect(mapa, margemBaixo, atribuicaoAcima) {
         val m = mapa ?: return@LaunchedEffect
-        m.uiSettings.attributionGravity = android.view.Gravity.BOTTOM or android.view.Gravity.START
+        // com barra embaixo, o "i" vai para a direita (a legenda fica à esquerda)
+        m.uiSettings.attributionGravity = android.view.Gravity.BOTTOM or (if (atribuicaoAcima > 0) android.view.Gravity.END else android.view.Gravity.START)
         val d = densidade
-        m.uiSettings.setAttributionMargins((8 * d).toInt(), 0, 0, ((margemBaixo + atribuicaoAcima + 6) * d).toInt())
+        m.uiSettings.setAttributionMargins((8 * d).toInt(), 0, (8 * d).toInt(), ((margemBaixo + atribuicaoAcima + 6) * d).toInt())
     }
     LaunchedEffect(mapa, irPara) {
         val m = mapa ?: return@LaunchedEffect
@@ -517,7 +518,8 @@ private fun MapaBase(
 
     androidx.compose.foundation.layout.Box(modifier) {
         AndroidView(factory = { mapView }, modifier = Modifier.matchParentSize())
-        if (legenda && trilhas.any { it.pontos.size >= 2 }) LegendaLinhas(aFazer.isNotEmpty(), Modifier.align(androidx.compose.ui.Alignment.BottomStart).padding(start = 10.dp, bottom = (margemBaixo + 10).dp))
+        // com barra de botões embaixo (atribuicaoAcima > 0), a legenda sobe acima dela (sem ficar atrás dos botões)
+        if (legenda && trilhas.any { it.pontos.size >= 2 }) LegendaLinhas(aFazer.isNotEmpty(), Modifier.align(androidx.compose.ui.Alignment.BottomStart).padding(start = 10.dp, bottom = (margemBaixo + atribuicaoAcima + 10).dp))
         if (botoes != null || controles) androidx.compose.foundation.layout.Column(
             Modifier.align(androidx.compose.ui.Alignment.CenterEnd).padding(end = 12.dp),
             verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),

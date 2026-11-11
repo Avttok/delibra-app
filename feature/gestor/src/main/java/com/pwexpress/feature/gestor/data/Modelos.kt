@@ -48,6 +48,8 @@ data class ParadaG(
     /** Confirmações pedidas neste ponto (null = segue o padrão da rota), código próprio e horário em que atende. */
     val exigeFoto: Boolean? = null, val exigeNome: Boolean? = null, val exigeAssinatura: Boolean? = null, val exigeCodigo: Boolean? = null,
     val codigo: String? = null, val janelaDe: String? = null, val janelaAte: String? = null,
+    /** Pedido de onde veio a parada (rotas montadas de pedidos). */
+    val pedidoId: String? = null,
 )
 
 data class CorridaG(
@@ -137,6 +139,7 @@ fun JsonObject.paraParadaG() = ParadaG(
     referencias = arr("referencias").mapNotNull { r -> r.str("nome")?.let { RefG(it, r.int("distancia_m"), r.str("tipo"), r.dbl("lat"), r.dbl("lng"), r.str("relacao")) } },
     exigeFoto = boolOuNulo("exige_foto"), exigeNome = boolOuNulo("exige_nome"), exigeAssinatura = boolOuNulo("exige_assinatura"), exigeCodigo = boolOuNulo("exige_codigo"),
     codigo = str("codigo"), janelaDe = str("janela_de")?.take(5), janelaAte = str("janela_ate")?.take(5),
+    pedidoId = str("pedido_id"),
 )
 
 /** true/false do JSON, ou null quando vazio. */

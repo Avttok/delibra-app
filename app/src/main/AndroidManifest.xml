@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- óculos VR e tablets sem tela de toque/GPS também instalam -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+
     <application
         android:name=".PwApp"
         android:allowBackup="false"
@@ -10,12 +14,22 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.PWExpress">
 
+        <!-- Meta Quest (Horizon OS): roda como painel 2D redimensionável -->
+        <meta-data android:name="com.oculus.supportedDevices" android:value="quest2|questpro|quest3|quest3s" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:screenOrientation="portrait"
+            android:resizeableActivity="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density"
             android:windowSoftInputMode="adjustResize">
+            <!-- tamanho do painel no Meta Quest (em pé, como um celular grande); dá para redimensionar -->
+            <layout
+                android:defaultWidth="560dp"
+                android:defaultHeight="900dp"
+                android:minWidth="360dp"
+                android:minHeight="500dp" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

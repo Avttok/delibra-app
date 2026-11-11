@@ -106,7 +106,7 @@ fun DevG(onVoltar: () -> Unit) {
         PwFiltros(listOf("Empresas" to 0, "Faturamento" to 0, "Módulos" to 0, "Sistema" to 0, "Aparelhos" to 0, "Registro" to 0, "Versão do app" to 0, "Tarefas" to 0, "Apagar" to 0), aba, { aba = it })
         PwErro(erro)
         if (aba == 0) { DevEmpresasG(); return@PwPagina }
-        if (aba == 1) { DevFaturamentoG(); return@PwPagina }
+        if (aba == 1) { DevFaturamentoG(); DevPagamentosG(); return@PwPagina }
         val sub = aba - 2
         if (sub == 4) { VersaoAppG(); return@PwPagina }
         if (sub == 6) { ApagarTudoG(); return@PwPagina }

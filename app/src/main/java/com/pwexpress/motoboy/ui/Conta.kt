@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -70,20 +71,32 @@ fun RowScope.AcoesTopo(painel: Painel, podeTrocar: Boolean, onTrocar: (Painel) -
     val c = Pw.cores
     val perfil by Perfis.perfil.collectAsState()
     val teste by TemaApp.modoTeste.collectAsState()
-    if (podeTrocar) {
+    val chat = perfil?.logico("chat_ligado", true) != false && perfil?.modulo("chat") != false
+    // uma pílula só: troca motoboy/gestor e o chat (ocupa menos o topo e não aperta a foto)
+    if (podeTrocar || chat) {
         val forma = RoundedCornerShape(99.dp)
-        Row(Modifier.clip(forma).background(c.vidroForte).border(1.dp, c.borda, forma).padding(3.dp)) {
-            listOf(Painel.MOTOBOY to PwIcones.Bike, Painel.GESTOR to PwIcones.ShieldCheck).forEach { (p, i) ->
+        val naoLidas by com.pwexpress.core.chat.Chat.naoLidas.collectAsState()
+        Row(Modifier.clip(forma).background(c.vidroForte).border(1.dp, c.borda, forma).padding(3.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (podeTrocar) listOf(Painel.MOTOBOY to PwIcones.Bike, Painel.GESTOR to PwIcones.ShieldCheck).forEach { (p, i) ->
                 val ativo = p == painel
+                val fundo by androidx.compose.animation.animateColorAsState(if (ativo) c.ouro else androidx.compose.ui.graphics.Color.Transparent, label = "troca")
                 Box(
-                    Modifier.clip(forma).then(if (ativo) Modifier.background(c.gradOuro) else Modifier).clickable { onTrocar(p) }.padding(horizontal = 11.dp, vertical = 8.dp),
+                    Modifier.clip(forma).background(fundo).clickable { onTrocar(p) }.padding(horizontal = 10.dp, vertical = 8.dp),
                     contentAlignment = Alignment.Center,
                 ) { Icon(i, if (p == Painel.MOTOBOY) "MotoApp" else "Painel do gestor", tint = if (ativo) c.sobreOuro else c.texto3, modifier = Modifier.size(17.dp)) }
             }
+            if (podeTrocar && chat) Box(Modifier.padding(horizontal = 3.dp).width(1.dp).height(18.dp).background(c.borda))
+            if (chat) Box(
+                Modifier.clip(forma).clickable { com.pwexpress.core.chat.Chat.abrir.value = true }.padding(horizontal = 10.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(PwIcones.MessagesSquare, "Conversas", tint = if (naoLidas > 0) c.ouro else c.texto2, modifier = Modifier.size(17.dp))
+                if (naoLidas > 0) Box(
+                    Modifier.align(Alignment.TopEnd).offset(x = 7.dp, y = (-6).dp).size(16.dp).clip(forma).background(c.vermelho),
+                    contentAlignment = Alignment.Center,
+                ) { Text(if (naoLidas > 9) "9+" else "$naoLidas", color = androidx.compose.ui.graphics.Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+            }
         }
-    }
-    if (perfil?.logico("chat_ligado", true) != false && perfil?.modulo("chat") != false) {
-        com.pwexpress.core.chat.BotaoChatTopo { com.pwexpress.core.chat.Chat.abrir.value = true }
     }
     PwAvatarConta(perfil?.nome ?: "", perfil?.fotoUrl, teste, modifier = Modifier.alvoTour("conta"), tamanho = 42.dp, onClick = onConta, dev = perfil?.dev == true, gestor = perfil?.gestor == true, motoboy = perfil?.motoboy == true)
 }

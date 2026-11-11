@@ -132,6 +132,22 @@ object Corridas {
         ativa
     }.recoverCatching { e -> throw if (e is java.io.IOException) Exception("Sem internet.") else e }
 
+    // ------------------------------------------------------------------ pedir para cancelar / rota compartilhada
+
+    /** Chama uma função do banco e devolve o JSON (erros traduzidos). */
+    suspend fun rpc(funcao: String, args: JsonObject = JsonObject(emptyMap())): Result<kotlinx.serialization.json.JsonElement?> = tentar {
+        val r = PwCore.rpc.chamar(funcao, args)
+        if (!r.ok) throw Exception(traduzir(r))
+        r.json()
+    }.recoverCatching { e -> throw if (e is java.io.IOException) Exception("Sem internet.") else e }
+
+    /** Rota que mandaram no chat (mesmo em revisão), no formato do quadro. */
+    suspend fun rotaCompartilhada(id: String): Result<Pair<Corrida, JsonObject>> =
+        rpc("rota_compartilhada", buildJsonObject { put("p_corrida", id) }).mapCatching { j ->
+            val o = j as? JsonObject ?: throw Exception("Rota não encontrada.")
+            o.paraCorrida() to o
+        }
+
     // ------------------------------------------------------------------ holerite
 
     suspend fun meusHolerites(): Result<Pair<List<PeriodoHolerite>, Boolean>> = tentar {
@@ -317,6 +333,19 @@ object Corridas {
         "ainda_nao_pode_iniciar" to "Ainda é cedo para iniciar essa corrida.",
         "apenas_motoboy" to "Só motoboys podem fazer isso.",
         "rota_ja_pegada" to "Outro motoboy pegou essa rota antes.",
+        "chamado_ja_aberto" to "Você já pediu para cancelar esta rota. Espere a resposta do gestor.",
+        "chamado_desligado" to "O gestor desligou o pedido de cancelamento pelo app. Fale com ele.",
+        "informe_o_motivo" to "Conte o motivo.",
+        "corrida_nao_e_sua" to "Essa rota não está mais com você.",
+        "chamado_nao_encontrado" to "Esse pedido já foi respondido.",
+        "motoboy_suspenso" to "Você está suspenso por penalidades e não pode pegar rotas agora.",
+        "rota_compartilhada_desligada" to "O gestor não deixa abrir rotas pelo chat.",
+        "sem_permissao" to "Você não tem acesso a isso.",
+        "nao_encontrado" to "Não encontrado (pode ter sido apagado).",
+        "so_o_gestor_edita" to "Só o gestor muda o veículo (Ajustes → Veículo).",
+        "placa_invalida" to "Placa inválida. Use o formato ABC1D23 ou ABC1234.",
+        "cnh_invalida" to "Número da CNH inválido (9 a 11 dígitos).",
+        "cnh_categoria_invalida" to "Categoria da CNH inválida.",
     )
 
     private fun traduzir(r: HttpResposta): String {

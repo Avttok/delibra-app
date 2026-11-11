@@ -270,8 +270,26 @@ private fun JanelaPedido(p: PedidoG, empresa: String?, onFechar: () -> Unit) {
                     PwBotaoVidro("Cartão", onClick = { rodar("Pagamento confirmado: o pedido segue para as rotas.", fechar = false) { Gestao.confirmarPagamentoPedido(p.id, "cartao") } },
                         icone = PwIcones.Wallet, modifier = Modifier.weight(1f))
                 }
+                Spacer(Modifier.size(8.dp))
+                // o cliente pagou pelo site (PIX/cartão no Mercado Pago): confere lá na hora
+                PwBotaoOuro("Verificar no Mercado Pago", onClick = {
+                    rodar("Conferido no Mercado Pago.", fechar = false) {
+                        Gestao.verificarPagamento(p.id).map { st ->
+                            com.pwexpress.core.designsystem.PwToast.mostrar(when (st) {
+                                "aprovado" -> "Pago! O pedido segue para as rotas."
+                                "sem_pagamento" -> "O cliente ainda não começou o pagamento pelo site."
+                                "pendente", "em_processo" -> "Ainda não caiu. O cliente pode estar pagando agora."
+                                "recusado" -> "O pagamento foi recusado pelo Mercado Pago."
+                                "expirado" -> "O PIX venceu sem pagamento."
+                                else -> "Situação: ${st ?: "desconhecida"}."
+                            })
+                        }
+                    }
+                }, icone = PwIcones.CreditCard, modifier = Modifier.fillMaxWidth())
             }
         }
+        // como ele se junta com outros pedidos (só enquanto ainda dá para mudar)
+        if (p.status in setOf("recebido", "aprovado")) PainelJuntarG(p, onAbrir = { GestorNav.abrir(it) })
         if (p.status !in setOf("cancelado", "recusado") && (p.status != "recebido" || Gestao.dados.value.config.logico("revisao_previa_rotas", true)))
             RotasDoPedidoG(p.id, p.status, "${p.status}|${p.valor}|${p.regras}")
         if (p.status !in setOf("recebido", "cancelado", "recusado", "concluido")) SituacaoRotaG(p.id, "${p.status}|${p.pagamentoStatus}|${p.regras}")
@@ -303,9 +321,14 @@ private fun JanelaPedido(p: PedidoG, empresa: String?, onFechar: () -> Unit) {
             if (regras) RegrasPedidoG(p.id, p.regras, onFechar = { regras = false })
         }
         if (p.status in setOf("aprovado", "roteirizado", "em_rota")) {
-            PwBotaoVidro("Voltar para revisão", onClick = {
-                rodar("Pedido voltou para revisão: as rotas dele foram desfeitas.", fechar = false) { Gestao.revisarPedido(p.id, "voltar_revisao", null, motivo.ifBlank { null }) }
-            }, icone = PwIcones.History, modifier = Modifier.fillMaxWidth())
+            var confirmarVolta by remember { mutableStateOf(false) }
+            val pedirConfirmacao = com.pwexpress.core.perfil.Perfis.perfil.collectAsState().value?.logico("pedido_confirmar_revisao", true) != false
+            fun voltarRevisao() = rodar("Pedido voltou para revisão: as rotas dele foram desfeitas.", fechar = false) { Gestao.revisarPedido(p.id, "voltar_revisao", null, motivo.ifBlank { null }) }
+            PwBotaoVidro("Voltar para revisão", onClick = { if (pedirConfirmacao) confirmarVolta = true else voltarRevisao() }, icone = PwIcones.History, modifier = Modifier.fillMaxWidth())
+            if (confirmarVolta) com.pwexpress.core.designsystem.PwConfirmar(
+                "Voltar o pedido para revisão?",
+                "As rotas deste pedido são desfeitas e saem dos motoboys que já tinham pegado. Você revisa e monta de novo.",
+                "Voltar para revisão", onConfirmar = { confirmarVolta = false; voltarRevisao() }, onCancelar = { confirmarVolta = false })
             TextoDica("Só enquanto nenhuma coleta ou entrega dele foi feita. Serve para refazer as rotas com regras novas.")
         }
         Spacer(Modifier.size(12.dp))
@@ -1312,10 +1335,36 @@ private fun CartaoRotaG(
     }
     if (editavel) {
         if (outras.isNotEmpty()) {
-            Espaco(6)
-            com.pwexpress.core.designsystem.PwSelecao("", outras.map { o -> o.str("id") to "Juntar com a rota #${o.str("numero")}" }, null as String?, { dest ->
-                rodar("Rotas juntadas.", rpc("juntar_rotas") { put("p_origem", id); put("p_destino", dest) })
-            }, vazio = "Juntar esta rota com…")
+            Espaco(8)
+            // juntar: cada rota possível num cartão (quantas entregas, distância entre as coletas) e um toque para juntar
+            var juntar by remember(id) { mutableStateOf<String?>(null) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(PwIcones.Combine, null, tint = c.ouro, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp))
+                Text("Juntar esta rota com outra", color = c.texto, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp)
+            }
+            val minhaColeta = paradas.firstOrNull { it.str("tipo") == "coleta" }
+            outras.forEach { o ->
+                val oc = (o["paradas"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it as? kotlinx.serialization.json.JsonObject }.orEmpty()
+                val oColeta = oc.firstOrNull { it.str("tipo") == "coleta" }
+                val dist = if (minhaColeta != null && oColeta != null) com.pwexpress.core.mapa.distanciaM(minhaColeta.dbl("lat") ?: 0.0, minhaColeta.dbl("lng") ?: 0.0, oColeta.dbl("lat") ?: 0.0, oColeta.dbl("lng") ?: 0.0) else null
+                val oe = oc.count { it.str("tipo") == "entrega" }
+                val sel = juntar == o.str("id")
+                val formaJ = RoundedCornerShape(14.dp)
+                Column(Modifier.fillMaxWidth().padding(top = 6.dp).clip(formaJ).background(if (sel) c.ouro.copy(alpha = 0.1f) else c.vidroSutil)
+                    .border(1.dp, if (sel) c.ouro else c.borda, formaJ).clickable { juntar = if (sel) null else o.str("id") }.padding(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("#${o.str("numero")}", color = c.texto, fontWeight = FontWeight.Black, fontSize = 15.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("$oe entrega${if (oe == 1) "" else "s"}" + (dist?.let { " · coleta a ${km(it.toInt())} da sua" } ?: ""), color = c.texto2, fontSize = 12.5.sp, modifier = Modifier.weight(1f))
+                        Text("= ${entregas + oe} entregas", color = c.ouro, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+                    }
+                    if (sel) {
+                        Espaco(8)
+                        PwBotaoOuro("Juntar com a #${o.str("numero")}", onClick = { rodar("Rotas juntadas.", rpc("juntar_rotas") { put("p_origem", id); put("p_destino", o.str("id")) }) },
+                            icone = PwIcones.Combine, habilitado = !ocupado, altura = 44.dp)
+                    }
+                }
+            }
         }
         if (r.str("status") == "montada") {
             Espaco(6)

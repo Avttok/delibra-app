@@ -1,6 +1,12 @@
 package com.pwexpress.feature.gestor.ui
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -108,25 +114,51 @@ internal fun EditarPercursoG(corrida: CorridaG, onFechar: () -> Unit) {
         polyline = codificarPolyline(r.pontos); distancia = r.distanciaM; duracao = r.duracaoS
     }
 
+    // ponto escolhido para mover: o próximo toque no mapa leva ele para lá (o "arrastar" do celular)
+    var escolhido by remember(corrida.id) { mutableStateOf<Int?>(null) }
+    fun encaixar(la: Double, lo: Double): Via {
+        var melhor = 0; var dist = Double.MAX_VALUE; var tt = 0.5
+        for (i in 0 until pontos.size - 1) {
+            val (d, t) = projecao(la to lo, pontos[i], pontos[i + 1])
+            if (d < dist) { dist = d; melhor = i; tt = t }
+        }
+        return Via(la, lo, melhor, tt)
+    }
+    val tocar: (Double, Double) -> Unit = toque@{ la, lo ->
+        if (pontos.size < 2) return@toque
+        val sel = escolhido
+        if (sel != null && sel in vias.indices) { vias[sel] = encaixar(la, lo); escolhido = null; return@toque }
+        if (vias.size >= 20) { PwToast.mostrar("Até 20 pontos por rota.", com.pwexpress.core.designsystem.TipoAviso.AVISO); return@toque }
+        vias.add(encaixar(la, lo))
+    }
+    val ferramentas: @Composable () -> Unit = {
+        val sel = escolhido
+        if (sel != null && sel in vias.indices) {
+            val forma = RoundedCornerShape(16.dp)
+            Column(Modifier.fillMaxWidth().clip(forma).background(c.vidroForte).border(1.dp, c.ouro, forma).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Ponto ${sel + 1} escolhido: toque no mapa onde ele deve ficar.", color = c.texto, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PwBotaoVidro("Tirar", onClick = { vias.removeAt(sel); escolhido = null }, icone = PwIcones.Trash2, modifier = Modifier.weight(1f))
+                    PwBotaoVidro("Pronto", onClick = { escolhido = null }, icone = PwIcones.Check, modifier = Modifier.weight(1f))
+                }
+            }
+        } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PwBotaoVidro("Desfazer", onClick = { if (vias.isNotEmpty()) vias.removeAt(vias.lastIndex) }, icone = PwIcones.RotateCcw, habilitado = vias.isNotEmpty() && !salvando, modifier = Modifier.weight(1f))
+            PwBotaoVidro("Limpar", onClick = { vias.clear() }, icone = PwIcones.Trash2, habilitado = vias.isNotEmpty() && !salvando, modifier = Modifier.weight(1f))
+        }
+    }
     PwJanela("Editar percurso", onFechar, fecharFora = !salvando) {
-        TextoDica("Toque numa rua para o caminho passar por ela. Toque num ponto branco para tirar. As paradas continuam na mesma ordem.")
+        TextoDica("Toque numa rua para o caminho passar por ela. Toque num ponto (número branco) para escolher e depois toque onde ele deve ir. As paradas continuam na mesma ordem.")
         val pinos = paradas.mapIndexed { i, p -> PinoMapa(p.lat, p.lng, p.coleta, false, p.status == "concluida", numero = i + 1) }
-        val marcas = vias.mapIndexed { i, v -> MarcadorMapa("via_$i", v.lat, v.lng, "#FFFFFF", "", pino = false, prioridade = 3) }
+        val marcas = vias.mapIndexed { i, v -> MarcadorMapa("via_$i", v.lat, v.lng, if (i == escolhido) "#D4AF37" else "#FFFFFF", "${i + 1}", pino = false, prioridade = 3) }
         Box(Modifier.fillMaxWidth().height(420.dp).clip(RoundedCornerShape(18.dp)).border(1.dp, c.borda, RoundedCornerShape(18.dp))) {
             PwMapa(paradas = pinos, rota = polyline ?: corrida.rota, minhaPosicao = null, modifier = Modifier.fillMaxSize(),
-                marcadores = marcas, caminhoAuto = corrida.rota == null && polyline == null, maximizavel = false, enquadrar = corrida.id, legenda = false,
-                onToque = { la, lo ->
-                    if (pontos.size < 2) return@PwMapa
-                    // trecho mais perto do toque
-                    var melhor = 0; var dist = Double.MAX_VALUE; var tt = 0.5
-                    for (i in 0 until pontos.size - 1) {
-                        val (d, t) = projecao(la to lo, pontos[i], pontos[i + 1])
-                        if (d < dist) { dist = d; melhor = i; tt = t }
-                    }
-                    if (vias.size >= 20) { PwToast.mostrar("Até 20 pontos por rota.", com.pwexpress.core.designsystem.TipoAviso.AVISO); return@PwMapa }
-                    vias.add(Via(la, lo, melhor, tt))
-                },
-                onMarcador = { id -> id.removePrefix("via_").toIntOrNull()?.let { if (it in vias.indices) vias.removeAt(it) } })
+                marcadores = marcas, caminhoAuto = corrida.rota == null && polyline == null, enquadrar = corrida.id, legenda = false,
+                tituloTelaCheia = "Editar percurso",
+                // na tela cheia: as mesmas ferramentas embaixo
+                rodapeTelaCheia = { ferramentas() },
+                onToque = { la, lo -> tocar(la, lo) },
+                onMarcador = { id -> id.removePrefix("via_").toIntOrNull()?.let { if (it in vias.indices) escolhido = if (escolhido == it) null else it } })
         }
         val antes = corrida.distanciaPlanejadaM
         PwLinhaInfo(PwIcones.Route, "Distância", when {
@@ -137,10 +169,7 @@ internal fun EditarPercursoG(corrida: CorridaG, onFechar: () -> Unit) {
         })
         PwLinhaInfo(PwIcones.MapPin, "Pontos de passagem", "${vias.size}")
         PwErro(erro)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PwBotaoVidro("Desfazer", onClick = { if (vias.isNotEmpty()) vias.removeAt(vias.lastIndex) }, icone = PwIcones.RotateCcw, habilitado = vias.isNotEmpty() && !salvando, modifier = Modifier.weight(1f))
-            PwBotaoVidro("Limpar", onClick = { vias.clear() }, icone = PwIcones.Trash2, habilitado = vias.isNotEmpty() && !salvando, modifier = Modifier.weight(1f))
-        }
+        ferramentas()
         PwBotaoOuro(if (salvando) "Salvando…" else "Salvar percurso", icone = PwIcones.Check, habilitado = !salvando && !calculando && polyline != null, onClick = {
             val pl = polyline ?: return@PwBotaoOuro
             salvando = true

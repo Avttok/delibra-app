@@ -58,6 +58,40 @@ class FcmService : FirebaseMessagingService() {
                     abrir = PwNotificacoes.abrirApp(applicationContext, 4300, "rotas"), icone = "calendario")
                 runBlocking { withTimeoutOrNull(6_000) { Corridas.carregarPlanejadas(); Corridas.carregarRotas() } }
             }
+            // a rota saiu do motoboy: passada para outro, ou o cancelamento que ele pediu foi aprovado
+            "corrida_passada" -> {
+                Alarme.pararOferta(applicationContext)
+                val titulo = message.data["titulo"] ?: "Rota passada para outro motoboy"
+                val texto = message.data["texto"] ?: "O gestor tirou esta rota de você."
+                PwNotificacoes.cartao(applicationContext, 4110, PwNotificacoes.CANAL_AVISOS, titulo, texto, PwNotificacoes.GRAD_VERMELHO, icone = "x")
+                PwDestaque.mostrar(titulo, texto, EstiloDestaque.CANCELADA, duracaoMs = 7_000)
+                runBlocking { withTimeoutOrNull(8_000) { Corridas.sincronizarAgora() } }
+            }
+            "chamado_respondido" -> {
+                val aprovado = message.data["aprovado"] == "true"
+                val titulo = message.data["titulo"] ?: if (aprovado) "Cancelamento aprovado" else "Cancelamento negado"
+                val texto = message.data["texto"] ?: if (aprovado) "A rota saiu de você. Pode parar." else "Siga com a rota como combinado."
+                PwNotificacoes.cartao(applicationContext, 4120, PwNotificacoes.CANAL_AVISOS, titulo, texto,
+                    if (aprovado) PwNotificacoes.GRAD_VERDE else PwNotificacoes.GRAD_OURO, icone = if (aprovado) "check" else "alerta")
+                PwDestaque.mostrar(titulo, texto, if (aprovado) EstiloDestaque.CANCELADA else EstiloDestaque.EXTENSAO, duracaoMs = 7_000)
+                runBlocking { withTimeoutOrNull(8_000) { Corridas.sincronizarAgora() } }
+            }
+            "suspenso", "suspensao_fim" -> {
+                val fim = message.data["tipo"] == "suspensao_fim"
+                PwNotificacoes.cartao(applicationContext, 4130, PwNotificacoes.CANAL_AVISOS,
+                    message.data["titulo"] ?: if (fim) "Suspensão retirada" else "Você está suspenso",
+                    message.data["texto"] ?: if (fim) "Você já pode receber corridas de novo." else "Sem corridas novas por um tempo.",
+                    if (fim) PwNotificacoes.GRAD_VERDE else PwNotificacoes.GRAD_VERMELHO, icone = if (fim) "check" else "alerta")
+                runBlocking { withTimeoutOrNull(6_000) { com.pwexpress.core.perfil.Perfis.carregar() } }
+            }
+            // avisos do gestor: motoboy pedindo para cancelar, motoboy suspenso
+            "chamado_cancelar", "motoboy_suspenso" -> {
+                val corrida = message.data["corrida_id"].orEmpty()
+                val idN = 4500 + ((message.data["chamado_id"] ?: corrida).hashCode() and 0xFF)
+                PwNotificacoes.cartao(applicationContext, idN, PwNotificacoes.CANAL_AVISOS,
+                    message.data["titulo"] ?: "Pedido de cancelamento", message.data["texto"] ?: "", PwNotificacoes.GRAD_VERMELHO,
+                    abrir = PwNotificacoes.abrirApp(applicationContext, idN, if (corrida.isNotBlank()) "gestor:corrida:$corrida" else "gestor:equipe"), icone = "alerta")
+            }
             // avisos do gestor: pedido novo, rota sem motoboy, cadastro de cliente
             "pedido_novo", "rota_sem_motoboy", "cadastro_novo" -> {
                 val t = message.data["tipo"]!!
@@ -76,6 +110,12 @@ class FcmService : FirebaseMessagingService() {
                 val conversa = message.data["conversa_id"] ?: return
                 PwNotificacoes.mensagemChat(applicationContext, conversa, message.data["titulo"] ?: "Conversa", message.data["texto"] ?: "Nova mensagem")
                 runBlocking { withTimeoutOrNull(5_000) { com.pwexpress.core.chat.Chat.carregar() } }
+            }
+            // qualquer aviso novo do servidor que traga título e texto aparece, mesmo sem tratamento próprio
+            else -> {
+                val titulo = message.data["titulo"] ?: message.notification?.title ?: return
+                val texto = message.data["texto"] ?: message.notification?.body ?: ""
+                PwNotificacoes.cartao(applicationContext, 4600 + (titulo.hashCode() and 0xFF), PwNotificacoes.CANAL_AVISOS, titulo, texto, PwNotificacoes.GRAD_OURO, icone = "rota")
             }
         }
     }

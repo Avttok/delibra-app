@@ -108,6 +108,35 @@ class AuthRepository(
         }
     }
 
+    /**
+     * Troca a senha da própria conta: confere a senha atual (login de novo) e grava a nova.
+     * A sessão continua (o token novo substitui o antigo).
+     */
+    suspend fun trocarSenha(atual: String, nova: String): Result<Unit> = try {
+        val s = _sessao.value ?: throw AuthErro("Entre de novo para trocar a senha.")
+        if (nova.length < 6) throw AuthErro("A senha nova precisa ter pelo menos 6 caracteres.")
+        if (nova == atual) throw AuthErro("A senha nova é igual à atual.")
+        val conf = http.post("/auth/v1/token?grant_type=password", buildJsonObject { put("email", s.email); put("password", atual) }.toString())
+        if (!conf.ok) throw AuthErro(if (conf.codigo == 400) "A senha atual não confere." else mensagemPorCodigo(conf))
+        val nova1 = parseSessao(conf.corpo)
+        guardar(nova1)
+        val r = http.requisitar("PUT", "/auth/v1/user", buildJsonObject { put("password", nova) }.toString(), bearer = nova1.accessToken)
+        if (!r.ok) throw AuthErro(when {
+            r.corpo.contains("weak", true) || r.corpo.contains("characters", true) -> "Senha fraca demais. Use letras e números."
+            r.corpo.contains("same", true) -> "A senha nova é igual à atual."
+            else -> mensagemPorCodigo(r)
+        })
+        // a senha mudou: o acesso de um toque salvo continua valendo com o token novo
+        contas.atualizarToken(nova1.email, nova1.refreshToken)
+        Result.success(Unit)
+    } catch (e: AuthErro) {
+        Result.failure(e)
+    } catch (e: IOException) {
+        Result.failure(AuthErro("Sem conexão com o servidor. Verifique a internet."))
+    } catch (e: Exception) {
+        Result.failure(AuthErro("Erro inesperado: ${e.message}"))
+    }
+
     fun sair() {
         store.limpar()
         _sessao.value = null

@@ -264,7 +264,9 @@ private fun EditorCatalogo(cat: Catalogo, l: JsonObject?, clienteId: String?, on
             }
         }
         if (cat == Catalogo.ZONAS) {
-            PwCampo(raioKm, { raioKm = it }, "Raio (km)", teclado = KeyboardType.Decimal)
+            Text("Raio", color = c.texto2, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            com.pwexpress.core.designsystem.PwPasso(num(raioKm) ?: 1.0, { raioKm = com.pwexpress.core.designsystem.numeroBr(it, 2) }, Modifier.fillMaxWidth(),
+                passo = 0.1, min = 0.1, max = 100.0, unidade = "km")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CORES.forEach { h ->
                     val col = Color(android.graphics.Color.parseColor(h))
@@ -273,8 +275,20 @@ private fun EditorCatalogo(cat: Catalogo, l: JsonObject?, clienteId: String?, on
             }
             val la = lat; val lo = lng
             if (la != null && lo != null) Box(Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(20.dp))) {
+                // toque no mapa muda o centro; na tela cheia, o raio e o centro ficam embaixo (tudo sem sair do mapa)
                 PwMapa(paradas = emptyList(), rota = null, minhaPosicao = null, modifier = Modifier.fillMaxWidth().height(220.dp),
-                    circulo = (la to lo) to ((num(raioKm) ?: 1.0) * 1000), inicio = la to lo, zoomInicio = 12.0, enquadrar = "$la$lo")
+                    circulo = (la to lo) to ((num(raioKm) ?: 1.0) * 1000), inicio = la to lo, zoomInicio = 12.0, enquadrar = "$la$lo",
+                    onToque = { nla, nlo -> lat = nla; lng = nlo },
+                    tituloTelaCheia = "Zona",
+                    rodapeTelaCheia = {
+                        val forma = RoundedCornerShape(16.dp)
+                        androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().clip(forma).background(c.vidroForte).border(1.dp, c.borda, forma).padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Toque no mapa para mudar o centro.", color = c.texto2, fontSize = 13.sp)
+                            com.pwexpress.core.designsystem.PwPasso(num(raioKm) ?: 1.0, { raioKm = com.pwexpress.core.designsystem.numeroBr(it, 2) }, Modifier.fillMaxWidth(),
+                                passo = 0.1, min = 0.1, max = 100.0, unidade = "km")
+                        }
+                    })
             }
             PwBotaoVidro(if (lat == null) "Marcar o centro no mapa" else "Mudar o centro", onClick = { marcando = true }, icone = PwIcones.MapPinned, modifier = Modifier.fillMaxWidth())
         }

@@ -274,7 +274,10 @@ private fun CartaoRota(r: Corrida, agora: Long, ocupado: Boolean, onPegar: () ->
  * cada parada (com cliente, referências e itens) e os cuidados. O motoboy se planeja antes.
  */
 @Composable
-private fun DetalheRotaQuadro(r: Corrida, agora: Long, ocupado: Boolean, onFechar: () -> Unit, onPegar: () -> Unit) {
+internal fun DetalheRotaQuadro(r: Corrida, agora: Long, ocupado: Boolean, onFechar: () -> Unit, onPegar: () -> Unit,
+                               /** Rodapé próprio (ex.: rota compartilhada no chat: responder se pode). */
+                               rodapeProprio: (@Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit)? = null,
+                               aviso: String? = null) {
     val c = Pw.cores
     val perfil by com.pwexpress.core.perfil.Perfis.perfil.collectAsState()
     val verEnderecos = perfil?.logico("quadro_mostra_enderecos", true) != false
@@ -282,13 +285,14 @@ private fun DetalheRotaQuadro(r: Corrida, agora: Long, ocupado: Boolean, onFecha
     com.pwexpress.core.designsystem.PwTelaCheia(
         "Rota ${r.numeroExibicao}", onFechar,
         subtitulo = r.agendadaPara?.let { quandoTexto(it).replaceFirstChar { ch -> ch.uppercase() } + " · " + relativoTexto(it, agora) } ?: "Para agora",
-        rodape = {
+        rodape = rodapeProprio ?: {
             PwBotaoOuro(
                 if (ocupado) (if (r.planejada) "Reservando…" else "Pegando…") else if (r.planejada) "Reservar esta rota" else "Pegar esta rota",
                 onClick = onPegar, icone = if (r.planejada) PwIcones.CalendarCheck else PwIcones.ChevronsRight, habilitado = !ocupado, altura = 58.dp,
             )
         },
     ) {
+        aviso?.let { PwCartao(cor = c.azul.copy(alpha = 0.55f)) { Text(it, color = c.texto, fontSize = 14.sp) } }
         var focoR by remember(r.id) { mutableStateOf<com.pwexpress.core.mapa.FocoMapa?>(null) }
         val trazer = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
         LaunchedEffect(focoR) { if (focoR != null) trazer.bringIntoView() }

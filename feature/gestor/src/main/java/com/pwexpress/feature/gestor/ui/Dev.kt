@@ -117,6 +117,7 @@ fun DevG(onVoltar: () -> Unit) {
                 ModulosDevG(l) { m, ligado, papeis -> salvar(m, ligado, papeis) }
             }
             1 -> {
+                DevPushG()
                 val cont = painel?.obj("contagens") ?: run { PwCarregando(); return@PwPagina }
                 PwBotaoVidro("Atualizar números", onClick = { escopo.launch { carregar() } }, icone = PwIcones.RefreshCw, modifier = Modifier.fillMaxWidth())
                 CONTAGENS_GRUPOS.forEach { (g, lista) ->

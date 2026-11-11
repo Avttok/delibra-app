@@ -3,6 +3,8 @@
 **Importante:** esta versão vem com a assinatura digital nova. Se o celular disser que não dá para atualizar, desinstale a versão antiga e instale esta (só desta vez).
 
 **Novidades desta versão**
+- **Avisos (push) corrigidos**: o servidor recusava os avisos, por isso a tela não acendia com rota nova. No Console Dev → Sistema dá para testar o aviso no próprio celular.
+- **Foto de perfil**: salva assim que você escolhe, com mensagem clara se algo der errado; trocar a foto não apaga mais cargos nem a marca da empresa.
 - **Visual do seu jeito**: 8 fontes (Sua conta → Fonte) e muitas cores novas, inclusive vermelho para todos e degradês (pôr do sol, oceano, aurora, neon, fogo).
 - **Abertura** com a logo até carregar tudo.
 - **Logo**: cor e força do brilho, fonte do nome no topo, e "Ajustar" sem enviar outra imagem.

@@ -96,13 +96,6 @@ fun PerfilScreen(
 
     LaunchedEffect(Unit) { Perfis.carregar() }
 
-    val galeria = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) scope.launch { novaFoto = withContext(Dispatchers.Default) { prepararFoto(ctx, uri) } }
-    }
-    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bmp ->
-        if (bmp != null) scope.launch { novaFoto = withContext(Dispatchers.Default) { quadrado(bmp) } }
-    }
-
     fun salvar() {
         salvando = true
         msg = null
@@ -114,6 +107,18 @@ fun PerfilScreen(
             salvando = false
         }
     }
+
+    val galeria = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) scope.launch {
+            novaFoto = withContext(Dispatchers.Default) { prepararFoto(ctx, uri) }
+            if (novaFoto == null) msg = false to "Não deu para abrir esta foto. Tente outra (JPG ou PNG)."
+            else salvar()
+        }
+    }
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bmp ->
+        if (bmp != null) scope.launch { novaFoto = withContext(Dispatchers.Default) { quadrado(bmp) }; salvar() }
+    }
+
 
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         com.pwexpress.core.designsystem.PwCabecalho("Seu perfil", onVoltar, subtitulo = email)

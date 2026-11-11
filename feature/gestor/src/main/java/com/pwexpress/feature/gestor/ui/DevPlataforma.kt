@@ -284,3 +284,44 @@ internal fun DevFaturamentoG() {
     Spacer(Modifier.height(4.dp))
     @Suppress("UNUSED_VARIABLE") val semUso = Color.Transparent to Modifier.width(0.dp)
 }
+
+
+/** Dev → Sistema: manda um aviso de teste para este celular e mostra onde o push travou. */
+@Composable
+internal fun DevPushG() {
+    val c = Pw.cores
+    val escopo = rememberCoroutineScope()
+    var diag by remember { mutableStateOf<JsonObject?>(null) }
+    var enviando by remember { mutableStateOf(false) }
+    suspend fun ler() { diag = Gestao.rpcJson("dev_push_diagnostico").getOrNull() as? JsonObject }
+    LaunchedEffect(Unit) { ler() }
+    PwCartao {
+        PwRotulo("Avisos (push)")
+        val d = diag
+        if (d != null) {
+            PwLinhaInfo(PwIcones.Smartphone, "Este celular registrado", if (d.str("tem_token") == "true") "sim" else "não — abra o app e entre de novo")
+            PwLinhaInfo(PwIcones.Globe, "Servidor do push", d.str("url") ?: "não configurado")
+            d.arr("respostas").take(3).forEach { r ->
+                val st = r.str("status")
+                PwLinhaInfo(PwIcones.Info, "Último envio", when {
+                    st == "200" -> "ok"
+                    st == "401" -> "recusado (segredo) — atualize o site"
+                    st != null -> "erro $st"
+                    else -> r.str("erro") ?: "—"
+                })
+            }
+        }
+        PwBotaoOuro(if (enviando) "Enviando…" else "Testar aviso neste celular", icone = PwIcones.Send, habilitado = !enviando, onClick = {
+            enviando = true
+            escopo.launch {
+                val r = Gestao.rpcJson("dev_testar_push").getOrNull() as? JsonObject
+                enviando = false
+                if (r?.str("ok") == "true") PwToast.mostrar("Enviado. O aviso deve chegar em segundos.", titulo = "Teste")
+                else PwToast.mostrar(if (r?.str("motivo") == "sem_token") "Este celular ainda não registrou o push. Saia e entre de novo." else "Não deu para enviar.", TipoAviso.ERRO)
+                kotlinx.coroutines.delay(4000); ler()
+            }
+        })
+        TextoDica("Para a tela acender com rota nova: Ajustes → Corridas novas → permitir tela cheia.")
+    }
+    @Suppress("UNUSED_VARIABLE") val semUso = c
+}

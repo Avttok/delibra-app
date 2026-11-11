@@ -320,7 +320,7 @@ fun PwTheme(content: @Composable () -> Unit) {
             marca = Marca.VERDE,
         )
         estilo.noturno != null -> {
-            val t = (if (escuro) estilo.noturno else estilo.diurno ?: estilo.noturno).map { Color(it) }
+            val t = (if (escuro) estilo.noturno!! else (estilo.diurno ?: estilo.noturno!!)).map { Color(it) }
             val principal = t[1]
             base.copy(
                 ouro = principal, ouroClaro = t[0], ouroEscuro = t[2],

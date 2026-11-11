@@ -341,7 +341,7 @@ private fun EscolherCores(atual: com.pwexpress.core.designsystem.EstiloTema) {
                         .clickable { com.pwexpress.core.designsystem.TemaApp.definirEstilo(e) }
                         .padding(5.dp).clip(androidx.compose.foundation.shape.CircleShape)
                         .background(androidx.compose.ui.graphics.Brush.linearGradient(
-                            if (e.noturno != null) e.noturno.map { Color(it) } else listOf(e.fundoAmostra, e.fundoAmostra, e.amostra, e.amostra),
+                            e.noturno?.map { Color(it) } ?: listOf(e.fundoAmostra, e.fundoAmostra, e.amostra, e.amostra),
                             start = androidx.compose.ui.geometry.Offset.Zero, end = androidx.compose.ui.geometry.Offset.Infinite)),
                     contentAlignment = Alignment.Center,
                 ) {

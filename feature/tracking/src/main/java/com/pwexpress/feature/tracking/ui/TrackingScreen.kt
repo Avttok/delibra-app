@@ -226,7 +226,9 @@ private fun BotaoStatus(modo: Modo, onAlternar: () -> Unit, onToque: () -> Unit,
     })
     val pintoresItens = listOf(PwIcones.FileText, PwIcones.Package, PwIcones.ShoppingBag, PwIcones.Pill, PwIcones.Key, PwIcones.Boxes)
         .map { androidx.compose.ui.graphics.vector.rememberVectorPainter(it) }
-    val ouroMarca = Pw.cores.ouro
+    // o orbe é sempre escuro: nos temas "preto no branco" o destaque preto some, então vira claro
+    val ouroMarca = Pw.cores.ouro.let { if (it.luminance() < 0.3f) Color(0xFFF4F4F5) else it }
+    val ouroFora = Pw.cores.ouro
     // o detector de toque não reinicia quando o modo muda (senão perde o "segurando")
     val emRotaAgora = androidx.compose.runtime.rememberUpdatedState(emRota)
     val onAlternarAgora = androidx.compose.runtime.rememberUpdatedState(onAlternar)
@@ -292,10 +294,10 @@ private fun BotaoStatus(modo: Modo, onAlternar: () -> Unit, onToque: () -> Unit,
                         val rMoto = rAnel + esp / 2f + 14.dp.toPx()
                         val ang = Math.toRadians(giro.toDouble())
                         val pc = Offset(centro.x + rMoto * kotlin.math.cos(ang).toFloat(), centro.y + rMoto * kotlin.math.sin(ang).toFloat())
-                        drawCircle(Brush.radialGradient(listOf(ouroMarca.copy(alpha = 0.22f * l), Color.Transparent), pc, t * 0.9f), t * 0.9f, pc)
+                        drawCircle(Brush.radialGradient(listOf(ouroFora.copy(alpha = 0.22f * l), Color.Transparent), pc, t * 0.9f), t * 0.9f, pc)
                         rotate(giro + 90f, pc) {
                             translate(pc.x - t / 2f, pc.y - t / 2f) {
-                                with(pintorMoto) { draw(androidx.compose.ui.geometry.Size(t, t), alpha = l, colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(ouroMarca)) }
+                                with(pintorMoto) { draw(androidx.compose.ui.geometry.Size(t, t), alpha = l, colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(ouroFora)) }
                             }
                         }
                     }

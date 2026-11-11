@@ -256,7 +256,8 @@ internal fun ExcecoesG(onVoltar: () -> Unit) {
 }
 
 /** Regras que fazem sentido num pedido só (preço, junção em rotas, despacho, revisão). */
-internal val PARAMS_PEDIDO = PARAMETROS_VISIVEIS.filter { ("cliente" in it.escopos || "tipo" in it.escopos) && it.grupo !in setOf("pagamento", "pag_combinar", "pag_zonas", "pag_km", "pag_entrega", "pag_fixo", "faturas") && !it.soDev }
+// "juntar rotas" fica no painel da revisão do pedido (não repete aqui)
+internal val PARAMS_PEDIDO = PARAMETROS_VISIVEIS.filter { ("cliente" in it.escopos || "tipo" in it.escopos) && it.grupo !in setOf("pagamento", "pag_combinar", "pag_zonas", "pag_km", "pag_entrega", "pag_fixo", "faturas") && !it.soDev && it.chave !in CHAVES_JUNTAR }
 
 /** Regras deste pedido (a peça mais alta do lego). Grava na hora e recalcula o orçamento. */
 @Composable

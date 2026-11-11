@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -135,94 +136,68 @@ fun JanelaConta(
             }
         }
 
-        // atalhos em blocos
-        val atalhos = buildList {
-            if (perfil?.motoboy == true) add(Triple(PwIcones.Trophy, "Conquistas", { conquistas = true }))
-            add(Triple(PwIcones.SlidersHorizontal, "Ajustes", onConfiguracoes))
-            if (ehMotoboy) add(Triple(PwIcones.Radar, "Raio", { raio = true }))
-            if (perfil?.dev == true || (perfil?.gestor == true && perfil?.supervisor != true)) add(Triple(PwIcones.Landmark, "Minha empresa", { empresa = true }))
-            if (perfil?.dev == true) add(Triple(PwIcones.CodeXml, "Console Dev", onDev))
-        }
-        atalhos.chunked(2).forEach { linha ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                linha.forEach { (ic, rot, acao) -> BlocoAtalho(ic, rot, if (rot == "Console Dev") c.dev else c.ouro, acao, Modifier.weight(1f)) }
-                if (linha.size == 1) Spacer(Modifier.weight(1f))
-            }
-        }
-        if (perfil?.motoboy == true) com.pwexpress.core.perfil.FaixaConquistas(onVerTodas = { conquistas = true })
-
-        GrupoMenu("Aparência") {
-            val escuro = c.escuro
-            val estilo by TemaApp.estilo.collectAsState()
-            val mono = estilo == com.pwexpress.core.designsystem.EstiloTema.PRETO_NO_BRANCO || estilo == com.pwexpress.core.designsystem.EstiloTema.BRANCO_NO_PRETO
-            if (!mono) ItemMenu(if (escuro) PwIcones.Moon else PwIcones.Sun, if (escuro) "Tema noturno" else "Tema claro",
-                onClick = { TemaApp.definir(if (escuro) PreferenciaTema.CLARO else PreferenciaTema.ESCURO) }) {
-                Interruptor(escuro) { TemaApp.definir(if (it) PreferenciaTema.ESCURO else PreferenciaTema.CLARO) }
-            }
-            EscolherCores(estilo)
-            if (perfil?.dev == true) {
-                val vermelho by TemaApp.vermelho.collectAsState()
-                ItemMenu(PwIcones.Palette, "Tema vermelho", subtitulo = if (vermelho) "A cor do Dev" else "Dourado, como todos", cor = c.dev, onClick = {}) {
-                    Interruptor(vermelho, c.dev) { lig ->
-                        TemaApp.definirVermelho(lig)
-                        escopo.launch { Perfis.definirCorTema(if (lig) "vermelho" else "ouro").onFailure { TemaApp.definirVermelho(!lig); PwToast.mostrar(it.message ?: "Erro", TipoAviso.ERRO) } }
-                    }
+        // tudo em blocos de 2 colunas: atalhos, liga/desliga e ajuda
+        val escuro = c.escuro
+        val estilo by TemaApp.estilo.collectAsState()
+        val mono = estilo == com.pwexpress.core.designsystem.EstiloTema.PRETO_NO_BRANCO || estilo == com.pwexpress.core.designsystem.EstiloTema.BRANCO_NO_PRETO
+        val vermelho by TemaApp.vermelho.collectAsState()
+        val info by com.pwexpress.feature.tracking.Tracking.info.collectAsState()
+        var oculto by remember { mutableStateOf(perfil?.devOculto == true) }
+        val ctxAjuda = androidx.compose.ui.platform.LocalContext.current
+        fun alternarTeste(lig: Boolean) {
+            if (trocandoTeste) return
+            trocandoTeste = true
+            escopo.launch {
+                Perfis.definirModoTeste(lig).onFailure { erro = it.message }.onSuccess {
+                    erro = null
+                    PwToast.mostrar(if (lig) "Tudo violeta: só corridas e ganhos de teste." else "De volta ao normal: tudo vale de verdade.", TipoAviso.INFO, if (lig) "Modo teste ligado" else "Modo teste desligado")
                 }
+                trocandoTeste = false
             }
         }
-
-        GrupoMenu("Trabalho") {
-            if (perfil?.gestor == true && perfil?.modulo("modo_teste") != false) {
-                fun alternarTeste(lig: Boolean) {
-                    if (trocandoTeste) return
-                    trocandoTeste = true
-                    escopo.launch {
-                        Perfis.definirModoTeste(lig).onFailure { erro = it.message }.onSuccess {
-                            erro = null
-                            PwToast.mostrar(if (lig) "Tudo violeta: só corridas e ganhos de teste." else "De volta ao normal: tudo vale de verdade.", TipoAviso.INFO, if (lig) "Modo teste ligado" else "Modo teste desligado")
-                        }
-                        trocandoTeste = false
-                    }
-                }
-                ItemMenu(PwIcones.FlaskConical, "Modo teste", subtitulo = if (teste) "Só corridas e ganhos de teste" else "Treine sem mexer no que é real", cor = c.violeta, onClick = { alternarTeste(!teste) }) {
-                    Interruptor(teste, c.violeta) { alternarTeste(it) }
-                }
-            }
-            if (ehMotoboy) {
-                val info by com.pwexpress.feature.tracking.Tracking.info.collectAsState()
-                ItemMenu(PwIcones.BatteryLow, "Economia de bateria", subtitulo = if (info.economia) "GPS a cada ${com.pwexpress.feature.tracking.Intervalos.corridaMs(true) / 1000} s em corrida" else "GPS no ritmo normal",
-                    onClick = { com.pwexpress.feature.tracking.Tracking.definirEconomia(!info.economia) }) {
-                    Interruptor(info.economia) { com.pwexpress.feature.tracking.Tracking.definirEconomia(it) }
-                }
-            }
-            if (perfil?.dev == true) {
-                var oculto by remember { mutableStateOf(perfil?.devOculto == true) }
-                ItemMenu(if (oculto) PwIcones.EyeOff else PwIcones.Eye, "Ficar oculto", subtitulo = if (oculto) "Você aparece só como Dev, com o ícone </>" else "Seu nome e foto aparecem para todos", cor = c.dev, onClick = {}) {
-                    Interruptor(oculto, c.dev) { lig ->
-                        oculto = lig
-                        escopo.launch { Perfis.definirOculto(lig).onFailure { oculto = !lig; PwToast.mostrar(it.message ?: "Erro", TipoAviso.ERRO) } }
-                    }
-                }
-            }
-            PwErro(erro)
-        }
-
-        GrupoMenu("Ajuda") {
-            val ctxAjuda = androidx.compose.ui.platform.LocalContext.current
-            ItemMenu(PwIcones.Info, "Central de ajuda", subtitulo = "Como usar o app, passo a passo", onClick = {
+        val blocos = buildList<Bloco> {
+            if (perfil?.motoboy == true) add(Bloco(PwIcones.Trophy, "Conquistas", onClick = { conquistas = true }))
+            add(Bloco(PwIcones.SlidersHorizontal, "Ajustes", onClick = onConfiguracoes))
+            if (ehMotoboy) add(Bloco(PwIcones.Radar, "Raio", onClick = { raio = true }))
+            if (perfil?.dev == true || (perfil?.gestor == true && perfil?.supervisor != true)) add(Bloco(PwIcones.Landmark, "Minha empresa", onClick = { empresa = true }))
+            if (perfil?.dev == true) add(Bloco(PwIcones.CodeXml, "Console Dev", c.dev, onClick = onDev))
+            if (perfil?.dev == true) add(Bloco(PwIcones.Layers, "Modo Dev", c.dev, sub = "Trocar de empresa", onClick = { onFechar(); ModoDevApp.abrir() }))
+            if (!mono) add(Bloco(if (escuro) PwIcones.Moon else PwIcones.Sun, if (escuro) "Tema noturno" else "Tema claro", ligado = escuro,
+                onClick = { TemaApp.definir(if (escuro) PreferenciaTema.CLARO else PreferenciaTema.ESCURO) }))
+            if (perfil?.dev == true) add(Bloco(PwIcones.Palette, "Tema vermelho", c.dev, ligado = vermelho, onClick = {
+                val lig = !vermelho
+                TemaApp.definirVermelho(lig)
+                escopo.launch { Perfis.definirCorTema(if (lig) "vermelho" else "ouro").onFailure { TemaApp.definirVermelho(!lig); PwToast.mostrar(it.message ?: "Erro", TipoAviso.ERRO) } }
+            }))
+            if (perfil?.gestor == true && perfil?.modulo("modo_teste") != false) add(Bloco(PwIcones.FlaskConical, "Modo teste", c.violeta, ligado = teste, onClick = { alternarTeste(!teste) }))
+            if (ehMotoboy) add(Bloco(PwIcones.BatteryLow, "Economia", sub = if (info.economia) "GPS mais espaçado" else "GPS normal", ligado = info.economia,
+                onClick = { com.pwexpress.feature.tracking.Tracking.definirEconomia(!info.economia) }))
+            if (perfil?.dev == true) add(Bloco(if (oculto) PwIcones.EyeOff else PwIcones.Eye, "Ficar oculto", c.dev, ligado = oculto, onClick = {
+                val lig = !oculto
+                oculto = lig
+                escopo.launch { Perfis.definirOculto(lig).onFailure { oculto = !lig; PwToast.mostrar(it.message ?: "Erro", TipoAviso.ERRO) } }
+            }))
+            add(Bloco(PwIcones.Info, "Ajuda", sub = "Passo a passo", onClick = {
                 runCatching { ctxAjuda.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
                     android.net.Uri.parse(com.pwexpress.core.config.PwConfig.siteUrl + "/ajuda?p=" + if (painel == Painel.GESTOR) "gestor" else "motoboy"))) }
-            })
-            ItemMenu(PwIcones.Navigation, "Ver o tour", subtitulo = "Um passeio rápido pelas telas", onClick = {
+            }))
+            add(Bloco(PwIcones.Navigation, "Ver o tour", onClick = {
                 onFechar()
                 if (painel == Painel.GESTOR) com.pwexpress.core.designsystem.PwTour.abrir("gestor-app", ToursApp.gestor)
                 else com.pwexpress.core.designsystem.PwTour.abrir("motoboy", ToursApp.motoboy)
-            })
-            if (perfil?.modulo("atualizacao_app") != false) ItemMenu(PwIcones.Download, "Verificar atualização", subtitulo = "Versão ${com.pwexpress.core.update.Atualizador.versaoAtual}",
-                onClick = { onFechar(); Atualizador.abrirJanela(); Atualizador.verificar(automatico = false) })
+            }))
+            if (perfil?.modulo("atualizacao_app") != false) add(Bloco(PwIcones.Download, "Atualização", sub = "Versão ${com.pwexpress.core.update.Atualizador.versaoAtual}",
+                onClick = { onFechar(); Atualizador.abrirJanela(); Atualizador.verificar(automatico = false) }))
+            add(Bloco(PwIcones.LogOut, "Sair", c.vermelho, onClick = onSair))
         }
-
-        ItemMenu(PwIcones.LogOut, "Sair da conta", cor = c.vermelho, corTexto = c.vermelho, onClick = onSair)
+        blocos.chunked(2).forEach { linha ->
+            Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                linha.forEach { b -> BlocoAtalho(b, Modifier.weight(1f).fillMaxHeight()) }
+                if (linha.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+        PwErro(erro)
+        GrupoMenu("Cores do app") { EscolherCores(estilo) }
         // easter egg, igual ao rodapé do site
         Row(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Text("Um projeto de irmão para irmão!", color = c.texto3, fontSize = 11.5.sp, fontFamily = Archivo)
@@ -235,16 +210,36 @@ fun JanelaConta(
     if (empresa) JanelaMinhaEmpresa(onFechar = { empresa = false })
 }
 
-/** Bloco grande de atalho (ícone em cima, nome embaixo). */
+/** Um bloco do menu: atalho, ou liga/desliga quando `ligado` não é null. */
+private data class Bloco(val icone: ImageVector, val texto: String, val cor: Color? = null, val sub: String? = null, val ligado: Boolean? = null, val onClick: () -> Unit)
+
+/** Bloco grande (ícone em cima, nome embaixo). Os de liga/desliga mostram o estado no canto. */
 @Composable
-private fun BlocoAtalho(icone: ImageVector, texto: String, cor: Color, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun BlocoAtalho(b: Bloco, modifier: Modifier = Modifier) {
     val c = Pw.cores
+    val cor = b.cor ?: c.ouro
     val forma = RoundedCornerShape(18.dp)
-    Column(modifier.clip(forma).background(c.vidro).border(1.dp, c.borda, forma).clickable(onClick = onClick).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box(Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(cor.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
-            Icon(icone, null, tint = cor, modifier = Modifier.size(20.dp))
+    val ligado = b.ligado == true
+    Column(
+        modifier.clip(forma).background(if (ligado) cor.copy(alpha = 0.12f) else c.vidro).border(1.dp, if (ligado) cor.copy(alpha = 0.55f) else c.borda, forma)
+            .clickable(onClick = b.onClick).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(cor.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+                Icon(b.icone, null, tint = cor, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.weight(1f))
+            if (b.ligado != null) Box(Modifier.size(width = 34.dp, height = 20.dp).clip(RoundedCornerShape(99.dp)).background(if (ligado) cor else c.bordaForte).padding(3.dp),
+                contentAlignment = if (ligado) Alignment.CenterEnd else Alignment.CenterStart) {
+                Box(Modifier.size(14.dp).clip(androidx.compose.foundation.shape.CircleShape).background(if (ligado) c.sobreOuro else c.texto3))
+            }
         }
-        Text(texto, color = c.texto, fontWeight = FontWeight.Bold, fontFamily = Archivo, fontSize = 14.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(b.texto, color = if (b.cor == c.vermelho) c.vermelho else c.texto, fontWeight = FontWeight.Bold, fontFamily = Archivo, fontSize = 14.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val sub = b.sub ?: b.ligado?.let { if (it) "Ligado" else "Desligado" }
+            if (sub != null) Text(sub, color = c.texto3, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
     }
 }
 
@@ -308,7 +303,7 @@ private fun CoracaoBatendo() {
 @Composable
 private fun EscolherCores(atual: com.pwexpress.core.designsystem.EstiloTema) {
     val c = Pw.cores
-    Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(PwIcones.Palette, null, tint = c.ouro, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(12.dp))

@@ -551,7 +551,7 @@ fun Modifier.pwDestaque(ativo: Boolean): Modifier {
 /** Conteúdo rolável com espaçamento padrão das telas. */
 @Composable
 fun PwPagina(modifier: Modifier = Modifier, padding: PaddingValues = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 120.dp), content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding), verticalArrangement = Arrangement.spacedBy(14.dp), content = content)
 }
 
 /** Texto de uma linha que diminui sozinho até caber (valores, números grandes). */

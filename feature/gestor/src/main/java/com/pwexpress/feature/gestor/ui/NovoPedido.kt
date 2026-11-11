@@ -139,12 +139,26 @@ fun NovoPedidoG(onVoltar: () -> Unit, onCriado: () -> Unit) {
         delay(400)
         rota = Geo.calcularRota(pts)
     }
+    // distância pelas ruas da coleta (a anterior na lista) até cada entrega: base do preço "soma das entregas"
+    val distEntrega = remember { androidx.compose.runtime.mutableStateMapOf<Int, Double>() }
+    LaunchedEffect(chaveRota) {
+        distEntrega.clear()
+        delay(400)
+        var col: Pair<Double, Double>? = paradas.firstOrNull { it.coleta && it.lat != null }?.let { it.lat!! to it.lng!! }
+        paradas.forEachIndexed { i, p ->
+            val pt = p.lat?.let { la -> p.lng?.let { lo -> la to lo } } ?: return@forEachIndexed
+            if (p.coleta) { col = pt; return@forEachIndexed }
+            val de = col ?: return@forEachIndexed
+            com.pwexpress.core.mapa.Navegacao.rota(de, pt)?.distanciaM?.takeIf { it > 0 }?.let { distEntrega[i] = it }
+        }
+    }
 
     fun pontosJson() = buildJsonArray {
-        paradas.forEach { p ->
+        paradas.forEachIndexed { i, p ->
             add(buildJsonObject {
                 put("tipo", if (p.coleta) "coleta" else "entrega"); put("endereco", p.endereco)
                 p.lat?.let { put("lat", it) }; p.lng?.let { put("lng", it) }
+                if (!p.coleta) distEntrega[i]?.let { put("dist_coleta_m", kotlin.math.round(it).toInt()) }
                 put("contato_nome", p.contato); put("contato_telefone", p.telefone); put("instrucoes", p.instrucoes)
                 if (p.exigeFoto) put("exige_foto", true); if (p.exigeNome) put("exige_nome", true)
                 if (p.exigeAssinatura) put("exige_assinatura", true); if (p.exigeCodigo) put("exige_codigo", true)
@@ -166,7 +180,7 @@ fun NovoPedidoG(onVoltar: () -> Unit, onCriado: () -> Unit) {
     val quandoIso = if (planejar) Instant.ofEpochMilli(quando).toString() else null
 
     // orçamento ao vivo
-    val chaveOrc = listOf(regras.toString(), empresaId, tipoPedido, urgente, quandoIso, rota?.distanciaM, chaveRota, itens.joinToString { "${it.categoria?.id}${it.quantidade}${it.peso}${it.comp}${it.larg}${it.alt}" }).joinToString("§")
+    val chaveOrc = listOf(regras.toString(), empresaId, tipoPedido, urgente, quandoIso, rota?.distanciaM, chaveRota, distEntrega.toMap(), itens.joinToString { "${it.categoria?.id}${it.quantidade}${it.peso}${it.comp}${it.larg}${it.alt}" }).joinToString("§")
     LaunchedEffect(chaveOrc) {
         if (paradas.any { it.lat == null }) { orc = null; return@LaunchedEffect }
         delay(450)

@@ -197,8 +197,13 @@ private fun OpcaoTema(rotulo: String, icone: androidx.compose.ui.graphics.vector
 @Composable
 fun Linha(rotulo: String, valor: String) {
     val c = Pw.cores
-    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+    // valor comprido (listas, JSON): vai para a linha de baixo, sem espremer o nome
+    if (valor.length > 22) Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Text(rotulo, color = c.texto2, style = MaterialTheme.typography.bodyMedium)
+        Text(valor, color = c.texto, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+    } else Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Text(rotulo, Modifier.weight(1f), color = c.texto2, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.width(12.dp))
         Text(valor, color = c.texto, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
     }
 }

@@ -129,7 +129,9 @@ fun MeusPercursos() {
         val pontos = r.orEmpty().flatMap { it.pontos }
         // início (bandeira pequena) e onde terminou, com a SUA foto
         val marcadores = listOfNotNull(
-            pontos.firstOrNull()?.let { com.pwexpress.core.mapa.MarcadorMapa("ini", it.lat, it.lng, "#22C55E", "Início", pino = false, prioridade = 1) },
+            // início some quando você terminou no mesmo lugar (senão os nomes se encavalam)
+            pontos.firstOrNull()?.takeIf { ini -> pontos.lastOrNull()?.let { fim -> kotlin.math.abs(fim.lat - ini.lat) * 111_000 + kotlin.math.abs(fim.lng - ini.lng) * 111_000 * kotlin.math.cos(Math.toRadians(ini.lat)) > 60 } ?: true }
+                ?.let { com.pwexpress.core.mapa.MarcadorMapa("ini", it.lat, it.lng, "#22C55E", "Início", pino = false, prioridade = 1) },
             pontos.lastOrNull()?.let { com.pwexpress.core.mapa.MarcadorMapa("eu", it.lat, it.lng, String.format("#%06X", 0xFFFFFF and c.ouro.toArgb()),
                 eu?.nome?.substringBefore(" ") ?: "Você", foto = eu?.fotoUrl, prioridade = 3) },
         )

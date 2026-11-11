@@ -883,14 +883,14 @@ fun PwConfirmar(titulo: String, texto: String, acao: String, onConfirmar: () -> 
 }
 
 /**
- * Página que o app lembra ao abrir de novo (aba, sub-aba…). Segue o ajuste "app_lembrar_pagina"
+ * Página que o app lembra ao abrir de novo (aba, sub-aba…). Segue o ajuste "lembrar_pagina"
  * (ligado: volta onde a pessoa estava; desligado: sempre começa no padrão).
  */
 @Composable
 fun lembrarPagina(chave: String, padrao: String): androidx.compose.runtime.MutableState<String> {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val prefs = androidx.compose.runtime.remember { ctx.getSharedPreferences("pwex_paginas", android.content.Context.MODE_PRIVATE) }
-    val ligado = com.pwexpress.core.perfil.Perfis.perfil.value?.logico("app_lembrar_pagina", true) != false
+    val ligado = com.pwexpress.core.perfil.Perfis.perfil.value?.logico("lembrar_pagina", true) != false
     val estado = androidx.compose.runtime.saveable.rememberSaveable(chave) {
         androidx.compose.runtime.mutableStateOf(if (ligado) prefs.getString(chave, padrao) ?: padrao else padrao)
     }

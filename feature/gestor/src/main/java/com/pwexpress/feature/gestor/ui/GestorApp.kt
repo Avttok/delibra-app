@@ -66,7 +66,7 @@ fun GestorApp(
     faixa: (@Composable () -> Unit)? = null,
     meuId: String?,
 ) {
-    // volta para onde a pessoa estava (Ajustes → app_lembrar_pagina)
+    // volta para onde a pessoa estava (Ajustes → lembrar_pagina)
     var aba by com.pwexpress.core.designsystem.lembrarPagina("gestor_aba", "mapa")
     var subOperacao by com.pwexpress.core.designsystem.lembrarPaginaNumero("gestor_sub_operacao", 0)   // 0 pedidos · 1 rotas
     var subPessoas by com.pwexpress.core.designsystem.lembrarPaginaNumero("gestor_sub_pessoas", 0)     // 0 clientes · 1 equipe

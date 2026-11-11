@@ -138,6 +138,7 @@ fun CorridaScreen(
     }
 
     var focoT by remember(corrida.id) { mutableStateOf<com.pwexpress.core.mapa.FocoMapa?>(null) }
+    var abrirCheio by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     Column(modifier.fillMaxSize()) {
         // ---------------------------------------------------------- navegação curva a curva (dentro do app)
         if (parada != null && !comprovanteAberto) {
@@ -148,7 +149,7 @@ fun CorridaScreen(
             // feito (pelas ruas, do servidor) + onde estou agora; a fazer: daqui até as paradas que faltam
             val feito = com.pwexpress.core.mapa.rememberTrilhaCorrida(corrida.id, ativa = true)
             val eu = posicao?.let { it.lat to it.lng }
-            PwMapa(botaoTelaCheiaEm = Alignment.CenterStart, tituloTelaCheia = "Corrida ${corrida.numeroExibicao}",
+            PwMapa(botaoTelaCheia = false, abrirTelaCheia = abrirCheio, atribuicaoAcima = 64, tituloTelaCheia = "Corrida ${corrida.numeroExibicao}",
                 botoesTelaCheia = if (parada != null) ({
                     com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.Navigation, "Abrir no Maps", { abrirMaps(ctx, parada) }, tamanho = 44.dp)
                     com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.Route, "Abrir no Waze", { abrirWaze(ctx, parada) }, tamanho = 44.dp)
@@ -185,25 +186,25 @@ fun CorridaScreen(
                 if (corrida.valoresVisiveis && corrida.valorMotoboy != null) PwValor(moeda(corrida.valorMotoboy), Modifier.widthIn(max = 150.dp), tamanhoMax = 22, cor = c.texto)
                 else Text("${corrida.paradas.count { it.tipo == TipoParada.ENTREGA && it.status == StatusParada.CONCLUIDA }}/${corrida.paradas.count { it.tipo == TipoParada.ENTREGA }} entregas", color = c.texto, fontFamily = ArchivoLargo, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
             }
-            // chat e painel do gestor, sem sair da corrida
-            if (chatLigado || onPainelGestor != null) {
+            // uma barra só embaixo do mapa: Chat, Gestor e tela cheia (ícones) à esquerda; Maps e Waze à direita
+            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp)) {
+                val comTexto = maxWidth >= 340.dp
                 val naoLidas by com.pwexpress.core.chat.Chat.naoLidas.collectAsState()
-                Row(Modifier.align(Alignment.BottomStart).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (chatLigado) Box {
-                        BotaoMapa("Chat", PwIcones.MessageCircle) { com.pwexpress.core.chat.Chat.abrir.value = true }
+                        BotaoMapa("", PwIcones.MessageCircle, descricao = "Chat") { com.pwexpress.core.chat.Chat.abrir.value = true }
                         if (naoLidas > 0) Box(
                             Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-4).dp).size(20.dp).clip(RoundedCornerShape(99.dp)).background(c.vermelho),
                             contentAlignment = Alignment.Center,
                         ) { Text(if (naoLidas > 9) "9+" else "$naoLidas", color = androidx.compose.ui.graphics.Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                     }
-                    if (onPainelGestor != null) BotaoMapa("Gestor", PwIcones.ShieldCheck, onPainelGestor)
-                }
-            }
-            // navegação externa, sempre à mão
-            if (parada != null) {
-                Row(Modifier.align(Alignment.BottomEnd).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    BotaoMapa("Maps", PwIcones.Navigation) { abrirMaps(ctx, parada) }
-                    BotaoMapa("Waze", PwIcones.Route) { abrirWaze(ctx, parada) }
+                    if (onPainelGestor != null) BotaoMapa("", PwIcones.ShieldCheck, descricao = "Painel do gestor", onClick = onPainelGestor)
+                    BotaoMapa("", PwIcones.Maximize2, descricao = "Mapa em tela cheia") { abrirCheio++ }
+                    Spacer(Modifier.weight(1f))
+                    if (parada != null) {
+                        BotaoMapa(if (comTexto) "Maps" else "", PwIcones.Navigation, descricao = "Abrir no Maps") { abrirMaps(ctx, parada) }
+                        BotaoMapa(if (comTexto) "Waze" else "", PwIcones.Route, descricao = "Abrir no Waze") { abrirWaze(ctx, parada) }
+                    }
                 }
             }
         }
@@ -220,7 +221,7 @@ fun CorridaScreen(
                     Spacer(Modifier.width(8.dp))
                     IndicadorDistancia(distancia, noLocal, corrida.exigirNoLocal)
                     Spacer(Modifier.width(8.dp))
-                    BotaoMapa("", PwIcones.Maximize2) { minimizado = false }
+                    BotaoMapa("", PwIcones.ChevronUp, descricao = "Mostrar detalhes") { minimizado = false }
                 }
                 erro?.let { Text(it, color = c.vermelho) }
                 BotaoAcao(corrida, parada, enviando, noLocal, podeIgnorar, onAvancar = { a, i -> avancar(a, i) }, onComprovante = { comprovanteAberto = true })
@@ -348,7 +349,7 @@ private fun BotaoAcao(
 
 /** Botão redondo de vidro sobre o mapa. */
 @Composable
-private fun BotaoMapa(texto: String, icone: ImageVector, onClick: () -> Unit) {
+private fun BotaoMapa(texto: String, icone: ImageVector, descricao: String? = null, onClick: () -> Unit) {
     val c = Pw.cores
     val forma = RoundedCornerShape(99.dp)
     Row(
@@ -356,7 +357,7 @@ private fun BotaoMapa(texto: String, icone: ImageVector, onClick: () -> Unit) {
             .padding(horizontal = if (texto.isEmpty()) 10.dp else 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icone, texto.ifEmpty { null }, tint = c.ouro, modifier = Modifier.size(18.dp))
+        Icon(icone, texto.ifEmpty { descricao }, tint = c.ouro, modifier = Modifier.size(18.dp))
         if (texto.isNotEmpty()) {
             Spacer(Modifier.width(6.dp))
             Text(texto, color = c.texto, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, fontFamily = Archivo)

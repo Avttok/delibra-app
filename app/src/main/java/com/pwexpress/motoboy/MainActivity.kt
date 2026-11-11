@@ -249,6 +249,12 @@ class MainActivity : ComponentActivity() {
                             GestorApp(
                                 modifier = conteudo,
                                 topo = { PwTopo { AcoesTopo(efetivo, podeTrocar, ::trocar) { conta = true } } },
+                                // gestor + motoboy com corrida ou oferta: faixa embaixo do topo para voltar (não cobre o mapa nem a gaveta)
+                                faixa = if (podeTrocar && (a != null || o != null)) ({
+                                    com.pwexpress.motoboy.ui.FaixaVoltarCorrida(
+                                        if (o != null) "Corrida nova! Ver a oferta" else "Você está na corrida ${a?.numeroExibicao ?: ""}".trim(),
+                                        destaque = o != null, onClick = { trocar(Painel.MOTOBOY) })
+                                }) else null,
                                 meuId = p?.id,
                             )
                         }
@@ -290,14 +296,6 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // gestor + motoboy no painel do gestor com corrida ou oferta: volta com um toque
-                    if (efetivo == Painel.GESTOR && podeTrocar && (a != null || o != null) && !chatAberto && !noPerfil) {
-                        com.pwexpress.core.designsystem.PwPilula(
-                            if (o != null) "Corrida nova! Ver oferta" else "Voltar à corrida ${a?.numeroExibicao ?: ""}".trim(),
-                            PwIcones.Bike, { trocar(Painel.MOTOBOY) },
-                            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 96.dp),
-                        )
-                    }
                     if (conta && s != null) {
                         JanelaConta(
                             s.email, efetivo, podeTrocar,

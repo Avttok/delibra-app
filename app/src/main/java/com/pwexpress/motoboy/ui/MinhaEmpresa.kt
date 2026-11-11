@@ -75,7 +75,7 @@ private fun com.pwexpress.core.network.HttpResposta.json(): kotlinx.serializatio
 private fun JsonObject.t(k: String) = (this[k] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
 private fun JsonObject.n(k: String) = (this[k] as? JsonPrimitive)?.doubleOrNull ?: 0.0
 
-private val MODELO = mapOf("percentual" to "Percentual do faturamento", "licenca" to "Licença mensal", "isento" to "Isento")
+private val MODELO = mapOf("percentual" to "Percentual do faturamento", "licenca" to "Licença", "isento" to "Isento")
 
 /**
  * Minha empresa (dono ou Dev): ícone que entra no lugar do Delibra no app, no site e no atalho do
@@ -93,6 +93,7 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
     var enviando by remember { mutableStateOf(false) }
     var versao by remember { mutableIntStateOf(0) }
     var nomeApp by remember { mutableStateOf("") }
+    var nomeTopo by remember { mutableStateOf("") }
     var salvandoNome by remember { mutableStateOf(false) }
 
     LaunchedEffect(versao) {
@@ -100,6 +101,7 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
             val o = PwCore.rpc.chamar("minha_organizacao", JsonObject(emptyMap()))
             org = if (o.ok) o.json() as? JsonObject else null
             nomeApp = org?.t("nome_app").orEmpty()
+            nomeTopo = org?.t("nome_topo").orEmpty()
             val p = PwCore.rpc.chamar("meu_plano", JsonObject(emptyMap()))
             plano = if (p.ok) p.json() as? JsonObject else null
         }
@@ -169,21 +171,36 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
         if (!carregou) { PwCarregando(); return@PwJanela }
         val o = org
         if (o == null) { PwVazio("Esta conta não está em nenhuma empresa.", icone = PwIcones.Landmark); return@PwJanela }
+        val atualF = com.pwexpress.core.designsystem.FonteApp.de(o.t("fonte_nome"))
+        var fonte by remember(o) { mutableStateOf(atualF) }
+        val topoTxt = nomeTopo.trim().ifEmpty { nomeApp.trim().ifEmpty { o.t("nome") ?: "Delibra" } }
+        val appTxt = nomeApp.trim().ifEmpty { o.t("nome") ?: "Delibra" }
+
+        // ------------------------------------------------ como fica (ao vivo, com o que está mudando)
         PwCartao {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(PwIcones.Image, null, tint = c.ouro, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
-                PwRotulo("Ícone e nome")
+                Icon(PwIcones.Eye, null, tint = c.ouro, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); PwRotulo("Como fica")
             }
             Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                PwSeloLogo(84.dp)
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(o.t("nome") ?: "", color = c.texto, fontFamily = Archivo, fontWeight = FontWeight.Black, fontSize = 19.sp)
-                    Text(if (marca?.logoUrl != null) "Aparece no lugar do Delibra no app, no site e nas notificações." else "Sem ícone próprio: o app mostra o Delibra.", color = c.texto2, fontSize = 13.sp)
-                }
+            Row(Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp)).background(c.fundo2)
+                .border(1.dp, c.borda, androidx.compose.foundation.shape.RoundedCornerShape(16.dp)).padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                PwSeloLogo((26 * (o.t("logo_escala")?.toFloatOrNull() ?: 1.9f)).dp)
+                Spacer(Modifier.width(8.dp))
+                Text(topoTxt, color = c.texto, fontFamily = fonte.familia, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp, maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
+            PwLinhaInfo(PwIcones.PanelTop, "No topo, ao lado da logo", topoTxt)
+            PwLinhaInfo(PwIcones.Bell, "Atalho, avisos e títulos", appTxt)
+        }
+
+        // ------------------------------------------------ ícone
+        PwCartao {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(PwIcones.Image, null, tint = c.ouro, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); PwRotulo("Ícone")
+            }
+            Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 PwBotaoOuro(if (enviando) "Enviando…" else if (o.t("logo_url") != null) "Trocar ícone" else "Enviar ícone", icone = PwIcones.ImagePlus, altura = 50.dp,
                     habilitado = !enviando, modifier = Modifier.weight(1f),
@@ -194,41 +211,56 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
                 })
             }
             Spacer(Modifier.height(6.dp))
-            Text("PNG com fundo transparente fica melhor; se a imagem tiver fundo, o editor tira. Ajuste zoom, posição e margem antes de salvar.", color = c.texto3, fontSize = 12.sp)
-            Spacer(Modifier.height(14.dp))
-            Text("Fonte do nome no topo", color = c.texto2, fontSize = 13.sp)
-            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-            androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                val atualF = com.pwexpress.core.designsystem.FonteApp.de(o.t("fonte_nome"))
-                com.pwexpress.core.designsystem.FonteApp.entries.forEach { f ->
-                    val ativo = f == atualF
-                    Text(f.rotulo.substringBefore(" ("), fontFamily = f.familia, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = if (ativo) c.sobreOuro else c.texto,
-                        modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(99.dp)).background(if (ativo) c.ouro else c.vidro)
-                            .border(1.dp, if (ativo) c.ouro else c.borda, androidx.compose.foundation.shape.RoundedCornerShape(99.dp))
-                            .clickable { escopo.launch {
-                                val r = PwCore.rpc.chamar("salvar_minha_organizacao", buildJsonObject { put("p", buildJsonObject { put("fonte", if (f == com.pwexpress.core.designsystem.FonteApp.ARCHIVO) "" else f.name) }) })
-                                if (r.ok) { Perfis.carregar(); versao++ } else PwToast.mostrar("Não deu para salvar (${r.codigo}).", TipoAviso.ERRO)
-                            } }.padding(horizontal = 12.dp, vertical = 7.dp))
-                }
+            Text("PNG com fundo transparente fica melhor; se tiver fundo, o editor tira. Ajuste zoom, posição, margem, brilho e tamanho no topo antes de salvar.", color = c.texto3, fontSize = 12.sp)
+        }
+
+        // ------------------------------------------------ nomes e fonte
+        PwCartao {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(PwIcones.Type, null, tint = c.ouro, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); PwRotulo("Nomes e fonte")
             }
             Spacer(Modifier.height(10.dp))
-            com.pwexpress.core.designsystem.PwCampo(nomeApp, { nomeApp = it.take(30) }, "Nome do app (no lugar de Delibra)", Modifier.fillMaxWidth())
+            com.pwexpress.core.designsystem.PwCampo(nomeApp, { nomeApp = it.take(30) }, "Nome do app", Modifier.fillMaxWidth(), dica = "Ex.: PW Express · atalho, avisos e entrada. Vazio = Delibra")
             Spacer(Modifier.height(8.dp))
-            val mudou = nomeApp.trim() != (o.t("nome_app") ?: "")
-            PwBotaoOuro(if (salvandoNome) "Salvando…" else "Salvar nome do app", icone = PwIcones.Check, altura = 48.dp, habilitado = mudou && !salvandoNome,
+            com.pwexpress.core.designsystem.PwCampo(nomeTopo, { nomeTopo = it.take(30) }, "Texto ao lado da logo (topo)", Modifier.fillMaxWidth(),
+                dica = "Se a logo já tem parte do nome (ex.: PW), escreva só o resto (Express). Vazio = o nome do app")
+            Spacer(Modifier.height(12.dp))
+            Text("Fonte do texto do topo", color = c.texto2, fontSize = 13.sp)
+            Spacer(Modifier.height(6.dp))
+            com.pwexpress.core.designsystem.FonteApp.entries.chunked(2).forEach { par ->
+                Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    par.forEach { f ->
+                        val ativo = f == fonte
+                        val forma = androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
+                        Column(Modifier.weight(1f).clip(forma).background(if (ativo) c.ouro.copy(alpha = 0.16f) else c.vidro)
+                            .border(if (ativo) 2.dp else 1.dp, if (ativo) c.ouro else c.borda, forma).clickable { fonte = f }.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                            Text(topoTxt, fontFamily = f.familia, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = c.texto, maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            Text(f.rotulo, color = c.texto3, fontSize = 11.sp, maxLines = 1)
+                        }
+                    }
+                    if (par.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
+            val mudou = nomeApp.trim() != (o.t("nome_app") ?: "") || nomeTopo.trim() != (o.t("nome_topo") ?: "") || fonte != atualF
+            PwBotaoOuro(if (salvandoNome) "Salvando…" else "Salvar", icone = PwIcones.Check, altura = 50.dp, habilitado = mudou && !salvandoNome, modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     val v = nomeApp.trim()
-                    if (v.isNotEmpty() && v.length < 2) { PwToast.mostrar("Use pelo menos 2 letras.", TipoAviso.ERRO); return@PwBotaoOuro }
+                    if (v.isNotEmpty() && v.length < 2) { PwToast.mostrar("O nome do app precisa de pelo menos 2 letras.", TipoAviso.ERRO); return@PwBotaoOuro }
                     salvandoNome = true
                     escopo.launch {
-                        val r = PwCore.rpc.chamar("salvar_minha_organizacao", buildJsonObject { put("p", buildJsonObject { put("nome_app", v) }) })
+                        val r = PwCore.rpc.chamar("salvar_minha_organizacao", buildJsonObject { put("p", buildJsonObject {
+                            put("nome_app", v); put("nome_topo", nomeTopo.trim())
+                            put("fonte", if (fonte == com.pwexpress.core.designsystem.FonteApp.ARCHIVO) "" else fonte.name)
+                        }) })
                         salvandoNome = false
-                        if (r.ok) { Perfis.carregar(); versao++; PwToast.mostrar(if (v.isEmpty()) "Voltou a se chamar Delibra." else "O app agora se chama $v.", titulo = "Nome do app") }
-                        else PwToast.mostrar("Não deu para salvar (${r.codigo}).", TipoAviso.ERRO)
+                        if (r.ok) { Perfis.carregar(); versao++; PwToast.mostrar("O app e o site já mostram assim.", titulo = "Salvo") }
+                        else PwToast.mostrar(if (r.codigo == 403) "Só o dono da empresa muda isto." else "Não deu para salvar (${r.codigo}).", TipoAviso.ERRO)
                     }
                 })
-            Text("Aparece no topo do app e do site, no atalho do celular e nas telas de entrar. Em branco = Delibra.", color = c.texto3, fontSize = 12.sp)
         }
+
+        RecebimentosApp()
 
         val p = plano
         if (p != null) {
@@ -242,7 +274,11 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
                 Text(MODELO[modelo] ?: modelo, color = c.ouro, fontFamily = Archivo, fontWeight = FontWeight.Black, fontSize = 22.sp)
                 Text(when (modelo) {
                     "percentual" -> "${numeroBr(p.n("pct"))}% sobre o valor das rotas concluídas no mês."
-                    "licenca" -> "${moedaBr(p.n("mensalidade"))} por mês, vencimento todo dia ${(p["vencimento_dia"] as? JsonPrimitive)?.intOrNull ?: 10}."
+                    "licenca" -> when (p.t("periodo")) {
+                        "anual" -> "${moedaBr(p.n("mensalidade"))} por ano."
+                        "vitalicia" -> "Licença vitalícia (${moedaBr(p.n("mensalidade"))}, paga uma vez)."
+                        else -> "${moedaBr(p.n("mensalidade"))} por mês, vencimento todo dia ${(p["vencimento_dia"] as? JsonPrimitive)?.intOrNull ?: 10}."
+                    }
                     else -> "Sua empresa não paga nada pela plataforma."
                 }, color = c.texto2, fontSize = 13.sp)
             }
@@ -261,5 +297,66 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+
+/** Receber dos clientes (PIX e cartão) pelo Mercado Pago: o dono liga a conta da empresa. */
+@Composable
+private fun RecebimentosApp() {
+    val c = Pw.cores
+    val escopo = rememberCoroutineScope()
+    var conta by remember { mutableStateOf<JsonObject?>(null) }
+    var token by remember { mutableStateOf("") }
+    var ocupado by remember { mutableStateOf(false) }
+    var teste by remember { mutableStateOf<String?>(null) }
+    var versao by remember { mutableIntStateOf(0) }
+    LaunchedEffect(versao) {
+        val r = runCatching { PwCore.rpc.chamar("pag_minha_conta", JsonObject(emptyMap())) }.getOrNull()
+        conta = if (r?.ok == true) r.json() as? JsonObject else null
+    }
+    val k = conta ?: return
+    fun testar() {
+        escopo.launch {
+            ocupado = true
+            teste = runCatching { PwCore.rpc.site("/api/pagamentos/testar", JsonObject(emptyMap())).json() as? JsonObject }.getOrNull()?.let { j ->
+                if ((j["ok"] as? JsonPrimitive)?.content == "true") "Conectada: ${(j["nome"] as? JsonPrimitive)?.content}" else (j["erro"] as? JsonPrimitive)?.content ?: "Não deu para testar."
+            } ?: "Sem resposta do site."
+            ocupado = false; versao++
+        }
+    }
+    PwCartao {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(PwIcones.CreditCard, null, tint = c.ouro, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); PwRotulo("Receber dos clientes (PIX e cartão)")
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(if (k.t("destino") == "plataforma") "Pela escolha da plataforma, os pagamentos dos seus clientes caem na conta da plataforma, que repassa a você."
+             else "Os pagamentos dos seus clientes caem direto na sua conta do Mercado Pago. O pedido segue sozinho quando o pagamento é aprovado.",
+            color = c.texto2, fontSize = 13.sp)
+        Spacer(Modifier.height(8.dp))
+        val ligada = k.t("conectada") == "true"
+        PwLinhaInfo(if (ligada) PwIcones.CircleCheck else PwIcones.Unplug, "Conta Mercado Pago",
+            if (ligada) "ligada · …${k.t("final")}${if (k.t("teste") == "true") " · teste" else ""}" else "não ligada", destaque = ligada)
+        k.t("nome")?.let { Text(it, color = c.texto3, fontSize = 12.sp) }
+        Spacer(Modifier.height(8.dp))
+        com.pwexpress.core.designsystem.PwCampo(token, { token = it.trim() }, "Access Token de produção", Modifier.fillMaxWidth(), senha = true,
+            dica = "Mercado Pago → Seu negócio → Configurações → Credenciais. Fica só no servidor.")
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PwBotaoOuro(if (ocupado) "Salvando…" else "Ligar conta", icone = PwIcones.PlugZap, altura = 48.dp, habilitado = token.isNotBlank() && !ocupado, modifier = Modifier.weight(1f), onClick = {
+                escopo.launch {
+                    ocupado = true
+                    val r = PwCore.rpc.chamar("pag_salvar_conta", buildJsonObject { put("p_token", token); put("p_public_key", JsonNull); put("p_nome", JsonNull) })
+                    ocupado = false
+                    if (r.ok) { token = ""; versao++; testar() }
+                    else PwToast.mostrar(if (r.corpo.contains("token_invalido")) "Isso não parece um Access Token (começa com APP_USR- ou TEST-)." else "Não deu para salvar (${r.codigo}).", TipoAviso.ERRO)
+                }
+            })
+            if (ligada) PwBotaoIcone(PwIcones.Link2, "Testar", onClick = { testar() })
+            if (ligada) PwBotaoIcone(PwIcones.Unplug, "Desligar", onClick = {
+                escopo.launch { if (PwCore.rpc.chamar("pag_salvar_conta", buildJsonObject { put("p_token", "") }).ok) { versao++; PwToast.mostrar("Conta desligada.") } }
+            })
+        }
+        teste?.let { Spacer(Modifier.height(6.dp)); Text(it, color = c.texto2, fontSize = 12.sp) }
     }
 }

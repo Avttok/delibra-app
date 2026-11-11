@@ -314,8 +314,11 @@ private fun OrbeTempo(segundos: Long, fracao: Float, pouco: Boolean) {
         drawCircle(Brush.radialGradient(listOf(cor.copy(alpha = 0.30f * pulso), Color.Transparent)), size.minDimension / 2f)
         drawCircle(fundo, size.minDimension / 2f - esp)
         drawCircle(trilho, size.minDimension / 2f - esp / 2, style = Stroke(esp))
-        drawArc(Brush.sweepGradient(listOf(cor.copy(alpha = 0.4f), cor, cor)), -90f, 360f * fracao, false,
-            topLeft = Offset(esp / 2, esp / 2), size = Size(size.width - esp, size.height - esp), style = Stroke(esp, cap = StrokeCap.Round))
+        // o degradê começa no topo junto com o arco (sem "quebra" no lado direito)
+        androidx.compose.ui.graphics.drawscope.rotate(-90f) {
+            drawArc(Brush.sweepGradient(0f to cor.copy(alpha = 0.4f), (fracao.coerceIn(0.05f, 1f)) to cor, 1f to cor), 0f, 360f * fracao, false,
+                topLeft = Offset(esp / 2, esp / 2), size = Size(size.width - esp, size.height - esp), style = Stroke(esp, cap = StrokeCap.Round))
+        }
     }, contentAlignment = Alignment.Center) {
         Text("$segundos", color = if (pouco) c.vermelho else c.texto, fontFamily = ArchivoLargo, fontWeight = FontWeight.Black, fontSize = 22.sp)
     }

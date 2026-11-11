@@ -245,7 +245,7 @@ fun PwLogo(modifier: Modifier = Modifier, tamanho: Int = 26, soSelo: Boolean = f
         PwSeloLogo((tamanho * escala).dp, descricao = propria ?: "Delibra")
         Spacer(Modifier.width((tamanho * 0.3f).dp))
         Text(
-            propria ?: "delibra",
+            empresa?.textoTopo ?: propria ?: "delibra",
             color = c.texto,
             // fonte do nome escolhida pelo gestor (Minha empresa); senão a do app
             fontFamily = empresa?.fonte?.let { FonteApp.de(it).familia } ?: Archivo,

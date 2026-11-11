@@ -67,6 +67,15 @@ object PwIcones {
     val PenLine: ImageVector by lazy { icone("pen-line", "M13 21h8", "M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z") }
     val KeyRound: ImageVector by lazy { icone("key-round", "M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z", "M16 7.5a0.5 0.5 0 1 0 1 0a0.5 0.5 0 1 0 -1 0") }
     val ArrowLeftRight: ImageVector by lazy { icone("arrow-left-right", "M8 3 4 7l4 4", "M4 7h16", "m16 21 4-4-4-4", "M20 17H4") }
+    val PanelTop: ImageVector by lazy { icone("panel-top", "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z", "M3 9h18") }
+    val Bell: ImageVector by lazy { icone("bell", "M10.268 21a2 2 0 0 0 3.464 0", "M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326") }
+    val CreditCard: ImageVector by lazy { icone("credit-card", "M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z", "M2 10h20") }
+    val Unplug: ImageVector by lazy { icone("unplug", "m19 5 3-3", "m2 22 3-3", "M6.3 20.3a2.4 2.4 0 0 0 3.4 0L12 18l-6-6-2.3 2.3a2.4 2.4 0 0 0 0 3.4Z", "M7.5 13.5 10 11", "M10.5 16.5 13 14", "m12 6 6 6 2.3-2.3a2.4 2.4 0 0 0 0-3.4l-2.6-2.6a2.4 2.4 0 0 0-3.4 0Z") }
+    val PlugZap: ImageVector by lazy { icone("plug-zap", "M6.3 20.3a2.4 2.4 0 0 0 3.4 0L12 18l-6-6-2.3 2.3a2.4 2.4 0 0 0 0 3.4Z", "m2 22 3-3", "M7.5 13.5 10 11", "M10.5 16.5 13 14", "m18 3-4 4h6l-4 4") }
+    val Link2: ImageVector by lazy { icone("link-2", "M9 17H7A5 5 0 0 1 7 7h2", "M15 7h2a5 5 0 1 1 0 10h-2", "M8 12h8") }
+    val Gavel: ImageVector by lazy { icone("gavel", "m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999", "M15.973 4.027 20 8", "M12.5 6.5 17.5 11.5", "m8 8 6-6", "m16 16 6-6", "M9 9l6 6") }
+    val Hand: ImageVector by lazy { icone("hand", "M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2", "M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2", "M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8", "M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15") }
+    val UserX: ImageVector by lazy { icone("user-x", "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", "M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z", "m17 8 5 5", "m22 8-5 5") }
     val Clock: ImageVector by lazy { icone("clock", "M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0", "M12 6v6l4 2") }
     val ArrowUpFromLine: ImageVector by lazy { icone("arrow-up-from-line", "m18 9-6-6-6 6", "M12 3v14", "M5 21h14") }
     val ArrowDownToLine: ImageVector by lazy { icone("arrow-down-to-line", "M12 17V3", "m6 11 6 6 6-6", "M19 21H5") }

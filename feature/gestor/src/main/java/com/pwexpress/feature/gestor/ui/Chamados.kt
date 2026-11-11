@@ -62,7 +62,10 @@ import kotlinx.serialization.json.put
 internal data class ChamadoG(
     val id: String, val corridaId: String, val corridaNumero: Long, val corridaTeste: Boolean, val motoboyId: String, val motoboyNome: String,
     val motivo: String, val status: String, val resposta: String?, val criadoEm: Long?, val feitas: Int, val paradas: Int, val abandono: Boolean,
+    /** "cancelar" ou "pular" (liberar uma parada fora do raio). */
+    val tipo: String = "cancelar", val paradaOrdem: Int? = null, val paradaEndereco: String? = null,
 ) {
+    val pular get() = tipo == "pular"
     val numeroExibicao get() = (if (corridaTeste) "T" else "#") + corridaNumero
 }
 
@@ -70,6 +73,7 @@ private fun JsonObject.paraChamado() = ChamadoG(
     str("id").orEmpty(), str("corrida_id").orEmpty(), long("corrida_numero") ?: 0, bool("corrida_teste"), str("motoboy_id").orEmpty(),
     str("motoboy_nome") ?: "Motoboy", str("motivo").orEmpty(), str("status") ?: "pendente", str("resposta"), iso(str("criado_em")),
     int("feitas") ?: 0, int("paradas") ?: 0, bool("abandono"),
+    str("tipo") ?: "cancelar", int("parada_ordem"), str("parada_endereco"),
 )
 
 internal object ChamadosG {
@@ -99,10 +103,15 @@ internal fun FaixaChamadosG(onAbrir: (String) -> Unit) {
             .clickable { onAbrir(lista.first().corridaId) }.padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(PwIcones.Hand, null, tint = c.vermelho, modifier = Modifier.size(18.dp))
+        val um = lista.first()
+        Icon(if (lista.size == 1 && um.pular) PwIcones.LockOpen else PwIcones.Hand, null, tint = c.vermelho, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text(if (lista.size == 1) "${lista.first().motoboyNome.substringBefore(" ")} quer cancelar a rota ${lista.first().numeroExibicao}" else "${lista.size} motoboys querem cancelar a rota",
+            Text(when {
+                lista.size > 1 -> "${lista.size} motoboys esperam sua resposta"
+                um.pular -> "${um.motoboyNome.substringBefore(" ")} pede para liberar a parada ${(um.paradaOrdem ?: 0) + 1} da rota ${um.numeroExibicao}"
+                else -> "${um.motoboyNome.substringBefore(" ")} quer cancelar a rota ${um.numeroExibicao}"
+            },
                 color = c.texto, fontWeight = FontWeight.Bold, fontFamily = Archivo, fontSize = 13.5.sp, maxLines = 1)
             Text(if (lista.size == 1) lista.first().motivo else "Toque para responder o primeiro", color = c.texto2, fontSize = 12.sp, maxLines = 1)
         }
@@ -117,10 +126,11 @@ internal fun ChamadosDaCorridaG(corridaId: String, onMudou: suspend () -> Unit) 
     var lista by remember(corridaId) { mutableStateOf<List<ChamadoG>>(emptyList()) }
     var versao by remember { mutableStateOf(0) }
     LaunchedEffect(corridaId, versao) { lista = ChamadosG.abertos().filter { it.corridaId == corridaId } }
-    val ch = lista.firstOrNull { it.status == "pendente" } ?: lista.firstOrNull { it.status == "negado" && !it.abandono } ?: return
+    val ch = lista.firstOrNull { it.status == "pendente" } ?: lista.firstOrNull { it.status == "negado" && !it.abandono && !it.pular } ?: return
     val escopo = rememberCoroutineScope()
     var resposta by remember(ch.id) { mutableStateOf("") }
-    var penalizar by remember(ch.id) { mutableStateOf(Gestao.dados.value.cfgNum("pen_pts_desistencia", 2.0) > 0) }
+    // pular: sem penalidade, a não ser que você marque
+    var penalizar by remember(ch.id) { mutableStateOf(!ch.pular && Gestao.dados.value.cfgNum("pen_pts_desistencia", 2.0) > 0) }
     var ocupado by remember { mutableStateOf(false) }
     var erro by remember { mutableStateOf<String?>(null) }
     var abandono by remember { mutableStateOf(false) }
@@ -133,27 +143,37 @@ internal fun ChamadosDaCorridaG(corridaId: String, onMudou: suspend () -> Unit) 
     }
     PwCartao(cor = (if (ch.status == "pendente") c.vermelho else c.ouro).copy(alpha = 0.55f)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(PwIcones.Hand, null, tint = if (ch.status == "pendente") c.vermelho else c.ouro, modifier = Modifier.size(18.dp))
+            Icon(if (ch.pular) PwIcones.LockOpen else PwIcones.Hand, null, tint = if (ch.status == "pendente") c.vermelho else c.ouro, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            PwRotulo(if (ch.status == "pendente") "${ch.motoboyNome.substringBefore(" ")} pediu para cancelar" else "Cancelamento negado", Modifier.weight(1f))
+            PwRotulo(when {
+                ch.pular && ch.status == "pendente" -> "${ch.motoboyNome.substringBefore(" ")} pede para liberar a parada ${(ch.paradaOrdem ?: 0) + 1}"
+                ch.pular -> "Liberação negada"
+                ch.status == "pendente" -> "${ch.motoboyNome.substringBefore(" ")} pediu para cancelar"
+                else -> "Cancelamento negado"
+            }, Modifier.weight(1f))
             PwSelo("${ch.feitas}/${ch.paradas} feitas", c.texto2, icone = PwIcones.ListChecks)
         }
         Espaco(6)
         Text("“${ch.motivo}”", color = c.texto, fontSize = 14.5.sp, fontFamily = Archivo)
+        if (ch.pular) ch.paradaEndereco?.let { TextoDica("Parada: $it") }
         ch.criadoEm?.let { TextoDica("Às ${hora(it)} · ${relativo(it)}") }
         if (ch.status == "pendente") {
             Espaco(8)
             PwCampo(resposta, { resposta = it }, "Resposta para ele", dica = "Opcional: ele vê no aviso")
             Espaco(6)
-            PwInterruptor("Penalizar se aprovar", penalizar, { penalizar = it },
+            if (ch.pular) PwInterruptor("Penalizar ao liberar", penalizar, { penalizar = it },
+                descricao = "Conta como pulo (${numeroBr(maxOf(Gestao.dados.value.cfgNum("pen_pts_pulo", 0.0), 1.0), 1)} pts). Sem marcar, não conta nada.", icone = PwIcones.Gavel, cor = c.vermelho)
+            else PwInterruptor("Penalizar se aprovar", penalizar, { penalizar = it },
                 descricao = "Conta como desistência (${numeroBr(Gestao.dados.value.cfgNum("pen_pts_desistencia", 2.0), 1)} pts em Ajustes)", icone = PwIcones.Gavel, cor = c.vermelho)
             Espaco(8)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PwBotaoVidro("Negar", onClick = { rodar("Negado: a rota continua com ele.") { ChamadosG.responder(ch.id, false, resposta, null) } },
+                PwBotaoVidro("Negar", onClick = { rodar(if (ch.pular) "Negado: ele precisa chegar ao endereço." else "Negado: a rota continua com ele.") { ChamadosG.responder(ch.id, false, resposta, null) } },
                     icone = PwIcones.CircleX, habilitado = !ocupado, modifier = Modifier.weight(1f))
-                PwBotaoOuro("Aprovar", onClick = { rodar("Aprovado: a rota voltou para o sistema.") { ChamadosG.responder(ch.id, true, resposta, penalizar) } },
-                    icone = PwIcones.Check, habilitado = !ocupado, modifier = Modifier.weight(1f))
+                PwBotaoOuro(if (ch.pular) "Liberar" else "Aprovar", onClick = { rodar(if (ch.pular) "Liberada: ele confirma de onde está." else "Aprovado: a rota voltou para o sistema.") { ChamadosG.responder(ch.id, true, resposta, penalizar) } },
+                    icone = if (ch.pular) PwIcones.LockOpen else PwIcones.Check, habilitado = !ocupado, modifier = Modifier.weight(1f))
             }
+        } else if (ch.pular) {
+            ch.resposta?.let { TextoDica("Sua resposta: $it") }
         } else {
             ch.resposta?.let { TextoDica("Sua resposta: $it") }
             Espaco(8)
@@ -264,4 +284,5 @@ internal fun PenalidadesG(alvoTipo: String, alvoId: String) {
 private val ROTULO_PEN = mapOf(
     "ignorada" to "Oferta ignorada", "recusa" to "Recusou oferta", "desistencia" to "Desistência", "abandono" to "Abandono",
     "atraso" to "Atraso", "manual" to "Manual", "cancelamento" to "Cancelamento",
+    "pulo" to "Parada liberada fora do raio", "avaliacao" to "Avaliação ruim",
 )

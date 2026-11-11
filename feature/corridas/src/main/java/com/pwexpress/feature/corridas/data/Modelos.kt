@@ -35,6 +35,12 @@ data class Parada(
     /** Horário em que o endereço atende (ex.: 09:00 às 12:00). */
     val janelaDe: String? = null,
     val janelaAte: String? = null,
+    /** O gestor liberou: confirma de onde estiver (sem o raio). */
+    val liberadaLocal: Boolean = false,
+    /** A rota fechou sozinha (sem sinal) e esta etapa espera os dados do app. */
+    val confirmacaoPendente: Boolean = false,
+    /** Feita sem internet: ainda na fila do celular. */
+    val naFila: Boolean = false,
 )
 
 data class Exigencias(val foto: Boolean, val nome: Boolean, val assinatura: Boolean, val codigo: Boolean) {
@@ -88,6 +94,7 @@ data class Corrida(
     val sugerida: Boolean = false,
     val distanciaAteColetaM: Int? = null,
     val noQuadroDesde: Long? = null,
+    val aguardandoConfirmacao: Boolean = false,
 ) {
     /** Reais "#12", de teste "T12" (sequências separadas). */
     val numeroExibicao: String get() = if (teste) "T$numero" else "#$numero"
@@ -138,6 +145,7 @@ internal fun JsonElement.paraCorrida(): Corrida {
         exigeCodigo = o.logico("exige_codigo"),
         empresaNome = o.texto("empresa_nome"),
         paradas = o["paradas"]?.jsonArray?.map { it.paraParada() }.orEmpty().sortedBy { it.ordem },
+        aguardandoConfirmacao = o.logico("aguardando_confirmacao"),
         agendadaPara = o.texto("agendada_para")?.let { instante(it) },
         cancelarReservaAte = o.texto("cancelar_reserva_ate")?.let { instante(it) },
         iniciarAPartirDe = o.texto("iniciar_a_partir_de")?.let { instante(it) },
@@ -176,6 +184,8 @@ private fun JsonElement.paraParada(): Parada {
             Referencia(r.texto("nome") ?: return@mapNotNull null, r.inteiro("distancia_m"), r.texto("tipo"), r.texto("relacao"))
         }.orEmpty(),
         cliente = o.texto("cliente"),
+        liberadaLocal = o.logico("liberada_local"),
+        confirmacaoPendente = o.logico("confirmacao_pendente"),
         pedidoNumero = o.texto("pedido_numero")?.toLongOrNull(),
         itens = (o["itens"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { e ->
             val i = e as? JsonObject ?: return@mapNotNull null

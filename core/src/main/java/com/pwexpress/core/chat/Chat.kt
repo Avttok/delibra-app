@@ -24,10 +24,13 @@ import java.time.Instant
 data class Anexo(
     val tipo: String, val id: String? = null, val titulo: String? = null, val sub: String? = null,
     val caminho: String? = null, val lat: Double? = null, val lng: Double? = null,
+    /** Áudio: arquivo no Storage, duração e se já passou do tempo guardado. */
+    val path: String? = null, val duracao: Double? = null, val expirado: Boolean = false,
 ) {
     fun json(): JsonObject = buildJsonObject {
         put("tipo", tipo); id?.let { put("id", it) }; titulo?.let { put("titulo", it) }; sub?.let { put("sub", it) }
         caminho?.let { put("caminho", it) }; lat?.let { put("lat", it) }; lng?.let { put("lng", it) }
+        path?.let { put("path", it) }; duracao?.let { put("duracao", it) }
     }
 }
 
@@ -38,6 +41,8 @@ data class Conversa(
     val oculto: Boolean = false, val papeis: List<String> = emptyList(),
     /** Só na visão do Dev (todas as conversas). */
     val empresa: String? = null, val souMembro: Boolean = true,
+    /** Grupo de corrida que terminou: só para ler. */
+    val arquivada: Boolean = false,
 )
 
 data class Contato(val id: String, val nome: String, val foto: String?, val papeis: List<String>, val status: String?, val empresa: String?, val oculto: Boolean = false) {
@@ -54,7 +59,12 @@ data class CartaoInfo(
     val semAcesso: Boolean, val foto: String? = null, val oculto: Boolean = false, val lat: Double? = null, val lng: Double? = null,
 )
 
-data class Mensagem(val id: String, val autor: String?, val texto: String?, val anexo: Anexo?, val quando: Long, val apagada: Boolean)
+data class Mensagem(
+    val id: String, val autor: String?, val texto: String?, val anexo: Anexo?, val quando: Long, val apagada: Boolean,
+    val respostaA: String? = null, val editada: Boolean = false, val reacoes: Map<String, List<String>> = emptyMap(), val automatica: Boolean = false,
+)
+
+data class MembroChat(val id: String, val nome: String, val foto: String?, val admin: Boolean, val papeis: List<String>, val lidaEm: Long)
 
 /** Chat geral, conversas diretas e grupos (as mesmas do site). */
 object Chat {
@@ -87,6 +97,10 @@ object Chat {
     }
 
     fun traduzir(corpo: String): String = when {
+        "conversa_arquivada" in corpo -> "Esta conversa terminou com a corrida: fica só para ler."
+        "tempo_de_editar_passou" in corpo -> "O tempo para editar essa mensagem passou."
+        "audio_desligado" in corpo -> "Áudio desligado nesta empresa."
+        "audio_longo" in corpo -> "O áudio passou do tempo máximo."
         "chat_desligado" in corpo -> "A conversa está desligada."
         "fotos_desligadas" in corpo -> "O envio de fotos está desligado."
         "mensagem_vazia" in corpo -> "Escreva algo ou anexe uma foto."
@@ -107,6 +121,7 @@ object Chat {
                 (o["nao_lidas"] as? JsonPrimitive)?.intOrNull ?: 0,
                 (o["oculto"] as? JsonPrimitive)?.booleanOrNull == true,
                 (o["papeis"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content },
+                arquivada = (o["arquivada"] as? JsonPrimitive)?.booleanOrNull == true,
             )
         }
         _conversas.value = l
@@ -164,26 +179,53 @@ object Chat {
     suspend fun apagarConversaDev(conversa: String) = tentar { rpc("dev_apagar_conversa", buildJsonObject { put("p_conversa", conversa) }); carregar() }
 
     suspend fun mensagens(conversa: String, limite: Int = 120): Result<List<Mensagem>> = tentar {
-        val r = PwCore.rpc.rest("GET", "/rest/v1/chat_mensagens?select=id,autor_id,texto,anexo,criada_em,apagada_em&conversa_id=eq.$conversa&order=criada_em.desc&limit=$limite")
+        val r = PwCore.rpc.rest("GET", "/rest/v1/chat_mensagens?select=id,autor_id,texto,anexo,criada_em,apagada_em,resposta_a,editada_em,reacoes,automatica&conversa_id=eq.$conversa&order=criada_em.desc&limit=$limite")
         if (!r.ok) error(traduzir(r.corpo))
         (json.parseToJsonElement(r.corpo) as? JsonArray).orEmpty().mapNotNull { e ->
             val o = e as? JsonObject ?: return@mapNotNull null
             val a = o["anexo"] as? JsonObject
             Mensagem(
                 o.t("id") ?: return@mapNotNull null, o.t("autor_id"), o.t("texto"),
-                a?.let { x -> Anexo(x.t("tipo") ?: "local", x.t("id"), x.t("titulo"), x.t("sub"), x.t("caminho"), (x["lat"] as? JsonPrimitive)?.doubleOrNull, (x["lng"] as? JsonPrimitive)?.doubleOrNull) },
+                a?.let { x -> Anexo(x.t("tipo") ?: "local", x.t("id"), x.t("titulo"), x.t("sub"), x.t("caminho"), (x["lat"] as? JsonPrimitive)?.doubleOrNull, (x["lng"] as? JsonPrimitive)?.doubleOrNull,
+                    x.t("path"), (x["duracao"] as? JsonPrimitive)?.doubleOrNull, (x["expirado"] as? JsonPrimitive)?.booleanOrNull == true) },
                 instante(o.t("criada_em")) ?: 0L, o.t("apagada_em") != null,
+                o.t("resposta_a"), o.t("editada_em") != null,
+                (o["reacoes"] as? JsonObject)?.mapValues { (_, v) -> (v as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content } }.orEmpty(),
+                (o["automatica"] as? JsonPrimitive)?.booleanOrNull == true,
             )
         }.reversed()
     }
 
-    suspend fun enviar(conversa: String, texto: String?, anexo: Anexo? = null): Result<Unit> = tentar {
+    suspend fun enviar(conversa: String, texto: String?, anexo: Anexo? = null, respostaA: String? = null): Result<Unit> = tentar {
         rpc("chat_enviar", buildJsonObject {
             put("p_conversa", conversa)
             if (!texto.isNullOrBlank()) put("p_texto", texto.trim())
             if (anexo != null) put("p_anexo", anexo.json())
+            if (respostaA != null) put("p_resposta_a", respostaA)
         })
         Unit
+    }
+
+    suspend fun reagir(mensagem: String, emoji: String) = tentar { rpc("chat_reagir", buildJsonObject { put("p_mensagem", mensagem); put("p_emoji", emoji) }); Unit }
+    suspend fun editar(mensagem: String, texto: String) = tentar { rpc("chat_editar", buildJsonObject { put("p_mensagem", mensagem); put("p_texto", texto) }); Unit }
+    suspend fun caixaEmpresa(): Result<String> = tentar { (rpc("chat_caixa_empresa", buildJsonObject { }) as JsonPrimitive).content }
+    suspend fun membros(conversa: String): List<MembroChat> = tentar {
+        (rpc("chat_membros_de", buildJsonObject { put("p_conversa", conversa) }) as? JsonArray).orEmpty().mapNotNull { e ->
+            val o = e as? JsonObject ?: return@mapNotNull null
+            MembroChat(o.t("id") ?: return@mapNotNull null, o.t("nome") ?: "", o.t("foto"), (o["admin"] as? JsonPrimitive)?.booleanOrNull == true,
+                (o["papeis"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content }, instante(o.t("lida_em")) ?: 0L)
+        }
+    }.getOrDefault(emptyList())
+    suspend fun grupo(conversa: String, acao: String, usuario: String? = null, nome: String? = null) = tentar {
+        rpc("chat_grupo", buildJsonObject { put("p_conversa", conversa); put("p_acao", acao); usuario?.let { put("p_usuario", it) }; nome?.let { put("p_nome", it) } }); Unit
+    }
+
+    /** Áudio: vai para o Storage (pasta da conversa) e a mensagem leva o caminho e a duração. */
+    suspend fun enviarAudio(conversa: String, bytes: ByteArray, duracao: Double, respostaA: String? = null): Result<Unit> = tentar {
+        val caminho = "$conversa/${java.util.UUID.randomUUID()}.m4a"
+        val r = PwCore.rpc.enviarArquivo("chat", caminho, bytes, "audio/mp4")
+        if (!r.ok) error("Não deu para enviar o áudio.")
+        enviar(conversa, null, Anexo("audio", path = caminho, duracao = duracao), respostaA).getOrThrow()
     }
 
     /** Foto: vai para o Storage (pasta da conversa) e a mensagem leva o caminho. */

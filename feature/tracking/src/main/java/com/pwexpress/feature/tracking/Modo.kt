@@ -59,4 +59,6 @@ data class TrackingInfo(
     val erro: String? = null,
     /** Última posição lida (para o mapa do raio). */
     val ultimaPosicao: Pair<Double, Double>? = null,
+    /** Velocidade da última leitura (m/s): o joguinho só abre parado. */
+    val ultimaVelocidadeMs: Float? = null,
 )

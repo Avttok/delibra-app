@@ -141,7 +141,11 @@ internal fun CartaoCorridaG(corrida: CorridaG, dados: Gestao.Dados, onClick: () 
             // o preço tem a linha só para ele: nunca fica cortado
             Text(moedaBr(corrida.valor), fontFamily = ArchivoLargo, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.texto, maxLines = 1, softWrap = false)
         }
-        PwSelo(Status.rotulo[corrida.status] ?: corrida.status, corStatus(corrida.status, c))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            PwSelo(Status.rotulo[corrida.status] ?: corrida.status, corStatus(corrida.status, c))
+            if (corrida.pagamentoStatus == "pago") PwSelo("PAGO", c.verde, icone = PwIcones.BadgeCheck)
+            if (corrida.urgente) PwSelo("URGENTE", c.vermelho, icone = PwIcones.Flame)
+        }
         if (corrida.planejada && corrida.agendadaPara != null) {
             val f2 = RoundedCornerShape(10.dp)
             val cor = if (corrida.atrasada) c.vermelho else c.azul

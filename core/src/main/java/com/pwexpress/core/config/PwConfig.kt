@@ -8,7 +8,10 @@ object PwConfig {
     val supabaseKey: String = BuildConfig.SUPABASE_KEY
 
     /** Site do gestor: rotas do servidor que precisam da chave secreta (criar conta, CNPJ…). */
-    val siteUrl: String = BuildConfig.SITE_URL.ifBlank { "https://delibra-web.vercel.app" }.trimEnd('/')
+    private val siteUrlPadrao: String = BuildConfig.SITE_URL.ifBlank { "https://delibra-web.vercel.app" }.trimEnd('/')
+    /** Domínio do site: o que o Dev escolheu em Dev → Sistema (dev_site_url) ou o padrão do build. */
+    @Volatile var siteUrlEscolhido: String? = null
+    val siteUrl: String get() = siteUrlEscolhido?.takeIf { it.startsWith("https://") }?.trimEnd('/') ?: siteUrlPadrao
 
     /** "dono/repositorio" no GitHub, de onde vêm as atualizações do app. */
     val githubRepo: String = BuildConfig.GITHUB_REPO.ifBlank { "Avttok/PWEx_App" }

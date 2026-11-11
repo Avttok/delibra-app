@@ -67,6 +67,8 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.put
 
 private val ROTULO_EVENTO = mapOf(
+    "parada_liberada" to "Parada liberada pelo gestor", "pediu_pular" to "Motoboy pediu para liberar uma parada", "emergencia" to "Botão de emergência",
+    "fechada_sem_noticia" to "Fechou sozinha (motoboy sem sinal)", "confirmada_offline" to "Etapas sem internet chegaram",
     "criada" to "Corrida criada", "oferta_enviada" to "Oferta enviada", "oferta_recusada" to "Oferta recusada", "oferta_expirada" to "Oferta expirou",
     "sem_motoboy" to "Nenhum motoboy disponível", "redespachada" to "Novo despacho", "aceita" to "Aceita", "chegou" to "Chegou na parada",
     "parada_concluida" to "Parada concluída", "concluida" to "Corrida concluída", "cancelada" to "Cancelada", "reservada" to "Reservada",
@@ -242,6 +244,16 @@ fun DetalheCorridaG(id: String, onVoltar: () -> Unit) {
             }
         }
 
+        if (corrida.aguardandoConfirmacao) PwCartao(cor = c.ouro.copy(alpha = 0.55f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(PwIcones.CloudOff, null, tint = c.ouro, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
+                PwRotulo("Aguardando confirmação", Modifier.weight(1f))
+            }
+            TextoDica("O motoboy ficou sem sinal e a rota fechou sozinha pela previsão. Quando o app dele voltar, as etapas chegam com a hora certa.")
+        }
+        var liberar by remember { mutableStateOf<com.pwexpress.feature.gestor.data.ParadaG?>(null) }
+        val ativaAgora = corrida.status == Status.ACEITA || corrida.status == Status.EM_ANDAMENTO
+        val podeLiberar = ativaAgora && corrida.exigirNoLocal && dados.cfgBool("saas_pular_parada", true) && dados.cfgBool("pular_parada_ligado", true)
         PwCartao {
             PwRotulo("Paradas · toque para ver no mapa")
             corrida.paradas.forEach { p ->
@@ -266,6 +278,13 @@ fun DetalheCorridaG(id: String, onVoltar: () -> Unit) {
                                 p.exigeCodigo ?: (ent && corrida.exigeCodigo), p.codigo ?: corrida.codigoEntrega.takeIf { ent }, p.janelaDe, p.janelaAte)
                         }
                         p.recebedorNome?.let { Text("Recebido por $it", color = c.texto, fontSize = 13.sp) }
+                        if (p.liberadaLocal || p.feitaOffline || p.confirmacaoPendente) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            if (p.liberadaLocal) PwSelo("LIBERADA", c.verde, icone = PwIcones.LockOpen)
+                            if (p.feitaOffline) PwSelo("SEM INTERNET", c.ouro, icone = PwIcones.CloudOff)
+                            if (p.confirmacaoPendente) PwSelo("AGUARDANDO", c.ouro, icone = PwIcones.Clock)
+                        }
+                        if (podeLiberar && p.status != "concluida" && !p.liberadaLocal)
+                            PwBotaoVidro("Liberar parada", onClick = { liberar = p }, icone = PwIcones.LockOpen, cor = c.texto2)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             p.fotoPath?.let { Comprovante("Foto", it) }
                             p.assinaturaPath?.let { Comprovante("Assinatura", it) }
@@ -277,6 +296,25 @@ fun DetalheCorridaG(id: String, onVoltar: () -> Unit) {
                 }
             }
             corrida.observacoes?.let { Espaco(8); Text("Obs.: $it", color = c.ouro) }
+        }
+
+        liberar?.let { p ->
+            var penalizar by remember(p.id) { mutableStateOf(false) }
+            var motivo by remember(p.id) { mutableStateOf("") }
+            PwJanela("Liberar a parada ${p.ordem + 1}?", onFechar = { liberar = null }) {
+                Text("O motoboy confirma esta etapa de onde estiver, sem precisar estar no raio do endereço. Fica marcado na rota.", color = c.texto2)
+                Text(p.endereco, color = c.texto, fontSize = 13.5.sp)
+                PwCampo(motivo, { motivo = it }, "Motivo", dica = "Opcional: fica na linha do tempo")
+                PwInterruptor("Penalizar", penalizar, { penalizar = it },
+                    descricao = "Conta como pulo (${com.pwexpress.core.designsystem.numeroBr(maxOf(dados.cfgNum("pen_pts_pulo", 0.0), 1.0), 1)} pts). Sem marcar, não conta nada.", icone = PwIcones.Gavel, cor = c.vermelho)
+                PwBotaoOuro("Liberar", onClick = {
+                    liberar = null
+                    acao { Gestao.rpcJson("liberar_parada", kotlinx.serialization.json.buildJsonObject {
+                        put("p_parada", kotlinx.serialization.json.JsonPrimitive(p.id)); put("p_penalizar", kotlinx.serialization.json.JsonPrimitive(penalizar))
+                        if (motivo.isNotBlank()) put("p_motivo", kotlinx.serialization.json.JsonPrimitive(motivo.trim()))
+                    }).map { com.pwexpress.core.designsystem.PwToast.mostrar("Parada liberada: o motoboy já pode confirmar.") } }
+                }, icone = PwIcones.LockOpen, modifier = Modifier.fillMaxWidth())
+            }
         }
 
         if (eventos.isNotEmpty()) {

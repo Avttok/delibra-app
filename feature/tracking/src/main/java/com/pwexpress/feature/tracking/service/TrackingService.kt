@@ -209,6 +209,7 @@ class TrackingService : Service() {
         val cm = getSystemService(ConnectivityManager::class.java) ?: return
         val cb = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
+                com.pwexpress.core.PwCore.http.renovarConexoes()
                 Tracking.sincronizarAgora()
             }
         }

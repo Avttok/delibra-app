@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.edit
 import com.pwexpress.core.R
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -167,17 +168,54 @@ object TemaApp {
     /** Cores escolhidas pelo usuário (guardadas no aparelho). */
     private val _estilo = MutableStateFlow(EstiloTema.OURO)
     val estilo: StateFlow<EstiloTema> = _estilo.asStateFlow()
-    fun definirEstilo(e: EstiloTema) {
+    fun definirEstilo(e: EstiloTema, enviar: Boolean = true) {
         _estilo.value = e
         ctx?.getSharedPreferences("pwex_tema", Context.MODE_PRIVATE)?.edit { putString("estilo", e.name) }
+        if (enviar) sincronizar()
     }
 
     /** Como a pessoa prefere mudar números: barra (deslizar) ou digitando (com − e +). Vale em todo o app. */
     private val _numeroBarra = MutableStateFlow(true)
     val numeroBarra: StateFlow<Boolean> = _numeroBarra.asStateFlow()
-    fun definirNumeroBarra(barra: Boolean) {
+    fun definirNumeroBarra(barra: Boolean, enviar: Boolean = true) {
         _numeroBarra.value = barra
         ctx?.getSharedPreferences("pwex_tema", Context.MODE_PRIVATE)?.edit { putBoolean("numero_barra", barra) }
+        if (enviar) sincronizar()
+    }
+
+    // ---------------------------------------------------------------- tema da pessoa, igual no app e no site
+    private val escopoSync = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+    private var envio: kotlinx.coroutines.Job? = null
+    private val ESTILO_SITE = mapOf(EstiloTema.PRETO_NO_BRANCO to "pnb", EstiloTema.BRANCO_NO_PRETO to "bnp")
+    private fun estiloParaSite(e: EstiloTema) = ESTILO_SITE[e] ?: e.name.lowercase()
+    private fun estiloDoSite(k: String?) = ESTILO_SITE.entries.firstOrNull { it.value == k }?.key ?: EstiloTema.entries.firstOrNull { it.name.equals(k, true) }
+
+    /** Manda a escolha para a conta (um pouco depois, juntando mudanças seguidas). */
+    private fun sincronizar() {
+        envio?.cancel()
+        envio = escopoSync.launch {
+            kotlinx.coroutines.delay(1_200)
+            if (com.pwexpress.core.PwCore.auth.sessao.value == null) return@launch
+            runCatching {
+                com.pwexpress.core.PwCore.rpc.chamar("salvar_meu_tema", kotlinx.serialization.json.buildJsonObject {
+                    put("p", kotlinx.serialization.json.buildJsonObject {
+                        put("preferencia", kotlinx.serialization.json.JsonPrimitive(when (_pref.value) { PreferenciaTema.CLARO -> "claro"; PreferenciaTema.ESCURO -> "escuro"; else -> "sistema" }))
+                        put("estilo", kotlinx.serialization.json.JsonPrimitive(estiloParaSite(_estilo.value)))
+                        put("numero_barra", kotlinx.serialization.json.JsonPrimitive(_numeroBarra.value))
+                    })
+                })
+            }
+        }
+    }
+
+    /** O que a conta tem salvo (vem com o perfil): vale aqui também. Conta sem tema: manda o deste aparelho. */
+    fun aplicarDaConta(t: kotlinx.serialization.json.JsonObject?) {
+        fun txt(k: String) = (t?.get(k) as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { it.isString }?.content
+        if (envio?.isActive == true) return // mudança daqui ainda indo para a conta
+        if (t == null || t.isEmpty()) { sincronizar(); return }
+        when (txt("preferencia")) { "claro" -> definir(PreferenciaTema.CLARO, false); "escuro" -> definir(PreferenciaTema.ESCURO, false); "sistema" -> definir(PreferenciaTema.SISTEMA, false) }
+        estiloDoSite(txt("estilo"))?.let { if (it != _estilo.value) definirEstilo(it, false) }
+        (t["numero_barra"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toBooleanStrictOrNull()?.let { if (it != _numeroBarra.value) definirNumeroBarra(it, false) }
     }
 
     fun init(context: Context) {
@@ -191,9 +229,10 @@ object TemaApp {
         _estilo.value = EstiloTema.entries.firstOrNull { it.name == est } ?: EstiloTema.OURO
     }
 
-    fun definir(p: PreferenciaTema) {
+    fun definir(p: PreferenciaTema, enviar: Boolean = true) {
         _pref.value = p
         ctx?.getSharedPreferences("pwex_tema", Context.MODE_PRIVATE)?.edit { putString("tema", p.name) }
+        if (enviar) sincronizar()
     }
 
     /** sistema → claro → noturno → sistema */

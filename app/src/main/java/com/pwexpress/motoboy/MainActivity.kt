@@ -304,6 +304,8 @@ class MainActivity : ComponentActivity() {
                                             onConfiguracoes = { naConfig = true },
                                         )
                                     }
+                                    // emergência sempre à mão no início (segurar 2 s + confirmar)
+                                    if (abaMotoboy == "inicio") com.pwexpress.feature.corridas.ui.BotaoEmergencia(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 14.dp))
                                 }
                             }
                             val reservas = planejadas.count { it.minha }
@@ -369,7 +371,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        // voltou do repouso: conexões velhas fora, e o login já renova em segundo plano (sem esperar a 1ª tela)
+        PwCore.http.renovarConexoes()
         if (PwCore.auth.sessao.value != null) {
+            lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) { runCatching { PwCore.auth.tokenValido() } }
             Tracking.retomarSeAtivo()
             Corridas.sincronizar()
         }

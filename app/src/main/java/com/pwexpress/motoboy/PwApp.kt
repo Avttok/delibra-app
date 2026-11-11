@@ -112,6 +112,7 @@ class PwApp : Application() {
                 TemaApp.definirVermelho(p.dev && p.corTema == "vermelho")
                 // "Logar com": mantém nome e foto atualizados na conta salva
                 PwCore.auth.sessao.value?.email?.let { PwCore.auth.contas.atualizarPerfil(it, p.nome, p.fotoUrl) }
+                com.pwexpress.core.config.PwConfig.siteUrlEscolhido = p.texto("dev_site_url", "").takeIf { it.isNotBlank() }
                 Tracking.aplicarConfiguracoes(
                     corridaS = p.numero("intervalo_corrida_s", 45.0),
                     economiaS = p.numero("intervalo_economia_s", 90.0),

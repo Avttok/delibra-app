@@ -93,6 +93,8 @@ data class Ganhos(
 object Perfis {
     /** Ícone e nome da empresa vêm junto com o perfil: o app troca o Delibra por eles. */
     private fun publicarMarca(o: kotlinx.serialization.json.JsonElement) {
+        // tema da pessoa (o mesmo no app e no site)
+        runCatching { com.pwexpress.core.designsystem.TemaApp.aplicarDaConta((o as? JsonObject)?.get("tema") as? JsonObject) }
         val org = ((o as? JsonObject)?.get("organizacao") as? JsonObject)
         fun t(k: String) = (org?.get(k) as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
         com.pwexpress.core.marca.MarcaEmpresa.atualizar(t("nome")?.let { com.pwexpress.core.marca.Marca(it, t("logo"), t("cor"), t("nome_app"), t("logo_escala")?.toFloatOrNull() ?: 1.9f,

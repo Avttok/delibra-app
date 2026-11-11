@@ -157,9 +157,11 @@ private fun CartaoPedido(p: PedidoG, empresa: String?, onClick: () -> Unit) {
             color = c.texto3, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
         val esperaPag = p.cobranca == "pre_pago" && p.pagamentoStatus == "pendente" && p.status !in setOf("cancelado", "recusado", "concluido")
-        if (p.urgente || esperaPag) {
+        val pago = p.pagamentoStatus == "pago"
+        if (p.urgente || esperaPag || pago) {
             Spacer(Modifier.size(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (pago) PwSelo("PAGO", c.verde, icone = PwIcones.BadgeCheck)
                 if (p.urgente) PwSelo("URGENTE", c.vermelho, icone = PwIcones.Flame)
                 if (esperaPag) PwSelo("Aguardando pagamento", androidx.compose.ui.graphics.Color(0xFF38BDF8), icone = PwIcones.Wallet)
             }
@@ -190,9 +192,29 @@ private fun JanelaPedido(p: PedidoG, empresa: String?, onFechar: () -> Unit) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             PwSelo(StatusPedido.rotulo[p.status] ?: p.status, if (p.status == "recebido") c.ouro else c.texto3)
             PwSelo(if (p.planejado) "Planejado" else "Agora", if (p.planejado) c.azul else c.ouro)
+            if (p.pagamentoStatus == "pago") PwSelo("PAGO", c.verde, icone = PwIcones.BadgeCheck)
             if (p.urgente) PwSelo("URGENTE", c.vermelho, icone = PwIcones.Flame)
             PwSelo(if (p.cobranca == "credito") "Crédito (fatura)" else "Pré-pago", c.texto2)
             Spacer(Modifier.weight(1f))
+            if (p.status !in setOf("cancelado", "recusado") && Gestao.dados.value.cfgBool("rastreio_ligado", true)) {
+                val ctxR = androidx.compose.ui.platform.LocalContext.current
+                val escR = androidx.compose.runtime.rememberCoroutineScope()
+                com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.Link, "Link de rastreio", {
+                    escR.launch {
+                        Gestao.rpcJson("gerar_rastreio", kotlinx.serialization.json.buildJsonObject { put("p_pedido", kotlinx.serialization.json.JsonPrimitive(p.id)) })
+                            .onSuccess { j ->
+                                val o = j as? kotlinx.serialization.json.JsonObject
+                                val tok = (o?.get("token") as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty()
+                                val url = (o?.get("url") as? kotlinx.serialization.json.JsonPrimitive)?.content?.takeIf { it.startsWith("http") } ?: "${com.pwexpress.core.config.PwConfig.siteUrl}/r/$tok"
+                                val cm = ctxR.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                cm.setPrimaryClip(android.content.ClipData.newPlainText("Rastreio", url))
+                                runCatching { ctxR.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, "Acompanhe sua entrega: $url"), "Mandar o link")) }
+                                com.pwexpress.core.designsystem.PwToast.mostrar("Link copiado.", com.pwexpress.core.designsystem.TipoAviso.OK, "Link de rastreio")
+                            }
+                            .onFailure { com.pwexpress.core.designsystem.PwToast.mostrar(it.message ?: "Não deu agora.", com.pwexpress.core.designsystem.TipoAviso.ERRO) }
+                    }
+                }, tamanho = 34.dp)
+            }
             com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.Share2, "Mandar no chat", {
                 com.pwexpress.core.chat.Chat.compartilhar(com.pwexpress.core.chat.Anexo("pedido", p.id, "Pedido ${p.numeroExibicao}", nomeCliente(p, empresa))); onFechar()
             }, tamanho = 34.dp)

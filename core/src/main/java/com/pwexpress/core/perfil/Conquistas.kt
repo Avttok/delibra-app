@@ -115,12 +115,12 @@ object Conquistas {
         Conquista("online_500", "Incansável", "Ficou 500 horas online.", "horas_online", 500.0, { PwIcones.Hourglass }, AMBAR, "h"),
         Conquista("online_1000", "Energia infinita", "Ficou 1.000 horas online.", "horas_online", 1000.0, { PwIcones.Zap }, OURO, "h"),
         // tempo de conta
-        Conquista("conta_7", "Bem-vindo", "Uma semana de Delibra.", "dias_conta", 7.0, { PwIcones.CalendarCheck }, VERDE, "dias"),
-        Conquista("conta_30", "Um mês de casa", "Um mês de Delibra.", "dias_conta", 30.0, { PwIcones.CalendarDays }, AZUL, "dias"),
-        Conquista("conta_90", "Da família", "Três meses de Delibra.", "dias_conta", 90.0, { PwIcones.Heart }, ROSA, "dias"),
-        Conquista("conta_180", "Meio ano", "Seis meses de Delibra.", "dias_conta", 180.0, { PwIcones.BadgeCheck }, INDIGO, "dias"),
-        Conquista("conta_365", "Aniversário", "Um ano de Delibra. Parabéns!", "dias_conta", 365.0, { PwIcones.Cake }, ROSA, "dias"),
-        Conquista("conta_730", "Raiz", "Dois anos de Delibra.", "dias_conta", 730.0, { PwIcones.Crown }, OURO, "dias"),
+        Conquista("conta_7", "Bem-vindo", "Uma semana com a gente.", "dias_conta", 7.0, { PwIcones.CalendarCheck }, VERDE, "dias"),
+        Conquista("conta_30", "Um mês de casa", "Um mês com a gente.", "dias_conta", 30.0, { PwIcones.CalendarDays }, AZUL, "dias"),
+        Conquista("conta_90", "Da família", "Três meses com a gente.", "dias_conta", 90.0, { PwIcones.Heart }, ROSA, "dias"),
+        Conquista("conta_180", "Meio ano", "Seis meses com a gente.", "dias_conta", 180.0, { PwIcones.BadgeCheck }, INDIGO, "dias"),
+        Conquista("conta_365", "Aniversário", "Um ano com a gente. Parabéns!", "dias_conta", 365.0, { PwIcones.Cake }, ROSA, "dias"),
+        Conquista("conta_730", "Raiz", "Dois anos com a gente.", "dias_conta", 730.0, { PwIcones.Crown }, OURO, "dias"),
         // dias e sequências
         Conquista("ativos_30", "Presença", "Trabalhou em 30 dias diferentes.", "dias_ativos", 30.0, { PwIcones.CalendarClock }, TURQUESA, "dias"),
         Conquista("ativos_100", "Cem dias de rua", "Trabalhou em 100 dias diferentes.", "dias_ativos", 100.0, { PwIcones.Star }, OURO, "dias"),

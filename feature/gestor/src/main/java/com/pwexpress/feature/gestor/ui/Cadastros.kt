@@ -480,7 +480,7 @@ private fun gerarSenha(): String {
 }
 
 private fun copiar(ctx: Context, texto: String) {
-    ctx.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("Acesso Delibra", texto))
+    ctx.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("Acesso", texto))
 }
 
 @Composable
@@ -496,7 +496,7 @@ private fun NovaContaG(repassePadrao: Double, onFechar: () -> Unit, onCriada: (S
     var erro by remember { mutableStateOf<String?>(null) }
     var enviando by remember { mutableStateOf(false) }
     var criada by remember { mutableStateOf<String?>(null) }
-    val acesso = "Delibra\nE-mail: ${email.trim().lowercase()}\nSenha: $senha"
+    val acesso = "${com.pwexpress.core.marca.MarcaEmpresa.marca.value?.nomeExibido ?: "Delibra"}\nE-mail: ${email.trim().lowercase()}\nSenha: $senha\nApp: ${com.pwexpress.core.config.PwConfig.siteUrl}/app"
     if (criada != null) {
         PwJanela("Conta criada", onFechar = { onCriada(criada) }) {
             Text("Passe estes dados para ${nome.trim().substringBefore(" ")}. A senha não aparece de novo.", color = c.texto2)
@@ -509,7 +509,7 @@ private fun NovaContaG(repassePadrao: Double, onFechar: () -> Unit, onCriada: (S
         return
     }
     PwJanela(if (cliente != null) "Acesso de ${cliente.nome}" else "Nova conta", onFechar = onFechar, fecharFora = !enviando) {
-        TextoDica(if (cliente != null) "O cliente entra no site da Delibra para pedir, pagar e acompanhar." else "A conta já nasce confirmada e pode entrar no app ou no painel na hora.")
+        TextoDica(if (cliente != null) "O cliente entra no site para pedir, pagar e acompanhar." else "A conta já nasce confirmada e pode entrar no app ou no painel na hora.")
         PwCampo(nome, { nome = it }, "Nome")
         PwCampo(email, { email = it }, "E-mail", teclado = KeyboardType.Email)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -784,7 +784,7 @@ private fun EditarMembroG(m: com.pwexpress.feature.gestor.data.MembroG, eu: Bool
     }
 
     senhaNova?.let { s ->
-        val acesso = "Delibra\nE-mail: ${m.email}\nSenha: $s"
+        val acesso = "${com.pwexpress.core.marca.MarcaEmpresa.marca.value?.nomeExibido ?: "Delibra"}\nE-mail: ${m.email}\nSenha: $s"
         PwJanela(if (senhaFeita) "Senha trocada" else "Nova senha", onFechar = { senhaNova = null }) {
             if (!senhaFeita) {
                 TextoDica("Para quando ${m.nome} esquecer a senha. Quem estiver conectado continua até sair.")
@@ -919,7 +919,7 @@ private fun ExtratoCarteiraG(onVoltar: (() -> Unit)?, abas: @Composable () -> Un
             }
             tentar {
                 ctx.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/csv")
-                    .putExtra(android.content.Intent.EXTRA_SUBJECT, "Extrato Delibra").putExtra(android.content.Intent.EXTRA_TEXT, csv), "Compartilhar extrato"))
+                    .putExtra(android.content.Intent.EXTRA_SUBJECT, "Extrato " + (com.pwexpress.core.marca.MarcaEmpresa.marca.value?.nomeExibido ?: "Delibra")).putExtra(android.content.Intent.EXTRA_TEXT, csv), "Compartilhar extrato"))
             }
         }, icone = PwIcones.Download, modifier = Modifier.fillMaxWidth())
         x.forEach { cor ->
@@ -975,7 +975,7 @@ private fun PixCarteiraG(onVoltar: (() -> Unit)?, abas: @Composable () -> Unit) 
 internal fun ParaOndeVai(total: Double, motoboys: Double, dev: Double) {
     val c = Pw.cores
     val gestor = (total - motoboys).coerceAtLeast(0.0)
-    val partes = listOf(Triple("Motoboys", motoboys, c.verde), Triple("Fica com o gestor", gestor, c.ouro))
+    val partes = listOf(Triple("Motoboys", motoboys, c.verde), Triple("Gestor", gestor, c.ouro))
     PwCartao {
         PwRotulo("Para onde vai esse valor")
         Espaco(8)

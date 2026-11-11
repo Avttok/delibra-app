@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -324,6 +325,12 @@ internal fun BlocoRotaG(corrida: com.pwexpress.feature.gestor.data.CorridaG, ocu
     val c = Pw.cores
     val dados by Gestao.dados.collectAsState()
     val aberta = corrida.motoboyId == null && corrida.status in setOf("montada", "agendada", "aguardando_motoboy", "sem_motoboy")
+    // editar percurso: arrastar o caminho para as ruas que o gestor quer
+    var editarPercurso by remember(corrida.id) { mutableStateOf(false) }
+    if (corrida.status !in setOf("concluida", "cancelada") && corrida.paradas.size >= 2) {
+        PwBotaoVidro("Editar percurso", onClick = { editarPercurso = true }, icone = PwIcones.Route, modifier = Modifier.fillMaxWidth())
+        if (editarPercurso) EditarPercursoG(corrida, onFechar = { editarPercurso = false })
+    }
     if (aberta) {
         var modo by remember(corrida.id) { mutableStateOf(if (corrida.modoDespacho in MODOS_DESPACHO.map { it.chave }) corrida.modoDespacho ?: "cascata" else "cascata") }
         var moto by remember(corrida.id) { mutableStateOf(corrida.sugeridoMotoboyId) }
@@ -1150,6 +1157,26 @@ private fun CartaoRotaG(
         PwRotulo("O motoboy que pegar recebe" + if (previaPag != null) " (prévia com as mudanças)" else "")
         Espaco(4)
         (previaPag ?: r.obj("pagamento"))?.let { LinhasCalculo(it) } ?: TextoDica("Sem cálculo ainda.")
+    }
+    // raio da zona direto aqui (sem ir em Ajustes): vale para esta rota e a prévia mostra na hora
+    if (mudaPagamento && raioZona != null) {
+        val raioAtual = (regras["zona_entrega_raio_m"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull() ?: raioZona
+        Espaco(8)
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.vidro).border(1.dp, c.borda, RoundedCornerShape(16.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(PwIcones.Radar, null, tint = c.ouro, modifier = Modifier.size(18.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Raio da mesma zona", color = c.texto, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                TextoDica("Só nesta rota")
+            }
+            PwBotaoIcone(PwIcones.Minus, "Diminuir o raio", { regras["zona_entrega_raio_m"] = kotlinx.serialization.json.JsonPrimitive((raioAtual - 100).coerceAtLeast(100.0)) }, tamanho = 40.dp, habilitado = !ocupado)
+            Text("${raioAtual.toInt()} m", color = c.texto, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.widthIn(min = 64.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            PwBotaoIcone(PwIcones.Plus, "Aumentar o raio", { regras["zona_entrega_raio_m"] = kotlinx.serialization.json.JsonPrimitive((raioAtual + 100).coerceAtMost(20000.0)) }, tamanho = 40.dp, habilitado = !ocupado)
+        }
+        if (mudouRegras) PwBotaoOuro("Salvar", onClick = {
+            if (previa) rodar("Raio salvo nesta rota. A prévia já mostra o valor novo.", rpc("definir_regras_rota_pedido") { put("p_pedido", pedidoId); put("p_regras", kotlinx.serialization.json.JsonObject(regras.toMap())) })
+            else rodar("Raio salvo nesta rota.", rpc("definir_regras_rota") { put("p_corrida", id); put("p_regras", kotlinx.serialization.json.JsonObject(regras.toMap())) })
+        }, icone = PwIcones.Check, habilitado = !ocupado, modifier = Modifier.padding(top = 6.dp))
     }
     if (mudaPagamento) {
         Espaco(8)

@@ -175,7 +175,7 @@ class MainActivity : ComponentActivity() {
                             androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 com.pwexpress.core.designsystem.PwLogoGrande(150.dp)
                                 com.pwexpress.core.designsystem.PwVazio(
-                                    "Sua conta é de cliente. Pedidos, pagamentos e acompanhamento ficam no site da Delibra — o app é para motoboys e gestores.",
+                                    "Sua conta é de cliente. Pedidos, pagamentos e acompanhamento ficam no site — o app é para motoboys e gestores.",
                                 )
                                 com.pwexpress.core.designsystem.PwBotaoVidro("Sair da conta", onClick = ::sair, icone = com.pwexpress.core.designsystem.PwIcones.LogOut)
                             }

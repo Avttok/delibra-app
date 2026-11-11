@@ -327,6 +327,6 @@ object Corridas {
             val raio = partes.getOrNull(2)
             return "Você está a ${dist ?: "?"} m do endereço. Aproxime-se (até ${raio ?: "?"} m) para continuar."
         }
-        return mensagens[msg] ?: msg ?: "Erro no servidor (${r.codigo})."
+        return mensagens[msg] ?: msg?.let { com.pwexpress.core.json.erroAmigavel(it, r.codigo) } ?: "Erro no servidor (${r.codigo})."
     }
 }

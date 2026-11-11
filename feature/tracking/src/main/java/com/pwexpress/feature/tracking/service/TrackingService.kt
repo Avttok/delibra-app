@@ -209,7 +209,7 @@ class TrackingService : Service() {
         PwNotificacoes.criarCanais(this)
         val canal = NotificationChannel(CANAL, "Status e GPS", NotificationManager.IMPORTANCE_LOW).apply {
             group = PwNotificacoes.GRUPO_SISTEMA
-            description = "Aviso fixo enquanto o Delibra envia sua localização"
+            description = "Aviso fixo enquanto o app envia sua localização"
             setShowBadge(false)
         }
         getSystemService(NotificationManager::class.java)?.createNotificationChannel(canal)
@@ -225,7 +225,7 @@ class TrackingService : Service() {
         val (titulo, texto) = when (modo) {
             Modo.EM_CORRIDA -> "Em corrida" to "Enviando sua posição a cada ${Intervalos.corridaMs(economia) / 1000} s" + if (economia) " (economia de bateria)" else ""
             Modo.DISPONIVEL -> "Disponível" to "Aguardando corridas… você será avisado assim que chegar uma."
-            Modo.OFFLINE -> "Delibra" to "Encerrando…"
+            Modo.OFFLINE -> (com.pwexpress.core.marca.MarcaEmpresa.marca.value?.nomeExibido ?: "Delibra") to "Encerrando…"
         }
         return PwNotificacoes.base(this, CANAL)
             .setContentTitle(titulo)

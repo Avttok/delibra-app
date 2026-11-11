@@ -40,7 +40,25 @@ fun HttpResposta.exigirOk(traduzir: (String) -> String? = { null }): HttpRespost
     val o = runCatching { json.parseToJsonElement(corpo).jsonObject }.getOrNull()
     val codigo = o?.str("message") ?: o?.str("erro") ?: o?.str("error") ?: o?.str("msg") ?: "erro_$codigo"
     val detalhe = o?.str("detalhe")
-    throw ErroServidor(codigo, traduzir(codigo) ?: detalhe ?: codigo.replace('_', ' ').replaceFirstChar { it.uppercase() }, this.codigo)
+    throw ErroServidor(codigo, traduzir(codigo) ?: detalhe?.let { erroAmigavel(it, this.codigo) } ?: erroAmigavel(codigo, this.codigo), this.codigo)
+}
+
+/**
+ * Mensagem que a pessoa entende: os códigos do banco (ex.: "apenas_gestor") viram frase,
+ * e erros técnicos em inglês (do banco ou do servidor) viram um aviso claro, sem jargão.
+ */
+fun erroAmigavel(msg: String, http: Int = 0): String {
+    val m = msg.lowercase()
+    return when {
+        "row-level security" in m || "permission denied" in m || http == 403 || "sem_permissao" in m -> "Sem permissão para isso."
+        "duplicate key" in m || "already exists" in m -> "Isso já existe."
+        "timeout" in m || "timed out" in m || http == 504 || http == 502 -> "O servidor demorou para responder. Tente de novo."
+        http == 401 || "jwt" in m -> "Sua sessão expirou. Entre de novo."
+        Regex("[a-z]+ [a-z]+ [a-z]+").containsMatchIn(m) && Regex("\\b(cannot|violates|does not exist|column|function|syntax|null value|invalid input|relation|operator|scalar|out of range)\\b").containsMatchIn(m) ->
+            "Algo deu errado do nosso lado. Já pode tentar de novo; se repetir, avise o suporte."
+        Regex("^[a-z0-9_]+$").matches(m) -> msg.replace('_', ' ').replaceFirstChar { it.uppercase() } + "."
+        else -> msg
+    }
 }
 
 fun JsonElement?.comoObjeto(): JsonObject? = runCatching { this?.jsonObject }.getOrNull()

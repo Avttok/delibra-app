@@ -253,6 +253,8 @@ fun PwLogo(modifier: Modifier = Modifier, tamanho: Int = 26, soSelo: Boolean = f
             fontSize = (tamanho * 0.95f).sp,
             letterSpacing = (-tamanho * 0.03f).sp,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            softWrap = false,
         )
     }
 }
@@ -264,7 +266,7 @@ fun PwLogoGrande(tamanho: Dp, modifier: Modifier = Modifier) {
         PwSeloLogo(tamanho)
         val empresa by com.pwexpress.core.marca.MarcaEmpresa.marca.collectAsState()
         Text(
-            empresa?.nomeExibido?.uppercase() ?: "DELIBRA", color = Pw.cores.texto2, fontFamily = Archivo, fontWeight = FontWeight.Light,
+            (empresa?.nomePara("entrada") ?: empresa?.nomeExibido)?.uppercase() ?: "DELIBRA", color = Pw.cores.texto2, fontFamily = Archivo, fontWeight = FontWeight.Light,
             fontSize = (tamanho.value * 0.09f).coerceAtLeast(12f).sp, letterSpacing = (tamanho.value * 0.055f).sp, maxLines = 1,
         )
     }

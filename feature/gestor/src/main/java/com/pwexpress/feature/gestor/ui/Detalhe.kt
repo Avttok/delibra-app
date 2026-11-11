@@ -64,6 +64,7 @@ import com.pwexpress.feature.gestor.data.Gestao
 import com.pwexpress.feature.gestor.data.Status
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.put
 
 private val ROTULO_EVENTO = mapOf(
     "criada" to "Corrida criada", "oferta_enviada" to "Oferta enviada", "oferta_recusada" to "Oferta recusada", "oferta_expirada" to "Oferta expirou",
@@ -76,6 +77,7 @@ private val ROTULO_EVENTO = mapOf(
 )
 
 @Composable
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 fun DetalheCorridaG(id: String, onVoltar: () -> Unit) {
     val c = Pw.cores
     val ctx = LocalContext.current
@@ -172,7 +174,47 @@ fun DetalheCorridaG(id: String, onVoltar: () -> Unit) {
             }
         }
 
+        // de qual pedido veio (rotas montadas de pedidos): volta ao pedido central
+        val pedidosDaRota = corrida.paradas.mapNotNull { it.pedidoId }.distinct()
+        if (pedidosDaRota.isNotEmpty()) {
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                pedidosDaRota.forEach { pid ->
+                    val pd = dados.pedidos.firstOrNull { it.id == pid }
+                    PwBotaoVidro(if (pd != null) "Ver pedido ${if (pd.teste) "T-" else "P-"}${pd.numero}" else "Ver pedido", onClick = { GestorNav.abrirPedido(pid) }, icone = PwIcones.ClipboardList)
+                }
+            }
+        }
+        ChamadosDaCorridaG(corrida.id) { eventos = Gestao.eventos(id) }
         PwErro(erro)
+        if (corrida.status in setOf(Status.ACEITA, Status.EM_ANDAMENTO) && corrida.motoboyId != null && corrida.paradas.none { it.coleta && it.status == "concluida" }
+            && dados.cfgBool("passar_corrida_ligado", true)) {
+            var para by remember { mutableStateOf<String?>(null) }
+            var motivo by remember { mutableStateOf("") }
+            var aberto by remember { mutableStateOf(false) }
+            PwCartao {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(PwIcones.ArrowLeftRight, null, tint = c.ouro, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Column(Modifier.weight(1f)) {
+                        PwRotulo("Passar para outro motoboy")
+                        TextoDica("Dá enquanto nada foi coletado. ${dados.membro(corrida.motoboyId)?.nome?.substringBefore(" ") ?: "O motoboy"} é avisado.")
+                    }
+                    PwBotaoIcone(if (aberto) PwIcones.ChevronUp else PwIcones.ChevronDown, if (aberto) "Fechar" else "Abrir", { aberto = !aberto }, tamanho = 38.dp)
+                }
+                if (aberto) {
+                    Espaco(8)
+                    PwSelecao("Para quem", listOf<Pair<String?, String>>(null to "O sistema escolhe (mais perto)") +
+                        dados.equipe.filter { it.motoboy && it.modoTeste == corrida.teste && it.id != corrida.motoboyId }.map { it.id to it.nome }, para, { para = it })
+                    Espaco(8)
+                    PwCampo(motivo, { motivo = it }, "Motivo (o motoboy vê)", dica = "Opcional")
+                    Espaco(8)
+                    PwBotaoOuro(if (ocupado) "Passando…" else if (para == null) "Devolver ao sistema" else "Passar para ${dados.membro(para)?.nome?.substringBefore(" ") ?: "ele"}",
+                        onClick = { acao { Gestao.rpcJson("passar_corrida", kotlinx.serialization.json.buildJsonObject {
+                            put("p_corrida", corrida.id); para?.let { put("p_motoboy", it) }; motivo.trim().takeIf { it.isNotEmpty() }?.let { put("p_motivo", it) }
+                        }).map { } } }, icone = PwIcones.ArrowLeftRight, habilitado = !ocupado)
+                }
+            }
+        }
         if (corrida.status == Status.AGUARDANDO_PAGAMENTO) {
             PwCartao(cor = Color(0xFF38BDF8).copy(alpha = 0.5f)) {
                 PwRotulo("Aguardando pagamento do cliente")

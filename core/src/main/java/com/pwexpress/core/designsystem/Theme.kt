@@ -172,9 +172,18 @@ object TemaApp {
         ctx?.getSharedPreferences("pwex_tema", Context.MODE_PRIVATE)?.edit { putString("estilo", e.name) }
     }
 
+    /** Como a pessoa prefere mudar números: barra (deslizar) ou digitando (com − e +). Vale em todo o app. */
+    private val _numeroBarra = MutableStateFlow(false)
+    val numeroBarra: StateFlow<Boolean> = _numeroBarra.asStateFlow()
+    fun definirNumeroBarra(barra: Boolean) {
+        _numeroBarra.value = barra
+        ctx?.getSharedPreferences("pwex_tema", Context.MODE_PRIVATE)?.edit { putBoolean("numero_barra", barra) }
+    }
+
     fun init(context: Context) {
         ctx = context.applicationContext
         Fontes.init(context)
+        _numeroBarra.value = context.applicationContext.getSharedPreferences("pwex_tema", Context.MODE_PRIVATE).getBoolean("numero_barra", false)
         val salvo = ctx!!.getSharedPreferences("pwex_tema", Context.MODE_PRIVATE).getString("tema", null)
         _pref.value = PreferenciaTema.entries.firstOrNull { it.name == salvo } ?: PreferenciaTema.SISTEMA
         _vermelho.value = ctx!!.getSharedPreferences("pwex_tema", Context.MODE_PRIVATE).getBoolean("vermelho", false)

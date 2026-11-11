@@ -56,6 +56,9 @@ data class Perfil(
     /** Empresa suspensa ou cancelada pelo Dev ("suspensa"/"cancelada"); null = acesso normal. */
     val empresaBloqueada: String? = null,
     val empresaBloqueadaMotivo: String? = null,
+    /** Motoboy suspenso por penalidades: até quando (ISO) e por quê. */
+    val suspensoAte: String? = null,
+    val suspensoMotivo: String? = null,
 ) {
     /** Supervisor pode fazer isto? (gestor e Dev podem tudo) */
     fun pode(acao: String, padrao: Boolean = true): Boolean = dev || !supervisor || (permissoes[acao] ?: padrao)
@@ -93,7 +96,8 @@ object Perfis {
         val org = ((o as? JsonObject)?.get("organizacao") as? JsonObject)
         fun t(k: String) = (org?.get(k) as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
         com.pwexpress.core.marca.MarcaEmpresa.atualizar(t("nome")?.let { com.pwexpress.core.marca.Marca(it, t("logo"), t("cor"), t("nome_app"), t("logo_escala")?.toFloatOrNull() ?: 1.9f,
-            t("brilho_cor"), t("brilho")?.toFloatOrNull() ?: 0.55f, t("fonte"), t("logo_original"), t("nome_topo")) })
+            t("brilho_cor"), t("brilho")?.toFloatOrNull() ?: 0.55f, t("fonte"), t("logo_original"), t("nome_topo"),
+            (org?.get("nomes") as? JsonObject)?.mapNotNull { (k, v) -> (v as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content?.takeIf { it.isNotBlank() }?.let { k to it } }?.toMap() ?: emptyMap()) })
     }
 
 
@@ -285,6 +289,8 @@ object Perfis {
             empresaBloqueada = ((o["organizacao"] as? JsonObject)?.get("status") as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
                 ?.takeIf { it in setOf("suspensa", "cancelada") && !bool("dev") },
             empresaBloqueadaMotivo = ((o["organizacao"] as? JsonObject)?.get("suspensa_motivo") as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content,
+            suspensoAte = (o["suspenso_ate"] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content,
+            suspensoMotivo = (o["suspenso_motivo"] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content,
             soCliente = (o["papeis"] as? kotlinx.serialization.json.JsonArray)?.map { it.jsonPrimitive.content }?.let { p -> "cliente" in p && p.none { it in listOf("gestor", "motoboy", "dev", "supervisor") } } ?: false,
         )
     }

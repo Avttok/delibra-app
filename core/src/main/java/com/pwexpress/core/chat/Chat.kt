@@ -72,6 +72,8 @@ object Chat {
     val abrir = MutableStateFlow(false)
     /** Conversa a abrir direto (ex.: toque na notificação). */
     val conversaPedida = MutableStateFlow<String?>(null)
+    /** Conversa aberta agora (para responder a uma rota compartilhada sem sair dela). */
+    val conversaAtual = MutableStateFlow<String?>(null)
 
     fun compartilhar(a: Anexo) { anexoPendente.value = a; abrir.value = true }
 

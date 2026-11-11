@@ -303,9 +303,14 @@ private fun JanelaPedido(p: PedidoG, empresa: String?, onFechar: () -> Unit) {
             if (regras) RegrasPedidoG(p.id, p.regras, onFechar = { regras = false })
         }
         if (p.status in setOf("aprovado", "roteirizado", "em_rota")) {
-            PwBotaoVidro("Voltar para revisão", onClick = {
-                rodar("Pedido voltou para revisão: as rotas dele foram desfeitas.", fechar = false) { Gestao.revisarPedido(p.id, "voltar_revisao", null, motivo.ifBlank { null }) }
-            }, icone = PwIcones.History, modifier = Modifier.fillMaxWidth())
+            var confirmarVolta by remember { mutableStateOf(false) }
+            val pedirConfirmacao = com.pwexpress.core.perfil.Perfis.perfil.collectAsState().value?.logico("pedido_confirmar_revisao", true) != false
+            fun voltarRevisao() = rodar("Pedido voltou para revisão: as rotas dele foram desfeitas.", fechar = false) { Gestao.revisarPedido(p.id, "voltar_revisao", null, motivo.ifBlank { null }) }
+            PwBotaoVidro("Voltar para revisão", onClick = { if (pedirConfirmacao) confirmarVolta = true else voltarRevisao() }, icone = PwIcones.History, modifier = Modifier.fillMaxWidth())
+            if (confirmarVolta) com.pwexpress.core.designsystem.PwConfirmar(
+                "Voltar o pedido para revisão?",
+                "As rotas deste pedido são desfeitas e saem dos motoboys que já tinham pegado. Você revisa e monta de novo.",
+                "Voltar para revisão", onConfirmar = { confirmarVolta = false; voltarRevisao() }, onCancelar = { confirmarVolta = false })
             TextoDica("Só enquanto nenhuma coleta ou entrega dele foi feita. Serve para refazer as rotas com regras novas.")
         }
         Spacer(Modifier.size(12.dp))

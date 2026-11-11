@@ -66,9 +66,10 @@ fun GestorApp(
     faixa: (@Composable () -> Unit)? = null,
     meuId: String?,
 ) {
-    var aba by rememberSaveable { mutableStateOf("mapa") }
-    var subOperacao by rememberSaveable { mutableStateOf(0) }   // 0 pedidos · 1 rotas
-    var subPessoas by rememberSaveable { mutableStateOf(0) }    // 0 clientes · 1 equipe
+    // volta para onde a pessoa estava (Ajustes → app_lembrar_pagina)
+    var aba by com.pwexpress.core.designsystem.lembrarPagina("gestor_aba", "mapa")
+    var subOperacao by com.pwexpress.core.designsystem.lembrarPaginaNumero("gestor_sub_operacao", 0)   // 0 pedidos · 1 rotas
+    var subPessoas by com.pwexpress.core.designsystem.lembrarPaginaNumero("gestor_sub_pessoas", 0)     // 0 clientes · 1 equipe
     val pilha = remember { mutableStateListOf<TelaG>() }
     val dados by Gestao.dados.collectAsState()
     val teste by TemaApp.modoTeste.collectAsState()
@@ -132,6 +133,8 @@ fun GestorApp(
         Column(Modifier.fillMaxSize()) {
             if (atual == null) topo()
             faixa?.invoke()
+            // motoboy pedindo para cancelar: aparece em todas as telas até alguém responder
+            if (atual !is TelaG.Corrida) FaixaChamadosG(onAbrir = { abrir(TelaG.Corrida(it)) })
             Box(Modifier.weight(1f)) {
                 when (atual) {
                     is TelaG.Corrida -> DetalheCorridaG(atual.id, onVoltar = ::voltar)

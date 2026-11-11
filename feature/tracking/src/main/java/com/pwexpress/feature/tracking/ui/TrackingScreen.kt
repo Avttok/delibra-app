@@ -141,6 +141,13 @@ fun TrackingScreen(
         }
 
         // ---------------------------------------------------------- o botão
+        var toquesSeguidos by remember { mutableStateOf(0) }
+        var ultimoToque by remember { mutableStateOf(0L) }
+        var perguntaJogo by remember { mutableStateOf(false) }
+        var jogando by remember { mutableStateOf(false) }
+        if (perguntaJogo) com.pwexpress.core.jogo.PerguntaJogo(onJogar = { perguntaJogo = false; jogando = true }, onFechar = { perguntaJogo = false })
+        // em corrida (oferta aceita) o jogo some sozinho
+        if (jogando && info.modo != Modo.EM_CORRIDA) com.pwexpress.core.jogo.JogoEntrega(onFechar = { jogando = false })
         Box(Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
             BotaoStatus(
                 info.modo,
@@ -152,6 +159,16 @@ fun TrackingScreen(
                     }
                 },
                 onToque = {
+                    // vários toques seguidos no anel (sem segurar): convite para o joguinho enquanto espera
+                    val agoraT = System.currentTimeMillis()
+                    toquesSeguidos = if (agoraT - ultimoToque < 1_300) toquesSeguidos + 1 else 1
+                    ultimoToque = agoraT
+                    val perfilJ = com.pwexpress.core.perfil.Perfis.perfil.value
+                    val precisa = (perfilJ?.numero("jogo_toques", 5.0) ?: 5.0).toInt().coerceIn(2, 30)
+                    if (info.modo != Modo.EM_CORRIDA && perfilJ?.logico("jogo_ligado", true) != false && toquesSeguidos >= precisa) {
+                        toquesSeguidos = 0; aviso = null; perguntaJogo = true
+                        return@BotaoStatus
+                    }
                     aviso = when (info.modo) {
                         Modo.EM_CORRIDA -> "Conclua a rota para mudar o status."
                         Modo.OFFLINE -> "Segure o botão até o anel encher para ficar online."

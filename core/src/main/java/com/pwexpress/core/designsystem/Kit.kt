@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -52,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -91,8 +93,9 @@ fun numeroBr(v: Double, casas: Int = 2): String = NumberFormat.getNumberInstance
 @Composable
 fun PwTopo(modifier: Modifier = Modifier, acoes: @Composable RowScope.() -> Unit = {}) {
     Row(modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        PwLogo(tamanho = 22)
-        Spacer(Modifier.weight(1f))
+        // a logo cede espaço (nunca a foto nem os botões)
+        Box(Modifier.weight(1f).clipToBounds(), contentAlignment = Alignment.CenterStart) { PwLogo(tamanho = 22) }
+        Spacer(Modifier.width(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), content = acoes)
     }
 }
@@ -336,7 +339,29 @@ fun PwPasso(valor: Double, onMudar: (Double) -> Unit, modifier: Modifier = Modif
     }
     fun ler(t: String) = t.replace(".", "").replace(",", ".").replace(" ", "").toDoubleOrNull()
     val mudou = confirmar && rascunho != null && rascunho != valor
+    // barra só faz sentido com limites razoáveis (e até ~400 passos)
+    val cabeBarra = max < 1e8 && max > min && (max - min) / passo.coerceAtLeast(1e-6) <= 400
+    val barraPref by TemaApp.numeroBarra.collectAsState()
+    val barra = barraPref && cabeBarra
     Column(modifier) {
+        if (barra) {
+            Row(Modifier.fillMaxWidth().clip(forma).background(c.campo).border(1.dp, if (mudou) c.ouro else c.bordaForte, forma).padding(start = 14.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f).padding(vertical = 6.dp)) {
+                    Text((if (unidade == "R$") "R$ " else "") + numeroBr(atual, 2) + (if (unidade != null && unidade != "R$") " $unidade" else ""),
+                        color = c.texto, fontWeight = FontWeight.Bold, fontSize = 16.sp, fontFamily = Archivo)
+                    com.pwexpress.core.mapa.PwBarraBolinha(
+                        atual.toFloat().coerceIn(min.toFloat(), max.toFloat()),
+                        { v -> val n = limpar(v.toDouble()); texto = numeroBr(n, 2); rascunho = n },
+                        min.toFloat()..max.toFloat(), passo.toFloat(), Modifier.fillMaxWidth(),
+                        aoSoltar = { if (!confirmar) rascunho?.let { onMudar(it); rascunho = null } },
+                    )
+                }
+                Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).clickable { TemaApp.definirNumeroBarra(false) }, contentAlignment = Alignment.Center) {
+                    Icon(PwIcones.Pencil, "Digitar o número", tint = c.texto3, modifier = Modifier.size(16.dp))
+                }
+            }
+        } else
         Row(Modifier.fillMaxWidth().clip(forma).background(c.campo).border(1.dp, if (focado || mudou) c.ouro else c.bordaForte, forma), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(48.dp).clickable(enabled = atual > min) { definir(atual - passo) }, contentAlignment = Alignment.Center) {
                 Icon(PwIcones.Minus, "Diminuir", tint = if (atual > min) c.ouro else c.texto3, modifier = Modifier.size(18.dp))
@@ -367,6 +392,9 @@ fun PwPasso(valor: Double, onMudar: (Double) -> Unit, modifier: Modifier = Modif
             }
             Box(Modifier.size(48.dp).clickable(enabled = atual < max) { definir(atual + passo) }, contentAlignment = Alignment.Center) {
                 Icon(PwIcones.Plus, "Aumentar", tint = if (atual < max) c.ouro else c.texto3, modifier = Modifier.size(18.dp))
+            }
+            if (cabeBarra) Box(Modifier.size(width = 40.dp, height = 48.dp).clickable { TemaApp.definirNumeroBarra(true) }, contentAlignment = Alignment.Center) {
+                Icon(PwIcones.SlidersHorizontal, "Usar a barra", tint = c.texto3, modifier = Modifier.size(16.dp))
             }
         }
         if (mudou) {
@@ -621,7 +649,7 @@ fun TextoAjustado(texto: String, estilo: TextStyle, maximo: Int, modifier: Modif
 fun PwAvatarConta(nome: String, foto: String?, teste: Boolean, modifier: Modifier = Modifier, tamanho: Dp = 42.dp, onClick: (() -> Unit)? = null, dev: Boolean = false,
                   gestor: Boolean = false, motoboy: Boolean = false) {
     val c = Pw.cores
-    Box(modifier.size(tamanho)) {
+    Box(modifier.requiredSize(tamanho)) {
         PwAvatar(
             nome, foto,
             Modifier.border(2.dp, if (teste) c.ouro else Color.Transparent, CircleShape).padding(3.dp),
@@ -646,7 +674,7 @@ fun PwSelosCargo(dev: Boolean, gestor: Boolean, motoboy: Boolean, teste: Boolean
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
         if (dev) PwSelo("Dev", c.dev, icone = PwIcones.CodeXml)
         if (gestor) PwSelo("Gestor", c.ouro, icone = PwIcones.ShieldCheck)
-        if (supervisor && !gestor) PwSelo("Supervisor", c.verde, icone = PwIcones.UserCog)
+        if (supervisor && !gestor) PwSelo("Supervisor", c.azul, icone = PwIcones.UserCog)
         if (motoboy) PwSelo("Motoboy", c.texto2, icone = PwIcones.Bike)
         if (teste) PwSelo("Teste", c.violeta, icone = PwIcones.FlaskConical)
     }
@@ -851,5 +879,36 @@ fun PwConfirmar(titulo: String, texto: String, acao: String, onConfirmar: () -> 
         else PwBotaoOuro(acao, onClick = onConfirmar, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(8.dp))
         PwBotaoVidro("Cancelar", onClick = onCancelar, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+/**
+ * Página que o app lembra ao abrir de novo (aba, sub-aba…). Segue o ajuste "app_lembrar_pagina"
+ * (ligado: volta onde a pessoa estava; desligado: sempre começa no padrão).
+ */
+@Composable
+fun lembrarPagina(chave: String, padrao: String): androidx.compose.runtime.MutableState<String> {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val prefs = androidx.compose.runtime.remember { ctx.getSharedPreferences("pwex_paginas", android.content.Context.MODE_PRIVATE) }
+    val ligado = com.pwexpress.core.perfil.Perfis.perfil.value?.logico("app_lembrar_pagina", true) != false
+    val estado = androidx.compose.runtime.saveable.rememberSaveable(chave) {
+        androidx.compose.runtime.mutableStateOf(if (ligado) prefs.getString(chave, padrao) ?: padrao else padrao)
+    }
+    androidx.compose.runtime.LaunchedEffect(estado.value) { prefs.edit().putString(chave, estado.value).apply() }
+    return estado
+}
+
+/** Igual a [lembrarPagina], para números (ex.: sub-aba 0/1). */
+@Composable
+fun lembrarPaginaNumero(chave: String, padrao: Int): androidx.compose.runtime.MutableState<Int> {
+    val s = lembrarPagina(chave, padrao.toString())
+    return androidx.compose.runtime.remember(s) {
+        object : androidx.compose.runtime.MutableState<Int> {
+            override var value: Int
+                get() = s.value.toIntOrNull() ?: padrao
+                set(v) { s.value = v.toString() }
+            override fun component1(): Int = value
+            override fun component2(): (Int) -> Unit = { value = it }
+        }
     }
 }

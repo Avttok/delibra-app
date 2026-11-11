@@ -66,6 +66,7 @@ import com.pwexpress.core.designsystem.TemaApp
 import com.pwexpress.core.perfil.Perfis
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.put
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 
@@ -162,6 +163,7 @@ fun PerfilScreen(
 
         // ---------------------------------------------------------- veículo (motoboy)
         if (perfil?.motoboy == true) CartaoMeuVeiculo()
+        if (perfil?.logico("usuario_troca_senha", true) != false) CartaoSenha()
 
         // ---------------------------------------------------------- diagnóstico (administrador)
         if (perfil?.admin == true) {
@@ -235,25 +237,31 @@ private fun quadrado(bmp: Bitmap): ByteArray {
 }
 
 
-/** Veículo e CNH do motoboy: quem cadastra é o gestor (o motoboy confere aqui). */
+/** Veículo e CNH do motoboy: o gestor cadastra; se ele deixar (Ajustes → Veículo), o próprio motoboy cadastra e muda. */
 @Composable
 private fun CartaoMeuVeiculo() {
     val c = Pw.cores
     var v by remember { mutableStateOf<kotlinx.serialization.json.JsonObject?>(null) }
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    var versao by remember { mutableStateOf(0) }
+    var editar by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(versao) {
         v = tentar { com.pwexpress.core.PwCore.rpc.chamar("meu_veiculo", kotlinx.serialization.json.JsonObject(emptyMap())) }.getOrNull()
             ?.takeIf { it.ok }?.let { tentar { kotlinx.serialization.json.Json.parseToJsonElement(it.corpo) as? kotlinx.serialization.json.JsonObject }.getOrNull() }
     }
     fun t(k: String) = (v?.get(k) as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { it !is kotlinx.serialization.json.JsonNull }?.content
+    val podeEditar = t("pode_editar") == "true"
+    if (editar) EditarMeuVeiculo(v, onFechar = { editar = false }, onSalvo = { editar = false; versao++ })
     PwCartao {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(PwIcones.Bike, null, tint = c.ouro, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            PwRotulo("Seu veículo")
+            PwRotulo("Seu veículo", Modifier.weight(1f))
+            if (podeEditar) com.pwexpress.core.designsystem.PwBotaoIcone(if (t("placa") == null) PwIcones.Plus else PwIcones.Pencil, "Editar veículo", { editar = true }, tamanho = 36.dp)
         }
         Spacer(Modifier.height(8.dp))
         val placa = t("placa")
-        if (placa == null) Text("Ainda sem veículo cadastrado. Peça ao gestor para cadastrar a placa, a cor e a CNH.", color = c.texto2)
+        if (placa == null && podeEditar) com.pwexpress.core.designsystem.PwBotaoOuro("Cadastrar meu veículo", onClick = { editar = true }, icone = PwIcones.Plus)
+        else if (placa == null) Text("Ainda sem veículo cadastrado. Peça ao gestor para cadastrar a placa, a cor e a CNH.", color = c.texto2)
         else {
             Text(listOfNotNull(t("modelo"), t("cor"), t("ano")).joinToString(" · ").ifEmpty { "Veículo" }, color = c.texto, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(10.dp))
@@ -266,6 +274,133 @@ private fun CartaoMeuVeiculo() {
             Text("CNH $cat" + (validade?.let { " · vale até $it" } ?: ""),
                 color = when { dias != null && dias < 0 -> c.vermelho; dias != null && dias <= 30 -> c.ouro; else -> c.texto2 }, fontSize = 13.5.sp)
             if (dias != null && dias < 0) Text("Sua CNH está vencida. Avise o gestor.", color = c.vermelho, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+
+/** O motoboy cadastra/muda o próprio veículo e a CNH (quando o gestor deixa). */
+@Composable
+private fun EditarMeuVeiculo(atual: kotlinx.serialization.json.JsonObject?, onFechar: () -> Unit, onSalvo: () -> Unit) {
+    val c = Pw.cores
+    fun t(k: String) = (atual?.get(k) as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { it !is kotlinx.serialization.json.JsonNull }?.content.orEmpty()
+    var tipo by remember { mutableStateOf(t("tipo").ifEmpty { "moto" }) }
+    var modelo by remember { mutableStateOf(t("modelo")) }
+    var cor by remember { mutableStateOf(t("cor")) }
+    var ano by remember { mutableStateOf(t("ano")) }
+    var placa by remember { mutableStateOf(t("placa")) }
+    var cnh by remember { mutableStateOf(t("cnh_numero")) }
+    var cat by remember { mutableStateOf(t("cnh_categoria")) }
+    var validade by remember { mutableStateOf(t("cnh_validade").takeIf { it.length >= 10 }?.let { "${it.substring(8, 10)}/${it.substring(5, 7)}/${it.substring(0, 4)}" }.orEmpty()) }
+    var erro by remember { mutableStateOf<String?>(null) }
+    var salvando by remember { mutableStateOf(false) }
+    val escopo = androidx.compose.runtime.rememberCoroutineScope()
+    com.pwexpress.core.designsystem.PwTelaCheia("Meu veículo", onFechar, rodape = {
+        com.pwexpress.core.designsystem.PwBotaoOuro(if (salvando) "Salvando…" else "Salvar veículo", onClick = {
+            val iso = validade.filter(Char::isDigit).takeIf { it.length == 8 }?.let { "${it.substring(4, 8)}-${it.substring(2, 4)}-${it.substring(0, 2)}" }
+            if (validade.isNotBlank() && iso == null) { erro = "Validade da CNH no formato dd/mm/aaaa."; return@PwBotaoOuro }
+            salvando = true
+            escopo.launch {
+                val r = tentar { com.pwexpress.core.PwCore.rpc.chamar("salvar_veiculo", kotlinx.serialization.json.buildJsonObject {
+                    put("p_motoboy", kotlinx.serialization.json.JsonNull)
+                    put("d", kotlinx.serialization.json.buildJsonObject {
+                        put("tipo", tipo); put("modelo", modelo.trim()); put("cor", cor.trim()); put("ano", ano.trim()); put("placa", placa.trim())
+                        put("cnh_numero", cnh.trim()); put("cnh_categoria", cat.trim()); put("cnh_validade", iso.orEmpty())
+                    })
+                }) }.getOrNull()
+                salvando = false
+                when {
+                    r == null -> erro = "Sem internet. Tente de novo."
+                    r.ok -> { com.pwexpress.core.designsystem.PwToast.mostrar("Veículo salvo."); onSalvo() }
+                    else -> erro = com.pwexpress.core.json.erroAmigavel(
+                        runCatching { kotlinx.serialization.json.Json.parseToJsonElement(r.corpo).let { (it as kotlinx.serialization.json.JsonObject)["message"]?.let { m -> (m as kotlinx.serialization.json.JsonPrimitive).content } } }.getOrNull()
+                            ?.let { m -> mapOf("placa_invalida" to "Placa inválida. Use ABC1D23 ou ABC1234.", "cnh_invalida" to "CNH inválida (9 a 11 dígitos).",
+                                "cnh_categoria_invalida" to "Categoria da CNH inválida.", "so_o_gestor_edita" to "O gestor não deixa mudar o veículo pelo app.")[m] ?: m } ?: "Erro", r.codigo)
+                }
+            }
+        }, icone = PwIcones.Check, habilitado = !salvando)
+    }) {
+        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+            listOf("moto" to "Moto", "carro" to "Carro", "bicicleta" to "Bicicleta", "van" to "Van").forEach { (k, r) ->
+                com.pwexpress.core.designsystem.PwPilula(r, when (k) { "carro" -> PwIcones.Car; "bicicleta" -> PwIcones.Bicycle; "van" -> PwIcones.Truck; else -> PwIcones.Bike }, { tipo = k }, ligada = tipo == k)
+            }
+        }
+        if (placa.isNotBlank()) Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center) { com.pwexpress.core.designsystem.PwPlaca(placa.uppercase(), largura = 220.dp) }
+        Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)) {
+            com.pwexpress.core.designsystem.PwCampo(placa, { placa = it.uppercase().filter { ch -> ch.isLetterOrDigit() }.take(7) }, "Placa", dica = "ABC1D23", modifier = Modifier.weight(1f))
+            com.pwexpress.core.designsystem.PwCampo(cor, { cor = it.take(30) }, "Cor", modifier = Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)) {
+            com.pwexpress.core.designsystem.PwCampo(modelo, { modelo = it.take(60) }, "Modelo", dica = "Ex.: CG 160", modifier = Modifier.weight(2f))
+            com.pwexpress.core.designsystem.PwCampo(ano, { ano = it.filter(Char::isDigit).take(4) }, "Ano", teclado = androidx.compose.ui.text.input.KeyboardType.Number, modifier = Modifier.weight(1f))
+        }
+        PwRotulo("CNH")
+        com.pwexpress.core.designsystem.PwCampo(cnh, { cnh = it.filter(Char::isDigit).take(11) }, "Número", teclado = androidx.compose.ui.text.input.KeyboardType.Number)
+        Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)) {
+            com.pwexpress.core.designsystem.PwCampo(cat, { cat = it.uppercase().filter(Char::isLetter).take(3) }, "Categoria", dica = "A, AB…", modifier = Modifier.weight(1f))
+            com.pwexpress.core.designsystem.PwCampo(validade, { validade = it.filter { ch -> ch.isDigit() || ch == '/' }.take(10) }, "Validade", dica = "dd/mm/aaaa",
+                teclado = androidx.compose.ui.text.input.KeyboardType.Number, modifier = Modifier.weight(1.4f))
+        }
+        com.pwexpress.core.designsystem.PwErro(erro)
+    }
+}
+
+
+/** Trocar a própria senha (sem depender do gestor). Ajustes → usuario_troca_senha. */
+@Composable
+private fun CartaoSenha() {
+    val c = Pw.cores
+    var aberto by remember { mutableStateOf(false) }
+    PwCartao {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(PwIcones.KeyRound, null, tint = c.ouro, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f)) {
+                PwRotulo("Senha")
+                Text("Troque quando quiser. Você continua conectado.", color = c.texto3, fontSize = 12.5.sp)
+            }
+            com.pwexpress.core.designsystem.PwBotaoVidro("Trocar", onClick = { aberto = true }, icone = PwIcones.Lock)
+        }
+    }
+    if (aberto) {
+        var atual by remember { mutableStateOf("") }
+        var nova by remember { mutableStateOf("") }
+        var repete by remember { mutableStateOf("") }
+        var erro by remember { mutableStateOf<String?>(null) }
+        var salvando by remember { mutableStateOf(false) }
+        val escopo = androidx.compose.runtime.rememberCoroutineScope()
+        val forca = when {
+            nova.length < 6 -> 0
+            nova.length >= 10 && nova.any(Char::isDigit) && nova.any(Char::isLetter) && nova.any { !it.isLetterOrDigit() } -> 3
+            nova.any(Char::isDigit) && nova.any(Char::isLetter) -> 2
+            else -> 1
+        }
+        com.pwexpress.core.designsystem.PwTelaCheia("Trocar senha", { if (!salvando) aberto = false }, rodape = {
+            com.pwexpress.core.designsystem.PwBotaoOuro(if (salvando) "Trocando…" else "Trocar senha", onClick = {
+                if (nova != repete) { erro = "As duas senhas novas não são iguais."; return@PwBotaoOuro }
+                salvando = true
+                escopo.launch {
+                    com.pwexpress.core.PwCore.auth.trocarSenha(atual, nova)
+                        .onSuccess { com.pwexpress.core.designsystem.PwToast.mostrar("Senha trocada.", titulo = "Pronto"); aberto = false }
+                        .onFailure { erro = it.message }
+                    salvando = false
+                }
+            }, icone = PwIcones.Check, habilitado = !salvando && atual.isNotEmpty() && nova.length >= 6 && repete.isNotEmpty())
+        }) {
+            com.pwexpress.core.designsystem.PwCampo(atual, { atual = it }, "Senha atual", senha = true)
+            com.pwexpress.core.designsystem.PwCampo(nova, { nova = it; erro = null }, "Senha nova", senha = true, dica = "Pelo menos 6 caracteres")
+            // força da senha: barrinhas coloridas
+            Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                (1..3).forEach { n ->
+                    androidx.compose.foundation.layout.Box(Modifier.weight(1f).height(6.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(99.dp))
+                        .background(if (forca >= n) when (forca) { 1 -> c.vermelho; 2 -> c.ouro; else -> c.verde } else c.bordaForte))
+                }
+                Spacer(Modifier.width(6.dp))
+                Text(when (forca) { 0 -> "Curta"; 1 -> "Fraca"; 2 -> "Boa"; else -> "Forte" }, color = c.texto3, fontSize = 12.sp)
+            }
+            com.pwexpress.core.designsystem.PwCampo(repete, { repete = it; erro = null }, "Repita a senha nova", senha = true)
+            com.pwexpress.core.designsystem.PwErro(erro)
         }
     }
 }

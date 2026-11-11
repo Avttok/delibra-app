@@ -33,6 +33,15 @@ object Intervalos {
     /** Em corrida, as posições vão em lote a cada X (economiza bateria). Ajustes → ping_envio_s. */
     @Volatile var envioLoteMs = 12_000L
 
+    /**
+     * Ping inteligente (Ajustes → ping_inteligente): em linha reta só manda a cada [retaMaxM];
+     * em curva (mudou mais de [curvaGraus]) manda já. O traçado fica igual com bem menos pontos
+     * (menos bateria, dados e espaço). O tempo máximo entre pings continua valendo.
+     */
+    @Volatile var inteligente = true
+    @Volatile var curvaGraus = 25f
+    @Volatile var retaMaxM = 200f
+
     const val LOTE_MAXIMO = 200
 
     fun corridaMs(economia: Boolean) = if (economia) corridaEconomiaMs else corridaNormalMs

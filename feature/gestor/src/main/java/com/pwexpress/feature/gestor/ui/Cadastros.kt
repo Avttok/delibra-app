@@ -224,9 +224,10 @@ fun EmpresaG(id: String?, onVoltar: () -> Unit) {
                         }.onFailure { erro = it.message }
                 }
             }, icone = PwIcones.Store, modifier = Modifier.fillMaxWidth())
-            PwSegmentado(listOf("Dados" to PwIcones.Building2, "Regras" to PwIcones.Layers, "Zonas" to PwIcones.MapPin), aba, { aba = it })
+            PwSegmentado(listOf("Dados" to PwIcones.Building2, "Regras" to PwIcones.Layers, "Zonas" to PwIcones.MapPin, "" to PwIcones.Gavel), aba, { aba = it })
             when (aba) {
                 1 -> { RegrasDoAlvoG("cliente", e.id, e.nome); return@PwPagina }
+                3 -> { PenalidadesG("cliente", e.id); return@PwPagina }
                 2 -> {
                     CatalogoG(Catalogo.ZONAS, null, clienteId = e.id)
                     PwRotulo("Horários de pico só deste cliente")
@@ -467,7 +468,7 @@ private fun Selos(m: com.pwexpress.feature.gestor.data.MembroG, status: String?)
     androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
         if (m.dev) PwSelo("Dev", c.dev, icone = PwIcones.CodeXml)
         if (m.gestor && !m.dev) PwSelo("Gestor", c.ouro, icone = PwIcones.ShieldCheck)
-        if (m.supervisor && !m.gestor && !m.dev) PwSelo("Supervisor", c.verde, icone = PwIcones.UserCog)
+        if (m.supervisor && !m.gestor && !m.dev) PwSelo("Supervisor", c.azul, icone = PwIcones.UserCog)
         if (m.motoboy) PwSelo(rotuloMotoboy[status] ?: "Offline", corMotoboy(status, c), icone = PwIcones.Bike)
         if (m.modoTeste) PwSelo("Teste", c.violeta, icone = PwIcones.FlaskConical)
         if (m.bloqueado) PwSelo("Bloqueado", c.vermelho, icone = PwIcones.Lock)
@@ -498,7 +499,7 @@ private fun NovaContaG(repassePadrao: Double, onFechar: () -> Unit, onCriada: (S
     var erro by remember { mutableStateOf<String?>(null) }
     var enviando by remember { mutableStateOf(false) }
     var criada by remember { mutableStateOf<String?>(null) }
-    val acesso = "${com.pwexpress.core.marca.MarcaEmpresa.marca.value?.nomeExibido ?: "Delibra"}\nE-mail: ${email.trim().lowercase()}\nSenha: $senha\nApp: ${com.pwexpress.core.config.PwConfig.siteUrl}/app"
+    val acesso = "${com.pwexpress.core.marca.MarcaEmpresa.marca.value?.nomePara("documentos") ?: "Delibra"}\nE-mail: ${email.trim().lowercase()}\nSenha: $senha\nApp: ${com.pwexpress.core.config.PwConfig.siteUrl}/app"
     if (criada != null) {
         PwJanela("Conta criada", onFechar = { onCriada(criada) }) {
             Text("Passe estes dados para ${nome.trim().substringBefore(" ")}. A senha não aparece de novo.", color = c.texto2)
@@ -521,7 +522,7 @@ private fun NovaContaG(repassePadrao: Double, onFechar: () -> Unit, onCriada: (S
         if (cliente == null) PwInterruptor("Motoboy", motoboy, { motoboy = it }, descricao = "Usa o app e recebe corridas", icone = PwIcones.Bike)
         if (cliente == null) PwInterruptor("Gestor", gestor, { gestor = it; if (it) supervisor = false }, descricao = "Acessa o painel", icone = PwIcones.ShieldCheck)
         // líder de equipe: faz só o que o gestor liberar (Equipe → pessoa → Permissões)
-        if (cliente == null) PwInterruptor("Supervisor", supervisor, { supervisor = it; if (it) gestor = false }, descricao = "Líder de equipe, com o que o gestor liberar", icone = PwIcones.UserCog, cor = Pw.cores.verde)
+        if (cliente == null) PwInterruptor("Supervisor", supervisor, { supervisor = it; if (it) gestor = false }, descricao = "Líder de equipe, com o que o gestor liberar", icone = PwIcones.UserCog, cor = Pw.cores.azul)
         PwErro(erro)
         PwBotaoOuro(if (enviando) "Criando…" else "Criar conta", icone = PwIcones.UserPlus, habilitado = !enviando, onClick = {
             enviando = true
@@ -564,6 +565,7 @@ fun MembroG(id: String, meuId: String?, onVoltar: () -> Unit) {
             Triple("veiculo", "Veículo", PwIcones.Bike).takeIf { m.motoboy },
             Triple("medalhas", "Medalhas", PwIcones.Trophy).takeIf { m.motoboy },
             Triple("regras", "Regras", PwIcones.Layers).takeIf { m.motoboy },
+            Triple("penalidades", "Penalidades", PwIcones.Gavel).takeIf { m.motoboy },
             Triple("editar", "Editar", PwIcones.Pencil),
         )
         // muitas abas: só a escolhida mostra o nome (as outras ficam no ícone, sem texto cortado)
@@ -590,7 +592,9 @@ fun MembroG(id: String, meuId: String?, onVoltar: () -> Unit) {
                     BotaoIcone(dados.membroIcone(m.id)) { nov -> escopoI.launch { Gestao.definirIcone("perfil", m.id, nov).onSuccess { Gestao.atualizar() } } }
                 }
                 RegrasDoAlvoG("motoboy", m.id, m.nome)
+                CompartilharMotoboyG(m.id, m.nome)
             }
+            "penalidades" -> PenalidadesG("motoboy", m.id)
             "editar" -> if (m.dev && !souDev) TextoDica("Conta Dev: só o Dev altera esta conta.") else EditarMembroG(m, eu = m.id == meuId, onExcluida = onVoltar, souDev = souDev)
         }
     }
@@ -758,7 +762,7 @@ private fun EditarMembroG(m: com.pwexpress.feature.gestor.data.MembroG, eu: Bool
         PwRotulo("Papéis")
         if (souDev) PwInterruptor("Dev", devPapel, { devPapel = it }, descricao = "Administra o sistema inteiro", icone = PwIcones.CodeXml, cor = c.dev)
         PwInterruptor("Gestor", gestor, { gestor = it; if (it) supervisor = false }, descricao = "Acessa o painel (site e app)", icone = PwIcones.ShieldCheck)
-        PwInterruptor("Supervisor", supervisor, { supervisor = it; if (it) gestor = false }, descricao = "Líder de equipe, com o que o gestor liberar", icone = PwIcones.UserCog, cor = Pw.cores.verde)
+        PwInterruptor("Supervisor", supervisor, { supervisor = it; if (it) gestor = false }, descricao = "Líder de equipe, com o que o gestor liberar", icone = PwIcones.UserCog, cor = Pw.cores.azul)
         PwInterruptor("Motoboy", motoboy, { motoboy = it }, descricao = "Usa o app e recebe corridas", icone = PwIcones.Bike)
         if (gestor || devPapel) VincularClienteG(m.id, m.nome)
         PwErro(erro)
@@ -790,7 +794,7 @@ private fun EditarMembroG(m: com.pwexpress.feature.gestor.data.MembroG, eu: Bool
     }
 
     senhaNova?.let { s ->
-        val acesso = "${com.pwexpress.core.marca.MarcaEmpresa.marca.value?.nomeExibido ?: "Delibra"}\nE-mail: ${m.email}\nSenha: $s"
+        val acesso = "${com.pwexpress.core.marca.MarcaEmpresa.marca.value?.nomePara("documentos") ?: "Delibra"}\nE-mail: ${m.email}\nSenha: $s"
         PwJanela(if (senhaFeita) "Senha trocada" else "Nova senha", onFechar = { senhaNova = null }) {
             if (!senhaFeita) {
                 TextoDica("Para quando ${m.nome} esquecer a senha. Quem estiver conectado continua até sair.")
@@ -925,7 +929,7 @@ private fun ExtratoCarteiraG(onVoltar: (() -> Unit)?, abas: @Composable () -> Un
             }
             tentar {
                 ctx.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/csv")
-                    .putExtra(android.content.Intent.EXTRA_SUBJECT, "Extrato " + (com.pwexpress.core.marca.MarcaEmpresa.marca.value?.nomeExibido ?: "Delibra")).putExtra(android.content.Intent.EXTRA_TEXT, csv), "Compartilhar extrato"))
+                    .putExtra(android.content.Intent.EXTRA_SUBJECT, "Extrato " + (com.pwexpress.core.marca.MarcaEmpresa.marca.value?.nomePara("documentos") ?: "Delibra")).putExtra(android.content.Intent.EXTRA_TEXT, csv), "Compartilhar extrato"))
             }
         }, icone = PwIcones.Download, modifier = Modifier.fillMaxWidth())
         x.forEach { cor ->
@@ -1205,6 +1209,7 @@ private fun ExemploConfig(grupo: String, cfg: Map<String, kotlinx.serialization.
     val c = Pw.cores
     fun r2(v: Double) = Math.round(v * 100) / 100.0
     when (grupo) {
+        "despacho" -> CompartilharEmpresaG()
         "distancia" -> {
             fun faixa(kmv: Double, cada: Double, f: Double) = if (cada > 0) Math.floor(kmv / cada) * f else 0.0
             val fc = faixa(250.0, cfg.numero("acrescimo_coleta_cada_km", 100.0), cfg.numero("acrescimo_coleta_fator", 0.5))

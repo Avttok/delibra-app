@@ -76,8 +76,12 @@ object Tracking {
 
     /** Aplica os intervalos vindos do servidor (Configurações do gestor), em segundos/minutos/metros. */
     fun aplicarConfiguracoes(corridaS: Double?, economiaS: Double?, disponivelMin: Double?, disponivelM: Double?,
-                             distanciaM: Double? = null, precisaoM: Double? = null, envioS: Double? = null) {
+                             distanciaM: Double? = null, precisaoM: Double? = null, envioS: Double? = null,
+                             inteligente: Boolean? = null, curvaGraus: Double? = null, retaMaxM: Double? = null) {
         var mudou = false
+        inteligente?.let { Intervalos.inteligente = it }
+        curvaGraus?.takeIf { it in 5.0..90.0 }?.let { Intervalos.curvaGraus = it.toFloat() }
+        retaMaxM?.takeIf { it >= 20 }?.let { Intervalos.retaMaxM = it.toFloat() }
         distanciaM?.takeIf { it >= 0 }?.let { val v = it.toFloat(); if (v != Intervalos.corridaDistanciaM) { Intervalos.corridaDistanciaM = v; mudou = true } }
         precisaoM?.takeIf { it >= 10 }?.let { Intervalos.precisaoMaximaM = it.toFloat() }
         envioS?.takeIf { it >= 1 }?.let { Intervalos.envioLoteMs = (it * 1000).toLong() }

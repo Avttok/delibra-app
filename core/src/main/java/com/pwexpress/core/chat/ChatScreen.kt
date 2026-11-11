@@ -250,6 +250,7 @@ private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: 
 
     suspend fun recarregar() { Chat.mensagens(id).onSuccess { novo -> val antes = msgs?.size; msgs = novo; if (antes != novo.size && novo.isNotEmpty()) estado.animateScrollToItem(novo.lastIndex) } }
     LaunchedEffect(id) { while (true) { recarregar(); Chat.marcarLida(id); delay(4_000) } }
+    androidx.compose.runtime.DisposableEffect(id) { Chat.conversaAtual.value = id; onDispose { if (Chat.conversaAtual.value == id) Chat.conversaAtual.value = null } }
 
     fun mandar(anexo: Anexo? = null) {
         val t = texto.trim()
@@ -276,6 +277,7 @@ private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: 
         Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             PwCabecalho(conv?.nome ?: "Conversa", onVoltar, subtitulo = when (conv?.tipo) { "geral" -> "Toda a equipe"; "grupo" -> "${conv.membros} pessoas"; else -> nomes[conv?.outro]?.papel }) {
                 if (conv?.tipo == "direta") SelosCargo(nomes[conv.outro]?.papeis.orEmpty())
+                if (conv?.tipo == "direta" && conv.outro != null) PwBotaoIcone(PwIcones.UserRound, "Ver perfil", { com.pwexpress.core.perfil.PerfilAberto.abrir(conv.outro) })
                 if (conv != null && conv.souMembro) PwBotaoIcone(if (conv.silenciada) PwIcones.BellRing else PwIcones.BellOff, if (conv.silenciada) "Voltar a avisar" else "Silenciar",
                     { escopo.launch { Chat.silenciar(id, !conv.silenciada) } })
                 if (dev) {
@@ -300,7 +302,8 @@ private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: 
                     val primeira = l.getOrNull(i - 1)?.autor != m.autor
                     Row(Modifier.fillMaxWidth().padding(top = if (primeira && i > 0) 6.dp else 0.dp), horizontalArrangement = if (minha) Arrangement.End else Arrangement.Start, verticalAlignment = Alignment.Top) {
                         if (emGrupo) {
-                            if (primeira) PwAvatar(autor?.nome ?: "?", autor?.foto, tamanho = 30.dp, oculto = autor?.oculto == true) else Spacer(Modifier.width(30.dp))
+                            if (primeira) PwAvatar(autor?.nome ?: "?", autor?.foto, tamanho = 30.dp, oculto = autor?.oculto == true,
+                                onClick = m.autor?.let { a -> { com.pwexpress.core.perfil.PerfilAberto.abrir(a) } }) else Spacer(Modifier.width(30.dp))
                             Spacer(Modifier.width(8.dp))
                         }
                         val forma = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = if (minha) 16.dp else 4.dp, bottomEnd = if (minha) 4.dp else 16.dp)
@@ -311,7 +314,8 @@ private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: 
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
                         ) {
                             if (emGrupo && primeira) Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(autor?.nome ?: "Alguém", color = c.ouro, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                Text(autor?.nome ?: "Alguém", color = c.ouro, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1,
+                                    modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable(enabled = m.autor != null) { m.autor?.let { com.pwexpress.core.perfil.PerfilAberto.abrir(it) } })
                                 SelosCargo(autor?.papeis.orEmpty())
                             }
                             if (m.apagada) Text("Mensagem apagada", color = c.texto3, fontSize = 13.sp)

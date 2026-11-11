@@ -64,13 +64,18 @@ fun ItensParada(p: com.pwexpress.feature.corridas.data.Parada, modifier: Modifie
         }
         if (p.itens.isNotEmpty()) {
             val presos = p.itens.count { !it.todas }
+            // pacotes iguais viram um só, com a quantidade somada (ex.: 7× Documentos)
+            val itens = androidx.compose.runtime.remember(p.itens) {
+                p.itens.groupBy { listOf(it.descricao.ifBlank { it.categoria ?: "Pacote" }, it.categoria, it.icone, it.perigoso, it.fragil, it.todas, it.pesoKg, it.medidas, it.observacoes) }
+                    .values.map { g -> g.first().copy(quantidade = g.sumOf { it.quantidade.coerceAtLeast(1) }, valorDeclarado = g.mapNotNull { it.valorDeclarado }.takeIf { it.isNotEmpty() }?.sum()) }
+            }
             Text(
                 if (p.tipo == com.pwexpress.feature.corridas.data.TipoParada.COLETA) "Pegar aqui" else if (presos > 0) "Entregar aqui" else "Vai para todas as entregas",
                 color = c.texto3, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold,
             )
             @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                p.itens.forEachIndexed { idx, i ->
+                itens.forEachIndexed { idx, i ->
                     val ativo = aberto == idx
                     val forma = androidx.compose.foundation.shape.RoundedCornerShape(99.dp)
                     Row(
@@ -88,7 +93,7 @@ fun ItensParada(p: com.pwexpress.feature.corridas.data.Parada, modifier: Modifie
                     }
                 }
             }
-            aberto?.let { p.itens.getOrNull(it) }?.let { i ->
+            aberto?.let { itens.getOrNull(it) }?.let { i ->
                 val forma = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
                 Column(Modifier.fillMaxWidth().clip(forma).background(c.vidro).border(1.dp, c.borda, forma).padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     @Composable fun linha(r: String, v: String) = Row { Text(r, color = c.texto3, fontSize = 12.sp, modifier = Modifier.width(104.dp)); Text(v, color = c.texto, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold) }
@@ -97,7 +102,7 @@ fun ItensParada(p: com.pwexpress.feature.corridas.data.Parada, modifier: Modifie
                     linha("Quantidade", i.quantidade.toString())
                     i.pesoKg?.let { linha("Peso", "${com.pwexpress.core.designsystem.numeroBr(it)} kg cada") }
                     i.medidas?.let { linha("Medidas", it) }
-                    i.valorDeclarado?.let { linha("Valor declarado", "R$ " + "%.2f".format(java.util.Locale("pt", "BR"), it)) }
+                    i.valorDeclarado?.let { linha(if (i.quantidade > 1) "Valor declarado (total)" else "Valor declarado", "R$ " + "%.2f".format(java.util.Locale("pt", "BR"), it)) }
                     i.observacoes?.let { linha("Obs.", it) }
                     if (i.todas) linha("Onde", if (p.tipo == com.pwexpress.feature.corridas.data.TipoParada.COLETA) "Qualquer coleta" else "Todas as entregas")
                     if (i.perigoso) Row(verticalAlignment = Alignment.CenterVertically) { Icon(PwIcones.Alerta, null, tint = c.vermelho, modifier = Modifier.size(13.dp)); Spacer(Modifier.width(4.dp)); Text("Produto perigoso: cuidado no transporte.", color = c.vermelho, fontSize = 12.sp) }

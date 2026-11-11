@@ -46,6 +46,8 @@ class TrackingService : Service() {
     private var configAtual: Triple<Modo, Boolean, Long>? = null
     private var ultimoEnviado: Location? = null
     private var ultimoEnviadoEm = 0L
+    /** Rumo do último trecho enviado (para o ping inteligente saber se virou). */
+    private var rumoAnterior: Float? = null
     private var redeCallback: ConnectivityManager.NetworkCallback? = null
     private val escopo = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
 
@@ -118,6 +120,7 @@ class TrackingService : Service() {
 
         fused.removeLocationUpdates(callback)
         ultimoEnviado = null
+        rumoAnterior = null
 
         val req = if (modo == Modo.EM_CORRIDA) {
             // com "a cada X m" ligado, lê mais rápido e decide em processar() (tempo OU distância)
@@ -158,13 +161,22 @@ class TrackingService : Service() {
                 if (ult != null) {
                     val andou = loc.distanceTo(ult)
                     val porTempo = passou >= intervalo - 300
-                    val porDistancia = Intervalos.corridaDistanciaM > 0f && andou >= Intervalos.corridaDistanciaM
+                    var porDistancia = Intervalos.corridaDistanciaM > 0f && andou >= Intervalos.corridaDistanciaM
+                    // ping inteligente: andou o mínimo mas segue reto → espera a curva ou o máximo da reta
+                    if (porDistancia && Intervalos.inteligente && !porTempo) {
+                        val rumo = ult.bearingTo(loc)
+                        val antes = rumoAnterior
+                        val virou = antes != null && kotlin.math.abs(((rumo - antes + 540f) % 360f) - 180f) >= Intervalos.curvaGraus
+                        porDistancia = antes == null || virou || andou >= Intervalos.retaMaxM
+                    }
                     if (!porTempo && !porDistancia) return
                     // parado no mesmo lugar (sinal oscilando): não enche o percurso de pontos
                     if (!porDistancia && andou < 3f && passou < intervalo * 2) return
+                    if (andou >= 5f) rumoAnterior = ult.bearingTo(loc)
                 }
             }
         }
+        if (modo != Modo.EM_CORRIDA) rumoAnterior = null
         ultimoEnviado = loc
         ultimoEnviadoEm = loc.time
 
@@ -225,7 +237,7 @@ class TrackingService : Service() {
         val (titulo, texto) = when (modo) {
             Modo.EM_CORRIDA -> "Em corrida" to "Enviando sua posição a cada ${Intervalos.corridaMs(economia) / 1000} s" + if (economia) " (economia de bateria)" else ""
             Modo.DISPONIVEL -> "Disponível" to "Aguardando corridas… você será avisado assim que chegar uma."
-            Modo.OFFLINE -> (com.pwexpress.core.marca.MarcaEmpresa.marca.value?.nomeExibido ?: "Delibra") to "Encerrando…"
+            Modo.OFFLINE -> (com.pwexpress.core.marca.MarcaEmpresa.marca.value?.nomePara("notificacoes") ?: "Delibra") to "Encerrando…"
         }
         return PwNotificacoes.base(this, CANAL)
             .setContentTitle(titulo)

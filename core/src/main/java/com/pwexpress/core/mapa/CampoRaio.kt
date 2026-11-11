@@ -38,11 +38,12 @@ import kotlinx.coroutines.delay
 /** Barra grossa com bolinha dourada (a mesma do "Raio de disponibilidade"). */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-fun PwBarraBolinha(valor: Float, onMudar: (Float) -> Unit, faixa: ClosedFloatingPointRange<Float>, passo: Float, modifier: Modifier = Modifier, habilitado: Boolean = true) {
+fun PwBarraBolinha(valor: Float, onMudar: (Float) -> Unit, faixa: ClosedFloatingPointRange<Float>, passo: Float, modifier: Modifier = Modifier, habilitado: Boolean = true, aoSoltar: (() -> Unit)? = null) {
     val c = Pw.cores
     val fracao = ((valor - faixa.start) / (faixa.endInclusive - faixa.start)).coerceIn(0f, 1f)
     Slider(
         value = valor, onValueChange = { v -> onMudar(if (passo > 0) (Math.round(v / passo) * passo) else v) }, valueRange = faixa, enabled = habilitado,
+        onValueChangeFinished = aoSoltar,
         modifier = modifier.height(48.dp),
         thumb = {
             Box(Modifier.size(30.dp).shadow(6.dp, CircleShape).clip(CircleShape).background(c.gradOuro).border(3.dp, c.fundo2, CircleShape))
@@ -73,14 +74,12 @@ fun CampoRaio(valor: Double, unidade: String, min: Double, max: Double, passo: D
     val faixa = min.toFloat()..max.toFloat().coerceAtLeast(min.toFloat() + 1f)
     val controles: @Composable () -> Unit = {
         Column {
+            // barra ou número digitado: a pessoa escolhe no ícone ao lado (vale para o app todo)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                PwBarraBolinha(v, { v = it }, faixa, passo.toFloat(), Modifier.weight(1f), habilitado)
-                Spacer(Modifier.width(10.dp))
-                PwBotaoIcone(PwIcones.Mapa, if (mapa) "Esconder o mapa" else "Ver no mapa", { mapa = !mapa }, ativo = mapa, tamanho = 38.dp)
+                com.pwexpress.core.designsystem.PwPasso(v.toDouble(), { n -> v = n.toFloat().coerceIn(faixa) }, Modifier.weight(1f), passo = passo, min = min, max = max, unidade = unidade)
+                Spacer(Modifier.width(8.dp))
+                PwBotaoIcone(PwIcones.Mapa, if (mapa) "Esconder o mapa" else "Ver no mapa", { mapa = !mapa }, ativo = mapa, tamanho = 44.dp)
             }
-            Spacer(Modifier.height(6.dp))
-            // número à mão (útil para raios grandes, que a barra deixa difícil acertar)
-            com.pwexpress.core.designsystem.PwPasso(v.toDouble(), { n -> v = n.toFloat().coerceIn(faixa) }, Modifier.fillMaxWidth(), passo = passo, min = min, max = max, unidade = unidade)
             if (v <= 0f) Text("0 = sem limite", color = c.texto3, fontSize = 12.sp)
             if (mudou && habilitado) {
                 Spacer(Modifier.height(8.dp))

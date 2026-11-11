@@ -35,7 +35,11 @@ data class Marca(
     val brilhoCor: String? = null, val brilho: Float = 0.55f, val fonte: String? = null, val original: String? = null,
     /** O texto ao lado da logo no topo (ex.: logo "PW" + "Express"); null = o nome do app. */
     val nomeTopo: String? = null,
+    /** Nome em cada lugar: entrada, notificacoes, cliente, documentos, atalho, chat (vazio = o nome do app). */
+    val nomes: Map<String, String> = emptyMap(),
 ) {
+    /** O nome que a empresa escolheu para aquele lugar (ou o nome do app). */
+    fun nomePara(lugar: String): String? = nomes[lugar]?.takeIf { it.isNotBlank() } ?: nomeExibido
     /** O que vai ao lado da logo (topo, abertura). */
     val textoTopo: String? get() = nomeTopo ?: nomeExibido
     /** Nome no lugar de "Delibra": o escolhido pela empresa, ou o da empresa quando ela tem ícone. */
@@ -65,7 +69,8 @@ object MarcaEmpresa {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val nome = p.getString("nome", null)
         if (nome != null) _marca.value = Marca(nome, p.getString("logo", null), p.getString("cor", null), p.getString("nome_app", null), p.getFloat("escala", 1.9f),
-            p.getString("brilho_cor", null), p.getFloat("brilho", 0.55f), p.getString("fonte", null), p.getString("original", null), p.getString("nome_topo", null))
+            p.getString("brilho_cor", null), p.getFloat("brilho", 0.55f), p.getString("fonte", null), p.getString("original", null), p.getString("nome_topo", null),
+            p.getString("nomes", null)?.let { txt -> runCatching { org.json.JSONObject(txt).let { j -> j.keys().asSequence().associateWith { k -> j.optString(k) } } }.getOrNull() } ?: emptyMap())
         val f = arquivo(ctx)
         if (f.exists() && _marca.value?.logoUrl != null) icone = runCatching { BitmapFactory.decodeFile(f.path) }.getOrNull()
     }
@@ -78,7 +83,8 @@ object MarcaEmpresa {
         _marca.value = m
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().apply {
             if (m == null) clear() else { putString("nome", m.nome); putString("logo", m.logoUrl); putString("cor", m.cor); putString("nome_app", m.nomeApp); putFloat("escala", m.escala)
-                putString("brilho_cor", m.brilhoCor); putFloat("brilho", m.brilho); putString("fonte", m.fonte); putString("original", m.original); putString("nome_topo", m.nomeTopo) }
+                putString("brilho_cor", m.brilhoCor); putFloat("brilho", m.brilho); putString("fonte", m.fonte); putString("original", m.original); putString("nome_topo", m.nomeTopo)
+                putString("nomes", org.json.JSONObject(m.nomes).toString()) }
         }.apply()
         if (m?.logoUrl == null) {
             icone = null; arquivo(ctx).delete(); _versaoIcone.value++
@@ -138,8 +144,8 @@ object MarcaEmpresa {
         val m = _marca.value ?: return@withContext false
         val abrir = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)?.apply { action = Intent.ACTION_MAIN } ?: return@withContext false
         val atalho = ShortcutInfoCompat.Builder(ctx, "marca_empresa")
-            .setShortLabel((m.nomeExibido ?: "Delibra").take(24))
-            .setLongLabel(m.nomeExibido ?: "Delibra")
+            .setShortLabel((m.nomePara("atalho") ?: "Delibra").take(24))
+            .setLongLabel(m.nomePara("atalho") ?: "Delibra")
             .setIcon(IconCompat.createWithAdaptiveBitmap(bmp))
             .setIntent(abrir)
             .build()
@@ -158,7 +164,7 @@ object MarcaEmpresa {
             if (ShortcutManagerCompat.getShortcuts(ctx, ShortcutManagerCompat.FLAG_MATCH_PINNED).none { it.id == "marca_empresa" }) return
             val abrir = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)?.apply { action = Intent.ACTION_MAIN } ?: return
             ShortcutManagerCompat.updateShortcuts(ctx, listOf(ShortcutInfoCompat.Builder(ctx, "marca_empresa")
-                .setShortLabel((m.nomeExibido ?: "Delibra").take(24)).setLongLabel(m.nomeExibido ?: "Delibra").setIcon(IconCompat.createWithAdaptiveBitmap(bmp)).setIntent(abrir).build()))
+                .setShortLabel((m.nomePara("atalho") ?: "Delibra").take(24)).setLongLabel(m.nomePara("atalho") ?: "Delibra").setIcon(IconCompat.createWithAdaptiveBitmap(bmp)).setIntent(abrir).build()))
         }
     }
 }

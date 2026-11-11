@@ -151,7 +151,7 @@ object Tracking {
     internal fun registrarPonto(p: PontoGps) {
         fila.inserir(p)
         _info.update {
-            it.copy(ultimaLeitura = p.registradoEm, ultimaPrecisao = p.precisao, naFila = fila.total(), ultimaPosicao = p.lat to p.lng)
+            it.copy(ultimaLeitura = p.registradoEm, ultimaPrecisao = p.precisao, naFila = fila.total(), ultimaPosicao = p.lat to p.lng, ultimaVelocidadeMs = p.velocidade)
         }
         // em corrida, junta as posições e manda em lote (o tempo do lote vem dos Ajustes)
         if (p.status == Modo.EM_CORRIDA && System.currentTimeMillis() - ultimaSync < Intervalos.envioLoteMs && fila.total() < Intervalos.LOTE_MAXIMO) {

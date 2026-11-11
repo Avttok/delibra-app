@@ -147,6 +147,12 @@ fun TrackingScreen(
         var jogando by remember { mutableStateOf(false) }
         if (perguntaJogo) com.pwexpress.core.jogo.PerguntaJogo(onJogar = { perguntaJogo = false; jogando = true }, onFechar = { perguntaJogo = false })
         // em corrida (oferta aceita) o jogo some sozinho
+        // segurança: o jogo só abre e só continua com a moto parada (limite do Dev)
+        val velMaxKmh = com.pwexpress.core.perfil.Perfis.perfil.collectAsState().value?.numero("dev_jogo_vel_max_kmh", 8.0) ?: 8.0
+        val andando = velMaxKmh > 0 && (info.ultimaVelocidadeMs ?: 0f) * 3.6f > velMaxKmh && agora - (info.ultimaLeitura ?: 0L) < 60_000
+        LaunchedEffect(andando, jogando) {
+            if (andando && jogando) { jogando = false; com.pwexpress.core.designsystem.PwToast.mostrar("O jogo fecha com a moto andando. Pare para jogar.", titulo = "Segurança") }
+        }
         if (jogando && info.modo != Modo.EM_CORRIDA) com.pwexpress.core.jogo.JogoEntrega(onFechar = { jogando = false })
         Box(Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
             BotaoStatus(
@@ -166,7 +172,9 @@ fun TrackingScreen(
                     val perfilJ = com.pwexpress.core.perfil.Perfis.perfil.value
                     val precisa = (perfilJ?.numero("jogo_toques", 5.0) ?: 5.0).toInt().coerceIn(2, 30)
                     if (info.modo != Modo.EM_CORRIDA && perfilJ?.logico("jogo_ligado", true) != false && toquesSeguidos >= precisa) {
-                        toquesSeguidos = 0; aviso = null; perguntaJogo = true
+                        toquesSeguidos = 0
+                        if (andando) { aviso = "O jogo só abre com a moto parada."; return@BotaoStatus }
+                        aviso = null; perguntaJogo = true
                         return@BotaoStatus
                     }
                     aviso = when (info.modo) {

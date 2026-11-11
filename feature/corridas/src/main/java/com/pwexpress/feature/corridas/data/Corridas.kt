@@ -47,6 +47,8 @@ object Corridas {
     fun init(context: Context) {
         if (::app.isInitialized) return
         app = context.applicationContext
+        _fila.value = lerFila().size
+        if (_fila.value > 0) esvaziarFilaDepois()
     }
 
     private val prefs get() = app.getSharedPreferences("pwex_corridas", Context.MODE_PRIVATE)
@@ -62,6 +64,8 @@ object Corridas {
 
     suspend fun sincronizarAgora(): Unit = mutex.withLock {
         if (PwCore.auth.sessao.value == null) return@withLock
+        // etapas feitas sem internet vão primeiro; enquanto não forem, o que está na tela vale mais que o servidor
+        if (_fila.value > 0 && !enviarFila()) return@withLock
         tentar {
             val a = PwCore.rpc.chamar("minha_corrida_ativa", JsonObject(emptyMap()))
             if (a.ok) {
@@ -249,26 +253,155 @@ object Corridas {
         dados: JsonObject = JsonObject(emptyMap()),
         posicao: Posicao? = null,
         ignorarLocal: Boolean = false,
-    ): Result<Unit> =
-        tentar {
-            val completo = buildJsonObject {
-                dados.forEach { (k, v) -> put(k, v) }
-                posicao?.let {
-                    put("lat", it.lat)
-                    put("lng", it.lng)
-                    put("precisao_m", it.precisaoM)
+        fotos: List<FotoFila> = emptyList(),
+    ): Result<Unit> {
+        val completo = buildJsonObject {
+            dados.forEach { (k, v) -> put(k, v) }
+            posicao?.let {
+                put("lat", it.lat)
+                put("lng", it.lng)
+                put("precisao_m", it.precisaoM)
+            }
+            if (ignorarLocal) put("ignorar_local", true)
+        }
+        // já tem etapa esperando internet: esta entra atrás dela (a ordem importa)
+        if (_fila.value > 0 && podeSemInternet()) { guardar(paradaId, acao, completo, fotos); return Result.success(Unit) }
+        return tentar {
+            val final = buildJsonObject {
+                completo.forEach { (k, v) -> put(k, v) }
+                fotos.forEach { f ->
+                    val caminho = "${ativa.value?.id.orEmpty()}/$paradaId-${f.nome}-${System.currentTimeMillis()}.${if (f.tipo == "image/png") "png" else "jpg"}"
+                    val up = PwCore.rpc.enviarArquivo("comprovantes", caminho, f.bytes, f.tipo) // sem rede: IOException
+                    if (!up.ok) throw Exception("Falha ao enviar ${f.nome} (${up.codigo}).")
+                    put(f.campo, caminho)
                 }
-                if (ignorarLocal) put("ignorar_local", true)
             }
             val r = PwCore.rpc.chamar("avancar_parada", buildJsonObject {
                 put("p_parada", paradaId)
                 put("p_acao", acao)
-                put("p_dados", completo)
+                put("p_dados", final)
             })
             if (!r.ok) throw Exception(traduzir(r))
             _ativa.value = r.json()?.paraCorrida() // null = corrida concluída
             Unit
-        }.recoverCatching { e -> throw if (e is java.io.IOException) Exception("Sem internet. Tente de novo.") else e }
+        }.recoverCatching { e ->
+            val semRede = e is java.io.IOException || e is SemInternet
+            if (semRede && podeSemInternet()) { guardar(paradaId, acao, completo, fotos); return@recoverCatching }
+            throw if (semRede) Exception("Sem internet. Tente de novo.") else e
+        }
+    }
+
+    // ------------------------------------------------------------------ sem internet: etapas na fila
+
+    /** Foto ou assinatura de uma etapa (vai junto, mesmo sem internet). */
+    class FotoFila(val campo: String, val nome: String, val bytes: ByteArray, val tipo: String)
+    private class SemInternet : Exception("Sem internet.")
+
+    private val _fila = MutableStateFlow(0)
+    /** Quantas etapas esperam internet para ir ao servidor. */
+    val naFila: StateFlow<Int> = _fila.asStateFlow()
+    private val mutexFila = Mutex()
+    private val arqFila get() = java.io.File(app.filesDir, "fila_etapas.json")
+    private val pastaFila get() = java.io.File(app.filesDir, "fila_fotos").apply { mkdirs() }
+    private var filaJob: kotlinx.coroutines.Job? = null
+
+    /** O gestor deixa concluir etapas sem internet? */
+    fun podeSemInternet(): Boolean = com.pwexpress.core.perfil.Perfis.perfil.value?.logico("offline_finalizar_ligado", true) != false
+
+    private fun lerFila(): MutableList<JsonObject> = runCatching {
+        (Json.parseToJsonElement(arqFila.readText()) as kotlinx.serialization.json.JsonArray).map { it.jsonObject }.toMutableList()
+    }.getOrElse { mutableListOf() }
+
+    private fun gravarFila(l: List<JsonObject>) {
+        runCatching { arqFila.writeText(kotlinx.serialization.json.JsonArray(l).toString()) }
+        _fila.value = l.size
+    }
+
+    private fun agoraIso(): String = java.time.Instant.now().toString()
+
+    /** Guarda a etapa no celular (com a hora de agora) e já mostra como feita. */
+    private fun guardar(paradaId: String, acao: String, dados: JsonObject, fotos: List<FotoFila>) {
+        val corridaId = ativa.value?.id.orEmpty()
+        val item = buildJsonObject {
+            put("parada", paradaId); put("corrida", corridaId); put("acao", acao)
+            put("dados", buildJsonObject {
+                dados.forEach { (k, v) -> put(k, v) }
+                put("feito_em", agoraIso()); put("offline", "true")
+            })
+            put("fotos", kotlinx.serialization.json.JsonArray(fotos.map { f ->
+                val arq = java.io.File(pastaFila, "${System.currentTimeMillis()}-${f.campo}.${if (f.tipo == "image/png") "png" else "jpg"}")
+                arq.writeBytes(f.bytes)
+                buildJsonObject { put("campo", f.campo); put("nome", f.nome); put("tipo", f.tipo); put("arquivo", arq.name) }
+            }))
+        }
+        synchronized(this) { gravarFila(lerFila().apply { add(item) }) }
+        // na tela: a etapa já conta como feita
+        _ativa.value = _ativa.value?.let { c ->
+            if (c.id != corridaId) c else {
+                val novas = c.paradas.map { p -> if (p.id != paradaId) p else p.copy(status = if (acao == "chegou") StatusParada.CHEGOU else StatusParada.CONCLUIDA, naFila = true) }
+                if (novas.all { it.status == StatusParada.CONCLUIDA }) null else c.copy(paradas = novas)
+            }
+        }
+        val fim = _ativa.value == null
+        com.pwexpress.core.designsystem.PwToast.mostrar(
+            if (fim) "Rota concluída sem internet. O app manda tudo assim que o sinal voltar." else "Sem internet: a etapa ficou guardada com a hora certa e vai sozinha quando o sinal voltar.",
+            com.pwexpress.core.designsystem.TipoAviso.OK, "Guardado no celular")
+        esvaziarFilaDepois()
+    }
+
+    /** Tenta mandar a fila de tempos em tempos até acabar. */
+    fun esvaziarFilaDepois() {
+        if (filaJob?.isActive == true) return
+        filaJob = escopo.launch {
+            while (_fila.value > 0) {
+                if (PwCore.auth.sessao.value != null && enviarFila()) break
+                kotlinx.coroutines.delay(15_000)
+            }
+            sincronizarAgora()
+        }
+    }
+
+    /** Manda as etapas guardadas, na ordem. true = a fila acabou. */
+    suspend fun enviarFila(): Boolean = mutexFila.withLock {
+        while (true) {
+            val item = lerFila().firstOrNull() ?: return@withLock true
+            val dados = item["dados"]?.jsonObject ?: JsonObject(emptyMap())
+            val extra = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+            val fotos = (item["fotos"] as? kotlinx.serialization.json.JsonArray)?.map { it.jsonObject }.orEmpty()
+            for (f in fotos) {
+                val campo = f["campo"]?.jsonPrimitive?.content ?: continue
+                val arq = java.io.File(pastaFila, f["arquivo"]?.jsonPrimitive?.content ?: continue)
+                if (!arq.exists()) continue
+                val caminho = "${item["corrida"]?.jsonPrimitive?.content}/${item["parada"]?.jsonPrimitive?.content}-${f["nome"]?.jsonPrimitive?.content}-${arq.name}"
+                val r = runCatching { PwCore.rpc.enviarArquivo("comprovantes", caminho, arq.readBytes(), f["tipo"]?.jsonPrimitive?.content ?: "image/jpeg") }
+                    .getOrElse { return@withLock false }
+                if (!r.ok && r.codigo !in 400..499) return@withLock false
+                // o Storage pode já ter o arquivo (tentativa anterior): o caminho vale igual
+                extra[campo] = kotlinx.serialization.json.JsonPrimitive(caminho)
+            }
+            val r = runCatching {
+                PwCore.rpc.chamar("avancar_parada", buildJsonObject {
+                    put("p_parada", item["parada"]?.jsonPrimitive?.content.orEmpty())
+                    put("p_acao", item["acao"]?.jsonPrimitive?.content.orEmpty())
+                    put("p_dados", JsonObject(dados + extra))
+                })
+            }.getOrElse { return@withLock false }
+            if (r.codigo >= 500 || r.codigo == 0) return@withLock false
+            synchronized(this) {
+                val l = lerFila()
+                if (l.firstOrNull() == item) l.removeAt(0)
+                gravarFila(l)
+            }
+            fotos.forEach { f -> f["arquivo"]?.jsonPrimitive?.content?.let { runCatching { java.io.File(pastaFila, it).delete() } } }
+            if (!r.ok) {
+                // já foi feita ou a rota não está mais com você: nada a reenviar
+                val msg = traduzir(r)
+                if (r.corpo.contains("corrida_nao_esta_ativa").not() && r.corpo.contains("conclua_a_parada_anterior").not())
+                    com.pwexpress.core.designsystem.PwToast.mostrar(msg, com.pwexpress.core.designsystem.TipoAviso.ERRO, "Uma etapa guardada não entrou")
+            }
+        }
+        true
+    }
 
     /** Envia foto/assinatura e devolve o caminho no Storage. */
     suspend fun enviarComprovante(corridaId: String, paradaId: String, nome: String, bytes: ByteArray, tipo: String): Result<String> =

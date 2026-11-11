@@ -304,6 +304,8 @@ class MainActivity : ComponentActivity() {
                                             onConfiguracoes = { naConfig = true },
                                         )
                                     }
+                                    // emergência sempre à mão no início (segurar 2 s + confirmar)
+                                    if (abaMotoboy == "inicio") com.pwexpress.feature.corridas.ui.BotaoEmergencia(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 14.dp))
                                 }
                             }
                             val reservas = planejadas.count { it.minha }

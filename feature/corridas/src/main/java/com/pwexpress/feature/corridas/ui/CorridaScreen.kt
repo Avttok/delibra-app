@@ -113,8 +113,14 @@ fun CorridaScreen(
 
     val distancia = if (parada != null) posicao?.let { PosicaoAtual.distanciaM(it, parada.lat, parada.lng) } else null
     val tolerancia = (posicao?.precisaoM ?: 0f).coerceAtMost(80f)
-    val noLocal = !corrida.exigirNoLocal || (distancia != null && distancia - tolerancia <= corrida.raioChegadaM)
-    val podeIgnorar = admin && corrida.teste && corrida.exigirNoLocal
+    val noLocalReal = !corrida.exigirNoLocal || (distancia != null && distancia - tolerancia <= corrida.raioChegadaM)
+    // o gestor liberou esta parada: vale de onde estiver
+    val noLocal = noLocalReal || parada?.liberadaLocal == true
+    val perfilAtual by com.pwexpress.core.perfil.Perfis.perfil.collectAsState()
+    val podePular = perfilAtual?.logico("motoboy_pode_pular", false) == true
+    val podePedirPular = perfilAtual?.logico("motoboy_pede_pular", true) != false
+    val podeIgnorar = (admin && corrida.teste && corrida.exigirNoLocal) || (podePular && corrida.exigirNoLocal)
+    val naFila by Corridas.naFila.collectAsState()
 
     fun avancar(acao: String, ignorar: Boolean = false) {
         val p = parada ?: return
@@ -129,7 +135,7 @@ fun CorridaScreen(
     }
 
     if (comprovanteAberto && parada != null) {
-        ComprovanteEntrega(corrida, parada, posicao, admin, onFechar = { comprovanteAberto = false }, modifier = modifier)
+        ComprovanteEntrega(corrida, parada, posicao, ignorarLocal = (admin && corrida.teste) || (!noLocalReal && podePular), onFechar = { comprovanteAberto = false }, modifier = modifier)
         return
     }
 
@@ -200,6 +206,7 @@ fun CorridaScreen(
                     }
                     if (onPainelGestor != null) BotaoMapa("", PwIcones.ShieldCheck, descricao = "Painel do gestor", onClick = onPainelGestor)
                     BotaoMapa("", PwIcones.Maximize2, descricao = "Mapa em tela cheia") { abrirCheio++ }
+                    BotaoEmergencia(tamanho = 40.dp)
                     Spacer(Modifier.weight(1f))
                     if (parada != null) {
                         BotaoMapa(if (comTexto) "Maps" else "", PwIcones.Navigation, descricao = "Abrir no Maps") { abrirMaps(ctx, parada) }
@@ -225,6 +232,7 @@ fun CorridaScreen(
                 }
                 erro?.let { Text(it, color = c.vermelho) }
                 BotaoAcao(corrida, parada, enviando, noLocal, podeIgnorar, onAvancar = { a, i -> avancar(a, i) }, onComprovante = { comprovanteAberto = true })
+                if (!noLocal && podePedirPular && !podeIgnorar) PedirPularParada(corrida.id, parada)
             }
             return@Column
         }
@@ -260,7 +268,15 @@ fun CorridaScreen(
                 }
 
                 erro?.let { Text(it, color = c.vermelho) }
+                if (naFila > 0) AvisoFila(naFila)
+                if (parada.liberadaLocal && !noLocalReal) PwCartao(cor = c.verde.copy(alpha = 0.5f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(PwIcones.BadgeCheck, null, tint = c.verde, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
+                        Text("Parada liberada pelo gestor: confirme de onde está.", color = c.texto, fontSize = 14.sp, fontFamily = Archivo)
+                    }
+                }
                 BotaoAcao(corrida, parada, enviando, noLocal, podeIgnorar, onAvancar = { a, i -> avancar(a, i) }, onComprovante = { comprovanteAberto = true })
+                if (!noLocal && podePedirPular && !podeIgnorar) PedirPularParada(corrida.id, parada)
             }
             PwCartao {
                 PwRotulo("Trajeto")
@@ -282,6 +298,8 @@ fun CorridaScreen(
                                     if (p.status == StatusParada.CONCLUIDA) " · concluída" else "",
                                 fontWeight = FontWeight.SemiBold, color = c.texto,
                             )
+                            if (p.naFila) PwSelo("GUARDADA NO CELULAR", c.ouro, icone = PwIcones.CloudOff)
+                            else if (p.liberadaLocal && p.status != StatusParada.CONCLUIDA) PwSelo("LIBERADA", c.verde, icone = PwIcones.BadgeCheck)
                             Text(p.endereco, color = c.texto2, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
@@ -334,14 +352,14 @@ private fun BotaoAcao(
         )
         if (podeIgnorar && !noLocal) {
             PwBotaoVidro(
-                "Ignorar localização (teste)",
+                if (corrida.teste) "Ignorar localização (teste)" else "Confirmar daqui (fora do raio)",
                 onClick = {
                     if (parada.status != StatusParada.CHEGOU) onAvancar("chegou", true)
                     else if (precisa) onComprovante()
                     else onAvancar("concluir", true)
                 },
-                icone = PwIcones.FlaskConical,
-                cor = c.violeta,
+                icone = if (corrida.teste) PwIcones.FlaskConical else PwIcones.MapPinned,
+                cor = if (corrida.teste) c.violeta else c.ouro,
                 habilitado = !enviando,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -387,7 +405,7 @@ private fun IndicadorDistancia(distancia: Float?, noLocal: Boolean, exige: Boole
 // ------------------------------------------------------------------ comprovante
 
 @Composable
-private fun ComprovanteEntrega(corrida: Corrida, parada: Parada, posicaoInicial: Posicao?, admin: Boolean, onFechar: () -> Unit, modifier: Modifier) {
+private fun ComprovanteEntrega(corrida: Corrida, parada: Parada, posicaoInicial: Posicao?, ignorarLocal: Boolean, onFechar: () -> Unit, modifier: Modifier) {
     val ctx = LocalContext.current
     val c = Pw.cores
     val scope = rememberCoroutineScope()
@@ -424,33 +442,24 @@ private fun ComprovanteEntrega(corrida: Corrida, parada: Parada, posicaoInicial:
         if (erro != null) return
         enviando = true
         scope.launch {
-            var fotoPath: String? = null
-            var assinaturaPath: String? = null
-            val f = foto
-            if (ex.foto && f != null) {
-                etapa = "Enviando foto…"
-                fotoPath = Corridas.enviarComprovante(corrida.id, parada.id, "foto", f, "image/jpeg")
-                    .onFailure { erro = it.message }.getOrNull() ?: run { enviando = false; return@launch }
-            }
-            if (ex.assinatura) {
-                etapa = "Enviando assinatura…"
-                val png = withContext(Dispatchers.Default) { assinatura.exportarPng() }
-                assinaturaPath = Corridas.enviarComprovante(corrida.id, parada.id, "assinatura", png, "image/png")
-                    .onFailure { erro = it.message }.getOrNull() ?: run { enviando = false; return@launch }
+            // foto e assinatura vão junto com a etapa (sem internet, ficam guardadas no celular)
+            val fotos = buildList {
+                val f = foto
+                if (ex.foto && f != null) add(Corridas.FotoFila("foto_path", "foto", f, "image/jpeg"))
+                if (ex.assinatura) add(Corridas.FotoFila("assinatura_path", "assinatura", withContext(Dispatchers.Default) { assinatura.exportarPng() }, "image/png"))
             }
             etapa = "Conferindo localização…"
             val posicao = PosicaoAtual.obter(ctx, 8_000) ?: posicaoInicial
-            etapa = "Finalizando…"
+            etapa = if (fotos.isEmpty()) "Finalizando…" else "Enviando comprovante…"
             Corridas.avancar(
                 parada.id, "concluir",
                 buildJsonObject {
                     put("recebedor_nome", nome.trim())
                     put("codigo", codigo)
-                    fotoPath?.let { put("foto_path", it) }
-                    assinaturaPath?.let { put("assinatura_path", it) }
                 },
                 posicao = posicao,
-                ignorarLocal = admin && corrida.teste,
+                ignorarLocal = ignorarLocal,
+                fotos = fotos,
             ).onSuccess { onFechar() }.onFailure { erro = it.message }
             enviando = false
         }

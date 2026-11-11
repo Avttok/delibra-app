@@ -1,5 +1,6 @@
 package com.pwexpress.motoboy.ui
 
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -50,7 +51,7 @@ fun SplashMarca(texto: String) {
             Box(Modifier.size(200.dp).drawBehind {
                 drawCircle(Brush.radialGradient(listOf(c.ouro.copy(alpha = 0.28f * pulso), Color.Transparent), center, size.minDimension / 2f))
                 // arco girando: o degradê gira junto (um degradê parado "quebrava" sempre no lado direito)
-                androidx.compose.ui.graphics.drawscope.rotate(giro) {
+                rotate(giro) {
                     drawArc(Brush.sweepGradient(0f to Color.Transparent, 0.06f to c.ouro.copy(alpha = 0.15f), 0.30f to c.ouroClaro, 0.31f to Color.Transparent, 1f to Color.Transparent),
                         0f, 110f, false,
                         topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.08f, size.height * 0.08f),

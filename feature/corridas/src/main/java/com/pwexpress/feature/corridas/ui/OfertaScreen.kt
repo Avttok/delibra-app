@@ -15,6 +15,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.background
@@ -315,7 +316,7 @@ private fun OrbeTempo(segundos: Long, fracao: Float, pouco: Boolean) {
         drawCircle(fundo, size.minDimension / 2f - esp)
         drawCircle(trilho, size.minDimension / 2f - esp / 2, style = Stroke(esp))
         // o degradê começa no topo junto com o arco (sem "quebra" no lado direito)
-        androidx.compose.ui.graphics.drawscope.rotate(-90f) {
+        rotate(-90f) {
             drawArc(Brush.sweepGradient(0f to cor.copy(alpha = 0.4f), (fracao.coerceIn(0.05f, 1f)) to cor, 1f to cor), 0f, 360f * fracao, false,
                 topLeft = Offset(esp / 2, esp / 2), size = Size(size.width - esp, size.height - esp), style = Stroke(esp, cap = StrokeCap.Round))
         }

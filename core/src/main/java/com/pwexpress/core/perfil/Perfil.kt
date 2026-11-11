@@ -143,7 +143,12 @@ object Perfis {
         if (foto != null) {
             val caminho = "${atual.id}/foto-${System.currentTimeMillis()}.jpg"
             val up = PwCore.rpc.enviarArquivo("avatares", caminho, foto, "image/jpeg")
-            if (!up.ok) error("Não foi possível enviar a foto (${up.codigo}).")
+            if (!up.ok) error(when (up.codigo) {
+                401 -> "Sua sessão expirou. Saia e entre de novo para trocar a foto."
+                403 -> "O servidor recusou a foto (permissão). Avise o suporte."
+                413 -> "A foto é grande demais."
+                else -> "Não foi possível enviar a foto (${up.codigo}${up.corpo.take(80).let { if (it.isNotBlank()) ": $it" else "" }})."
+            })
             url = "${PwConfig.supabaseUrl}/storage/v1/object/public/avatares/$caminho"
         }
         val r = PwCore.rpc.chamar("atualizar_meu_perfil", buildJsonObject {
@@ -151,7 +156,9 @@ object Perfis {
             url?.let { put("p_foto_url", it) }
         })
         if (!r.ok) error(if (r.corpo.contains("nome_invalido")) "O nome deve ter entre 2 e 60 letras." else "Erro ao salvar (${r.codigo}).")
-        r.json()?.let { _perfil.value = it.paraPerfil(); publicarMarca(it) }
+        // a resposta traz só nome e foto: recarrega o perfil inteiro (cargos, empresa, marca) para não perder nada
+        _perfil.value = _perfil.value?.copy(nome = nome ?: atual.nome, fotoUrl = url ?: atual.fotoUrl)
+        carregar()
         Unit
     }.recoverCatching { e -> throw if (e is java.io.IOException) Exception("Sem internet.") else e }
 

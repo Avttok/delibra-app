@@ -467,6 +467,7 @@ private fun Selos(m: com.pwexpress.feature.gestor.data.MembroG, status: String?)
     androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
         if (m.dev) PwSelo("Dev", c.dev, icone = PwIcones.CodeXml)
         if (m.gestor && !m.dev) PwSelo("Gestor", c.ouro, icone = PwIcones.ShieldCheck)
+        if (m.supervisor && !m.gestor && !m.dev) PwSelo("Supervisor", c.verde, icone = PwIcones.UserCog)
         if (m.motoboy) PwSelo(rotuloMotoboy[status] ?: "Offline", corMotoboy(status, c), icone = PwIcones.Bike)
         if (m.modoTeste) PwSelo("Teste", c.violeta, icone = PwIcones.FlaskConical)
         if (m.bloqueado) PwSelo("Bloqueado", c.vermelho, icone = PwIcones.Lock)
@@ -493,6 +494,7 @@ private fun NovaContaG(repassePadrao: Double, onFechar: () -> Unit, onCriada: (S
     var senha by remember { mutableStateOf(gerarSenha()) }
     var motoboy by remember { mutableStateOf(true) }
     var gestor by remember { mutableStateOf(false) }
+    var supervisor by remember { mutableStateOf(false) }
     var erro by remember { mutableStateOf<String?>(null) }
     var enviando by remember { mutableStateOf(false) }
     var criada by remember { mutableStateOf<String?>(null) }
@@ -517,14 +519,16 @@ private fun NovaContaG(repassePadrao: Double, onFechar: () -> Unit, onCriada: (S
             PwBotaoIcone(PwIcones.RefreshCw, "Gerar outra", { senha = gerarSenha() })
         }
         if (cliente == null) PwInterruptor("Motoboy", motoboy, { motoboy = it }, descricao = "Usa o app e recebe corridas", icone = PwIcones.Bike)
-        if (cliente == null) PwInterruptor("Gestor", gestor, { gestor = it }, descricao = "Acessa o painel", icone = PwIcones.ShieldCheck)
+        if (cliente == null) PwInterruptor("Gestor", gestor, { gestor = it; if (it) supervisor = false }, descricao = "Acessa o painel", icone = PwIcones.ShieldCheck)
+        // líder de equipe: faz só o que o gestor liberar (Equipe → pessoa → Permissões)
+        if (cliente == null) PwInterruptor("Supervisor", supervisor, { supervisor = it; if (it) gestor = false }, descricao = "Líder de equipe, com o que o gestor liberar", icone = PwIcones.UserCog, cor = Pw.cores.verde)
         PwErro(erro)
         PwBotaoOuro(if (enviando) "Criando…" else "Criar conta", icone = PwIcones.UserPlus, habilitado = !enviando, onClick = {
             enviando = true
             escopo.launch {
                 Gestao.criarConta(
                     nome.trim(), email.trim(), senha,
-                    if (cliente != null) listOf("cliente") else listOfNotNull("motoboy".takeIf { motoboy }, "gestor".takeIf { gestor }),
+                    if (cliente != null) listOf("cliente") else listOfNotNull("motoboy".takeIf { motoboy }, "gestor".takeIf { gestor }, "supervisor".takeIf { supervisor }),
                     null, cliente?.id,
                 )
                     .onSuccess { criada = it; Gestao.atualizar() }.onFailure { erro = it.message }
@@ -739,6 +743,7 @@ private fun EditarMembroG(m: com.pwexpress.feature.gestor.data.MembroG, eu: Bool
     val dados by Gestao.dados.collectAsState()
     var nome by remember(m.id) { mutableStateOf(m.nome) }
     var gestor by remember(m.id) { mutableStateOf(m.gestor) }
+    var supervisor by remember(m.id) { mutableStateOf(m.supervisor) }
     var motoboy by remember(m.id) { mutableStateOf(m.motoboy) }
     var devPapel by remember(m.id) { mutableStateOf(m.dev) }
     var msg by remember { mutableStateOf<String?>(null) }
@@ -752,7 +757,8 @@ private fun EditarMembroG(m: com.pwexpress.feature.gestor.data.MembroG, eu: Bool
         Espaco(8)
         PwRotulo("Papéis")
         if (souDev) PwInterruptor("Dev", devPapel, { devPapel = it }, descricao = "Administra o sistema inteiro", icone = PwIcones.CodeXml, cor = c.dev)
-        PwInterruptor("Gestor", gestor, { gestor = it }, descricao = "Acessa o painel (site e app)", icone = PwIcones.ShieldCheck)
+        PwInterruptor("Gestor", gestor, { gestor = it; if (it) supervisor = false }, descricao = "Acessa o painel (site e app)", icone = PwIcones.ShieldCheck)
+        PwInterruptor("Supervisor", supervisor, { supervisor = it; if (it) gestor = false }, descricao = "Líder de equipe, com o que o gestor liberar", icone = PwIcones.UserCog, cor = Pw.cores.verde)
         PwInterruptor("Motoboy", motoboy, { motoboy = it }, descricao = "Usa o app e recebe corridas", icone = PwIcones.Bike)
         if (gestor || devPapel) VincularClienteG(m.id, m.nome)
         PwErro(erro)
@@ -762,7 +768,7 @@ private fun EditarMembroG(m: com.pwexpress.feature.gestor.data.MembroG, eu: Bool
             PwBotaoVidro("Nova senha", onClick = { senhaNova = gerarSenha(); senhaFeita = false }, icone = PwIcones.KeyRound, modifier = Modifier.weight(1f))
             PwBotaoOuro("Salvar", icone = PwIcones.Check, modifier = Modifier.weight(1f), onClick = {
                 escopo.launch {
-                    Gestao.editarMembro(m.id, nome, listOfNotNull("dev".takeIf { devPapel }, "gestor".takeIf { gestor }, "motoboy".takeIf { motoboy }), null)
+                    Gestao.editarMembro(m.id, nome, listOfNotNull("dev".takeIf { devPapel }, "gestor".takeIf { gestor }, "supervisor".takeIf { supervisor }, "motoboy".takeIf { motoboy }), null)
                         .onSuccess { msg = null; erro = null; com.pwexpress.core.designsystem.PwToast.mostrar("${nome.ifBlank { m.email }} atualizado.", titulo = "Salvo"); Gestao.atualizar() }.onFailure { erro = it.message; msg = null }
                 }
             })
@@ -1155,7 +1161,7 @@ fun ConfiguracoesG(onVoltar: (() -> Unit)?, onAbrir: (TelaG) -> Unit = {}) {
         }
         val a = AREAS_CONFIG.getOrNull(area)
         val lista = when {
-            termo.isNotEmpty() -> PARAMETROS_VISIVEIS.filter { sem("${it.rotulo} ${it.descricao} ${it.chave}").contains(termo) }.filter { !soMudados || mudado(it) }
+            termo.isNotEmpty() -> PARAMETROS_VISIVEIS.filter { com.pwexpress.core.busca.combina(termo, it.rotulo, it.descricao, it.descricaoDesligado, it.chave) }.filter { !soMudados || mudado(it) }
             soMudados -> PARAMETROS_VISIVEIS.filter(::mudado)
             else -> PARAMETROS_VISIVEIS.filter { grupoArea[it.grupo] == a?.chave && (secao == null || it.grupo == secao) }
         }

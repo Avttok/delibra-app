@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -117,13 +118,29 @@ object PwCores {
 enum class PreferenciaTema { SISTEMA, CLARO, ESCURO }
 
 /** Cor principal: dourado (todos), vermelho (Dev) ou violeta (modo teste, sempre vence). */
-enum class Marca { OURO, VERMELHO, VIOLETA, AZUL, VERDE, BRANCO, PRETO }
+enum class Marca { OURO, VERMELHO, VIOLETA, AZUL, VERDE, BRANCO, PRETO, TINTA }
 
 /** Cores que qualquer usuário escolhe no menu da conta. Os dois "preto/branco" fixam claro ou noturno. */
-enum class EstiloTema(val rotulo: String, val amostra: Color, val fundoAmostra: Color) {
+enum class EstiloTema(
+    val rotulo: String, val amostra: Color, val fundoAmostra: Color,
+    /** Cores novas (claro, principal, escuro) no noturno e no claro; o degradê dos botões vai de uma à outra. */
+    val noturno: List<Long>? = null, val diurno: List<Long>? = null,
+) {
     OURO("Dourado", Color(0xFFD4AF37), Color(0xFF0F0F12)),
     AZUL("Azul", Color(0xFF3B82F6), Color(0xFF0F0F12)),
     VERDE("Verde", Color(0xFF10B981), Color(0xFF0F0F12)),
+    VERMELHO("Vermelho", Color(0xFFEF4444), Color(0xFF0F0F12), listOf(0xFFFCA5A5, 0xFFEF4444, 0xFF991B1B), listOf(0xFFF87171, 0xFFDC2626, 0xFF7F1D1D)),
+    ROSA("Rosa", Color(0xFFF472B6), Color(0xFF0F0F12), listOf(0xFFFBCFE8, 0xFFF472B6, 0xFFBE185D), listOf(0xFFF472B6, 0xFFDB2777, 0xFF831843)),
+    ROXO("Roxo", Color(0xFF8B5CF6), Color(0xFF0F0F12), listOf(0xFFDDD6FE, 0xFF8B5CF6, 0xFF5B21B6), listOf(0xFFA78BFA, 0xFF7C3AED, 0xFF4C1D95)),
+    LARANJA("Laranja", Color(0xFFFB923C), Color(0xFF0F0F12), listOf(0xFFFED7AA, 0xFFFB923C, 0xFFC2410C), listOf(0xFFFB923C, 0xFFEA580C, 0xFF7C2D12)),
+    CIANO("Ciano", Color(0xFF22D3EE), Color(0xFF0F0F12), listOf(0xFFA5F3FC, 0xFF22D3EE, 0xFF0E7490), listOf(0xFF22D3EE, 0xFF0891B2, 0xFF164E63)),
+    // degradês: as duas pontas são cores diferentes
+    POR_DO_SOL("Pôr do sol", Color(0xFFFB923C), Color(0xFFDB2777), listOf(0xFFFDE047, 0xFFFB923C, 0xFFDB2777), listOf(0xFFF59E0B, 0xFFEA580C, 0xFFBE185D)),
+    OCEANO("Oceano", Color(0xFF22D3EE), Color(0xFF4F46E5), listOf(0xFF67E8F9, 0xFF3B82F6, 0xFF4F46E5), listOf(0xFF06B6D4, 0xFF2563EB, 0xFF3730A3)),
+    AURORA("Aurora", Color(0xFF34D399), Color(0xFF22D3EE), listOf(0xFFBEF264, 0xFF34D399, 0xFF0891B2), listOf(0xFF65A30D, 0xFF059669, 0xFF0E7490)),
+    NEON("Neon", Color(0xFFE879F9), Color(0xFF6366F1), listOf(0xFFF0ABFC, 0xFFC026D3, 0xFF6366F1), listOf(0xFFD946EF, 0xFFA21CAF, 0xFF4338CA)),
+    FOGO("Fogo", Color(0xFFFACC15), Color(0xFFDC2626), listOf(0xFFFDE047, 0xFFF97316, 0xFFDC2626), listOf(0xFFEAB308, 0xFFEA580C, 0xFFB91C1C)),
+    PRATA("Prata", Color(0xFFD4D4D8), Color(0xFF52525B), listOf(0xFFF4F4F5, 0xFFA1A1AA, 0xFF52525B), listOf(0xFF71717A, 0xFF52525B, 0xFF27272A)),
     PRETO_NO_BRANCO("Preto no branco", Color(0xFF111111), Color(0xFFFFFFFF)),
     BRANCO_NO_PRETO("Branco no preto", Color(0xFFFFFFFF), Color(0xFF000000)),
 }
@@ -157,6 +174,7 @@ object TemaApp {
 
     fun init(context: Context) {
         ctx = context.applicationContext
+        Fontes.init(context)
         val salvo = ctx!!.getSharedPreferences("pwex_tema", Context.MODE_PRIVATE).getString("tema", null)
         _pref.value = PreferenciaTema.entries.firstOrNull { it.name == salvo } ?: PreferenciaTema.SISTEMA
         _vermelho.value = ctx!!.getSharedPreferences("pwex_tema", Context.MODE_PRIVATE).getBoolean("vermelho", false)
@@ -188,14 +206,56 @@ private fun archivo(peso: Int, largura: Float = 100f) = Font(
     variationSettings = FontVariation.Settings(FontVariation.weight(peso), FontVariation.width(largura)),
 )
 
-val Archivo = FontFamily(
+val ArchivoBase = FontFamily(
     archivo(300), archivo(400), archivo(500), archivo(600), archivo(700), archivo(800), archivo(900),
 )
+private val ArchivoLargoBase = FontFamily(archivo(780, 122f), archivo(900, 125f), archivo(700, 112f))
 
-/** Títulos "de letreiro": Archivo expandida e pesada, como no site. */
-val ArchivoLargo = FontFamily(archivo(780, 122f), archivo(900, 125f), archivo(700, 112f))
+private fun tres(r400: Int, r700: Int, r800: Int?) = FontFamily(listOfNotNull(
+    Font(r400, FontWeight.Normal), Font(r400, FontWeight.Medium), Font(r700, FontWeight.SemiBold), Font(r700, FontWeight.Bold),
+    Font(r800 ?: r700, FontWeight.ExtraBold), Font(r800 ?: r700, FontWeight.Black),
+))
 
-private val tipografia = Typography(
+/** Fontes que o usuário escolhe para o app (e o gestor para o nome da empresa no topo). */
+enum class FonteApp(val rotulo: String, familia: () -> FontFamily) {
+    ARCHIVO("Archivo (padrão)", { ArchivoBase }),
+    INTER("Inter", { tres(R.font.f_inter_400, R.font.f_inter_700, R.font.f_inter_800) }),
+    POPPINS("Poppins", { tres(R.font.f_poppins_400, R.font.f_poppins_700, R.font.f_poppins_800) }),
+    MONTSERRAT("Montserrat", { tres(R.font.f_montserrat_400, R.font.f_montserrat_700, R.font.f_montserrat_800) }),
+    NUNITO("Nunito", { tres(R.font.f_nunito_400, R.font.f_nunito_700, R.font.f_nunito_800) }),
+    SPACE_GROTESK("Space Grotesk", { tres(R.font.f_space_grotesk_400, R.font.f_space_grotesk_700, null) }),
+    PLAYFAIR("Playfair Display", { tres(R.font.f_playfair_400, R.font.f_playfair_700, R.font.f_playfair_800) }),
+    OSWALD("Oswald", { tres(R.font.f_oswald_400, R.font.f_oswald_700, null) });
+
+    val familia: FontFamily by lazy(familia)
+
+    companion object {
+        /** Nome guardado (no aparelho ou na empresa) → fonte; desconhecido = Archivo. */
+        fun de(nome: String?): FonteApp = entries.firstOrNull { it.name.equals(nome, ignoreCase = true) } ?: ARCHIVO
+    }
+}
+
+/** A fonte escolhida por este usuário (guardada no aparelho). Ler aqui recompõe a tela quando muda. */
+object Fontes {
+    private var ctx: Context? = null
+    val atual = androidx.compose.runtime.mutableStateOf(FonteApp.ARCHIVO)
+    fun init(context: Context) {
+        ctx = context.applicationContext
+        atual.value = FonteApp.de(ctx!!.getSharedPreferences("pwex_tema", Context.MODE_PRIVATE).getString("fonte", null))
+    }
+    fun definir(f: FonteApp) {
+        atual.value = f
+        ctx?.getSharedPreferences("pwex_tema", Context.MODE_PRIVATE)?.edit { putString("fonte", f.name) }
+    }
+}
+
+/** Fonte do app inteiro: a escolhida pelo usuário (padrão Archivo). */
+val Archivo: FontFamily get() = Fontes.atual.value.familia
+
+/** Títulos "de letreiro": Archivo expandida e pesada, como no site (ou a fonte escolhida). */
+val ArchivoLargo: FontFamily get() = if (Fontes.atual.value == FonteApp.ARCHIVO) ArchivoLargoBase else Fontes.atual.value.familia
+
+private fun tipografia() = Typography(
     displaySmall = TextStyle(fontFamily = ArchivoLargo, fontWeight = FontWeight(780), fontSize = 34.sp, letterSpacing = (-0.4).sp),
     headlineMedium = TextStyle(fontFamily = ArchivoLargo, fontWeight = FontWeight(780), fontSize = 26.sp, letterSpacing = (-0.3).sp),
     headlineSmall = TextStyle(fontFamily = ArchivoLargo, fontWeight = FontWeight(780), fontSize = 22.sp),
@@ -259,6 +319,16 @@ fun PwTheme(content: @Composable () -> Unit) {
             brilho2 = Color(if (escuro) 0x1234D399 else 0x1A059669),
             marca = Marca.VERDE,
         )
+        estilo.noturno != null -> {
+            val t = (if (escuro) estilo.noturno!! else (estilo.diurno ?: estilo.noturno!!)).map { Color(it) }
+            val principal = t[1]
+            base.copy(
+                ouro = principal, ouroClaro = t[0], ouroEscuro = t[2],
+                sobreOuro = if (escuro && principal.luminance() > 0.45f) Color(0xFF0A0A0A) else Color(0xFFFFFFFF),
+                brilho1 = principal.copy(alpha = if (escuro) 0.17f else 0.22f), brilho2 = principal.copy(alpha = if (escuro) 0.07f else 0.10f),
+                marca = Marca.TINTA,
+            )
+        }
         estilo == EstiloTema.BRANCO_NO_PRETO -> base.copy(
             fundo = Color(0xFF000000), fundo2 = Color(0xFF0A0A0A),
             vidro = Color(0xE00C0C0C), vidroForte = Color(0xF2141414),
@@ -295,6 +365,8 @@ fun PwTheme(content: @Composable () -> Unit) {
     val densidade = androidx.compose.ui.platform.LocalDensity.current
     val limitada = androidx.compose.ui.unit.Density(densidade.density, densidade.fontScale.coerceAtMost(1.15f))
     CompositionLocalProvider(LocalPw provides p, androidx.compose.ui.platform.LocalDensity provides limitada) {
-        MaterialTheme(colorScheme = esquema, typography = tipografia, content = content)
+        val fonte = Fontes.atual.value
+        val tipo = androidx.compose.runtime.remember(fonte) { tipografia() }
+        MaterialTheme(colorScheme = esquema, typography = tipo, content = content)
     }
 }

@@ -82,6 +82,7 @@ data class MembroG(
     val status: String?, val modoTeste: Boolean, val repassePct: Double?, val bloqueado: Boolean, val ultimoAcesso: Long?,
 ) {
     val gestor get() = "gestor" in papeis
+    val supervisor get() = "supervisor" in papeis
     val motoboy get() = "motoboy" in papeis
     val dev get() = "dev" in papeis
     /** Conta de acesso de um cliente (pede pelo site); não aparece na equipe. */

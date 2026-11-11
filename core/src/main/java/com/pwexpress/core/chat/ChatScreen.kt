@@ -447,7 +447,7 @@ private fun comprimir(ctx: android.content.Context, uri: Uri): ByteArray? = runC
 fun SelosCargo(papeis: List<String>) {
     if (papeis.isEmpty()) return
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(start = 6.dp)) {
-        listOf("dev" to ("Dev" to Color(0xFFEF4444)), "gestor" to ("Gestor" to Pw.cores.ouro), "supervisor" to ("Supervisor" to Color(0xFFF59E0B)),
+        listOf("dev" to ("Dev" to Color(0xFFEF4444)), "gestor" to ("Gestor" to Pw.cores.ouro), "supervisor" to ("Supervisor" to Color(0xFF34D399)),
             "motoboy" to ("Motoboy" to Color(0xFF22C55E)), "cliente" to ("Cliente" to Color(0xFF38BDF8)))
             .firstOrNull { it.first in papeis }?.let { listOf(it) }.orEmpty().forEach { (_, rc) ->
                 val (r, cor) = rc

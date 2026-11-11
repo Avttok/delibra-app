@@ -29,7 +29,11 @@ import java.net.URL
  * virar o ícone do atalho na tela inicial do celular. Fica guardada no aparelho: o app já abre
  * com ela, mesmo sem internet.
  */
-data class Marca(val nome: String, val logoUrl: String?, val cor: String?, val nomeApp: String? = null, val escala: Float = 1.9f) {
+data class Marca(
+    val nome: String, val logoUrl: String?, val cor: String?, val nomeApp: String? = null, val escala: Float = 1.9f,
+    /** Cor e força (0..1) do brilho atrás da logo; fonte do nome no topo; a imagem original (para reajustar). */
+    val brilhoCor: String? = null, val brilho: Float = 0.55f, val fonte: String? = null, val original: String? = null,
+) {
     /** Nome no lugar de "Delibra": o escolhido pela empresa, ou o da empresa quando ela tem ícone. */
     val nomeExibido: String? get() = nomeApp ?: nome.takeIf { logoUrl != null }
     val propria: Boolean get() = logoUrl != null || nomeApp != null
@@ -56,7 +60,8 @@ object MarcaEmpresa {
         app = ctx.applicationContext
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val nome = p.getString("nome", null)
-        if (nome != null) _marca.value = Marca(nome, p.getString("logo", null), p.getString("cor", null), p.getString("nome_app", null), p.getFloat("escala", 1.9f))
+        if (nome != null) _marca.value = Marca(nome, p.getString("logo", null), p.getString("cor", null), p.getString("nome_app", null), p.getFloat("escala", 1.9f),
+            p.getString("brilho_cor", null), p.getFloat("brilho", 0.55f), p.getString("fonte", null), p.getString("original", null))
         val f = arquivo(ctx)
         if (f.exists() && _marca.value?.logoUrl != null) icone = runCatching { BitmapFactory.decodeFile(f.path) }.getOrNull()
     }
@@ -68,7 +73,8 @@ object MarcaEmpresa {
         if (antes == m) return
         _marca.value = m
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().apply {
-            if (m == null) clear() else { putString("nome", m.nome); putString("logo", m.logoUrl); putString("cor", m.cor); putString("nome_app", m.nomeApp); putFloat("escala", m.escala) }
+            if (m == null) clear() else { putString("nome", m.nome); putString("logo", m.logoUrl); putString("cor", m.cor); putString("nome_app", m.nomeApp); putFloat("escala", m.escala)
+                putString("brilho_cor", m.brilhoCor); putFloat("brilho", m.brilho); putString("fonte", m.fonte); putString("original", m.original) }
         }.apply()
         if (m?.logoUrl == null) {
             icone = null; arquivo(ctx).delete(); _versaoIcone.value++
@@ -84,7 +90,7 @@ object MarcaEmpresa {
         }
     }
 
-    private fun corMarca(): Int = runCatching { android.graphics.Color.parseColor(_marca.value?.cor ?: "#D4AF37") }.getOrDefault(0xFFD4AF37.toInt())
+    private fun corMarca(): Int = runCatching { android.graphics.Color.parseColor(_marca.value?.brilhoCor ?: _marca.value?.cor ?: "#D4AF37") }.getOrDefault(0xFFD4AF37.toInt())
 
     /** Fundo escuro com o brilho da cor da empresa e a logo inteira por cima (sem cortar). */
     private fun comBrilho(b: Bitmap, lado: Int, dentro: Float, redondo: Boolean): Bitmap {
@@ -96,7 +102,8 @@ object MarcaEmpresa {
         if (redondo) tela.drawCircle(meio, meio, meio, p) else tela.drawRect(0f, 0f, lado.toFloat(), lado.toFloat(), p)
         val cor = corMarca()
         p.shader = android.graphics.RadialGradient(meio, meio, lado * 0.48f,
-            intArrayOf((cor and 0x00FFFFFF) or 0x88000000.toInt(), (cor and 0x00FFFFFF) or 0x2A000000, cor and 0x00FFFFFF), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+            intArrayOf((cor and 0x00FFFFFF) or (((_marca.value?.brilho ?: 0.55f) * 0xF0).toInt().coerceIn(0, 255) shl 24),
+                (cor and 0x00FFFFFF) or (((_marca.value?.brilho ?: 0.55f) * 0x4C).toInt().coerceIn(0, 255) shl 24), cor and 0x00FFFFFF), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
         tela.drawCircle(meio, meio, lado * 0.48f, p)
         p.shader = null
         val area = lado * dentro

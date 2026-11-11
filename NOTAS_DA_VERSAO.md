@@ -3,14 +3,16 @@
 **Importante:** esta versão vem com a assinatura digital nova. Se o celular disser que não dá para atualizar, desinstale a versão antiga e instale esta (só desta vez).
 
 **Novidades desta versão**
-- **Editar percurso**: na rota, toque nas ruas por onde o motoboy deve passar; o caminho é refeito e o motoboy vê o traçado novo.
-- **Raio da mesma zona** direto na rota (− / +), sem ir em Ajustes.
-- **Console Dev**: abas Empresas (criar empresa já com o gestor, plano, nome do app) e Faturamento.
-- Editor do ícone com **prévia do topo** e **tamanho da logo no topo**.
-- Dev com "Ficar oculto" some de todas as listas (equipe, mapa, contatos do chat).
-- Holerite do motoboy não dá mais erro; mensagens de erro agora em português claro.
-- Botões lado a lado do mesmo tamanho; "Fica com o gestor" virou "Gestor".
-- O console Dev mostra as versões da Delibra (não mais as da PW Express).
+- **Visual do seu jeito**: 8 fontes (Sua conta → Fonte) e muitas cores novas, inclusive vermelho para todos e degradês (pôr do sol, oceano, aurora, neon, fogo).
+- **Abertura** com a logo até carregar tudo.
+- **Logo**: cor e força do brilho, fonte do nome no topo, e "Ajustar" sem enviar outra imagem.
+- **Supervisor** (verde) ao criar ou editar uma conta.
+- **Pagar a volta** do motoboy (da última parada até a partida), em Ajustes ou por rota.
+- **Distância do preço** no pedido: pelas ruas ou linha reta.
+- **Editar percurso** também nas rotas do pedido.
+- Busca dos ajustes acha mesmo com erro de digitação; olho para ver a senha.
+- "Mudar como o motoboy é pago" mostra só o que vale para a modalidade escolhida e agora esconde de verdade.
+- Botão online com o seu veículo girando; itens do radar somem mais rápido; contraste certo no preto no branco.
 
 **Sua marca no app**
 - A empresa pode ter **ícone e nome do app próprios**: aparecem no lugar de "Delibra" no topo, nas telas de entrada e nas notificações.

@@ -5,11 +5,16 @@ import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -101,30 +106,55 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
         carregou = true
     }
 
-    suspend fun salvarLogo(url: String?, escala: Float? = null): Boolean {
-        val r = PwCore.rpc.chamar("salvar_minha_organizacao", buildJsonObject { put("p", buildJsonObject { put("logo_url", url ?: ""); escala?.let { put("logo_escala", it) } }) })
+    suspend fun salvarLogo(url: String?, escala: Float? = null, extra: (kotlinx.serialization.json.JsonObjectBuilder.() -> Unit)? = null): Boolean {
+        val r = PwCore.rpc.chamar("salvar_minha_organizacao", buildJsonObject { put("p", buildJsonObject {
+            put("logo_url", url ?: ""); escala?.let { put("logo_escala", it) }
+            if (url == null) put("logo_original_url", "")
+            extra?.invoke(this)
+        }) })
         if (r.ok) { Perfis.carregar(); versao++ }
         return r.ok
     }
 
     var editando by remember { mutableStateOf<Bitmap?>(null) }
+    // imagem nova escolhida (vai também como "original", para reajustar depois sem reenviar)
+    var originalNovo by remember { mutableStateOf<ByteArray?>(null) }
     val galeria = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         escopo.launch {
-            editando = withContext(Dispatchers.IO) { runCatching { ctx.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } }.getOrNull() }
+            val bytes = withContext(Dispatchers.IO) { runCatching { ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull() }
+            originalNovo = bytes
+            editando = bytes?.let { runCatching { BitmapFactory.decodeByteArray(it, 0, it.size) }.getOrNull() }
             if (editando == null) PwToast.mostrar("Não deu para abrir esta imagem.", TipoAviso.ERRO)
         }
     }
-    fun enviar(png: ByteArray, escala: Float) {
+    /** Reajustar sem enviar outra: abre a original guardada (ou a logo atual). */
+    fun ajustar() {
+        val url = org?.t("logo_original_url") ?: org?.t("logo_url") ?: return
+        escopo.launch {
+            originalNovo = null
+            editando = withContext(Dispatchers.IO) { runCatching { java.net.URL(url).openStream().use { BitmapFactory.decodeStream(it) } }.getOrNull() }
+            if (editando == null) PwToast.mostrar("Não deu para abrir a imagem atual.", TipoAviso.ERRO)
+        }
+    }
+    fun enviar(png: ByteArray, escala: Float, brilhoCor: String?, forca: Float) {
         val id = org?.t("id") ?: return
         editando = null
         enviando = true
         escopo.launch {
             val ok = runCatching {
-                val caminho = "$id/icone-${System.currentTimeMillis()}.png"
+                val agora = System.currentTimeMillis()
+                val caminho = "$id/icone-$agora.png"
                 val up = PwCore.rpc.enviarArquivo("marcas", caminho, png, "image/png")
                 if (!up.ok) error("envio ${up.codigo}")
-                salvarLogo("${PwConfig.supabaseUrl}/storage/v1/object/public/marcas/$caminho", escala)
+                val orig = originalNovo?.let { b ->
+                    val c2 = "$id/original-$agora.png"
+                    if (PwCore.rpc.enviarArquivo("marcas", c2, b, "image/png").ok) "${PwConfig.supabaseUrl}/storage/v1/object/public/marcas/$c2" else null
+                }
+                salvarLogo("${PwConfig.supabaseUrl}/storage/v1/object/public/marcas/$caminho", escala) {
+                    orig?.let { put("logo_original_url", it) }
+                    put("brilho_cor", brilhoCor ?: ""); put("brilho", forca)
+                }
             }.getOrDefault(false)
             enviando = false
             if (ok) PwToast.mostrar("O app e o site já usam o ícone novo.", titulo = "Ícone da empresa")
@@ -132,7 +162,8 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
         }
     }
     editando?.let { b -> EditorIconeApp(b, marca?.cor ?: org?.t("cor"), marca?.nomeExibido ?: org?.t("nome_app") ?: org?.t("nome") ?: "Delibra",
-        org?.t("logo_escala")?.toFloatOrNull() ?: 1.9f, onCancelar = { editando = null }, onPronto = ::enviar); return }
+        org?.t("logo_escala")?.toFloatOrNull() ?: 1.9f, onCancelar = { editando = null }, onPronto = ::enviar,
+        brilhoCorInicial = org?.t("logo_brilho_cor"), brilhoInicial = org?.t("logo_brilho")?.toFloatOrNull() ?: 0.55f, fonteNome = org?.t("fonte_nome")); return }
 
     PwJanela("Minha empresa", onFechar) {
         if (!carregou) { PwCarregando(); return@PwJanela }
@@ -157,6 +188,7 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
                 PwBotaoOuro(if (enviando) "Enviando…" else if (o.t("logo_url") != null) "Trocar ícone" else "Enviar ícone", icone = PwIcones.ImagePlus, altura = 50.dp,
                     habilitado = !enviando, modifier = Modifier.weight(1f),
                     onClick = { galeria.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) })
+                if (o.t("logo_url") != null) PwBotaoIcone(PwIcones.SlidersHorizontal, "Ajustar sem enviar outra", onClick = { ajustar() })
                 if (o.t("logo_url") != null) PwBotaoIcone(PwIcones.Trash2, "Voltar ao ícone do Delibra", onClick = {
                     escopo.launch { if (salvarLogo(null)) PwToast.mostrar("Voltou para o ícone do Delibra.", TipoAviso.INFO) }
                 })
@@ -164,6 +196,22 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
             Spacer(Modifier.height(6.dp))
             Text("PNG com fundo transparente fica melhor; se a imagem tiver fundo, o editor tira. Ajuste zoom, posição e margem antes de salvar.", color = c.texto3, fontSize = 12.sp)
             Spacer(Modifier.height(14.dp))
+            Text("Fonte do nome no topo", color = c.texto2, fontSize = 13.sp)
+            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+            androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                val atualF = com.pwexpress.core.designsystem.FonteApp.de(o.t("fonte_nome"))
+                com.pwexpress.core.designsystem.FonteApp.entries.forEach { f ->
+                    val ativo = f == atualF
+                    Text(f.rotulo.substringBefore(" ("), fontFamily = f.familia, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = if (ativo) c.sobreOuro else c.texto,
+                        modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(99.dp)).background(if (ativo) c.ouro else c.vidro)
+                            .border(1.dp, if (ativo) c.ouro else c.borda, androidx.compose.foundation.shape.RoundedCornerShape(99.dp))
+                            .clickable { escopo.launch {
+                                val r = PwCore.rpc.chamar("salvar_minha_organizacao", buildJsonObject { put("p", buildJsonObject { put("fonte", if (f == com.pwexpress.core.designsystem.FonteApp.ARCHIVO) "" else f.name) }) })
+                                if (r.ok) { Perfis.carregar(); versao++ } else PwToast.mostrar("Não deu para salvar (${r.codigo}).", TipoAviso.ERRO)
+                            } }.padding(horizontal = 12.dp, vertical = 7.dp))
+                }
+            }
+            Spacer(Modifier.height(10.dp))
             com.pwexpress.core.designsystem.PwCampo(nomeApp, { nomeApp = it.take(30) }, "Nome do app (no lugar de Delibra)", Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             val mudou = nomeApp.trim() != (o.t("nome_app") ?: "")

@@ -263,9 +263,16 @@ fun PwCampo(
     habilitado: Boolean = true,
 ) {
     val c = Pw.cores
+    // senha: o olho no canto mostra/esconde o que foi digitado
+    var mostrar by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     OutlinedTextField(
         value = valor,
         onValueChange = onMudar,
+        trailingIcon = if (senha) { {
+            androidx.compose.material3.IconButton(onClick = { mostrar = !mostrar }) {
+                Icon(if (mostrar) PwIcones.EyeOff else PwIcones.Eye, if (mostrar) "Esconder a senha" else "Ver a senha", tint = c.texto3)
+            }
+        } } else null,
         label = { Text(rotulo, fontFamily = Archivo, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         placeholder = dica?.let { { Text(it, color = c.texto3, fontFamily = Archivo, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
         textStyle = TextStyle(fontFamily = Archivo, fontSize = 15.sp, color = c.texto),
@@ -274,7 +281,7 @@ fun PwCampo(
         enabled = habilitado,
         prefix = prefixo?.let { { Text(it, color = c.texto3) } },
         suffix = sufixo?.let { { Text(it, color = c.texto3) } },
-        visualTransformation = if (senha) PasswordVisualTransformation() else VisualTransformation.None,
+        visualTransformation = if (senha && !mostrar) PasswordVisualTransformation() else VisualTransformation.None,
         keyboardOptions = KeyboardOptions(keyboardType = teclado),
         shape = RoundedCornerShape(14.dp),
         colors = OutlinedTextFieldDefaults.colors(
@@ -591,11 +598,12 @@ fun PwAvatarConta(nome: String, foto: String?, teste: Boolean, modifier: Modifie
 
 /** Ícone e cor de cada cargo (iguais ao site): Dev </>, Gestor escudo, Motoboy moto. */
 @Composable
-fun PwSelosCargo(dev: Boolean, gestor: Boolean, motoboy: Boolean, teste: Boolean = false, modifier: Modifier = Modifier) {
+fun PwSelosCargo(dev: Boolean, gestor: Boolean, motoboy: Boolean, teste: Boolean = false, modifier: Modifier = Modifier, supervisor: Boolean = false) {
     val c = Pw.cores
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
         if (dev) PwSelo("Dev", c.dev, icone = PwIcones.CodeXml)
         if (gestor) PwSelo("Gestor", c.ouro, icone = PwIcones.ShieldCheck)
+        if (supervisor && !gestor) PwSelo("Supervisor", c.verde, icone = PwIcones.UserCog)
         if (motoboy) PwSelo("Motoboy", c.texto2, icone = PwIcones.Bike)
         if (teste) PwSelo("Teste", c.violeta, icone = PwIcones.FlaskConical)
     }

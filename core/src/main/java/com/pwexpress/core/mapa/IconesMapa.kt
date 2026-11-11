@@ -71,8 +71,11 @@ object IconesMapa {
         val cx = w / 2f; val cy = margem + diam / 2f
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         val escuroFundo = 0xFF111114.toInt()
+        // contraste sempre certo: destaque escuro (tema preto no branco) ou claro (branco no preto)
+        val lum = android.graphics.Color.luminance(ouro)
+        val visivel = if (lum < 0.3f) 0xFFFFFFFF.toInt() else ouro // destaque que aparece sobre o escuro
         val fundo = if (coleta) ouro else escuroFundo
-        val traco = if (coleta) 0xFF111114.toInt() else ouro
+        val traco = if (coleta) (if (lum > 0.45f) 0xFF111114.toInt() else 0xFFFFFFFF.toInt()) else (if (lum < 0.3f) 0xFFFFFFFF.toInt() else ouro)
         val alfa = if (concluida) 120 else 255
         // sombra + ponta (o ponto exato fica embaixo)
         p.color = 0x55000000; cv.drawCircle(cx, cy + 2 * d, diam / 2f, p)
@@ -92,7 +95,7 @@ object IconesMapa {
         }
         caminhos(nome).forEach { base -> cv.drawPath(Path(base).apply { transform(m) }, pi) }
         // número da parada (canto de cima, à esquerda)
-        if (numero != null && numero > 0) selo(cv, cx - diam / 2f + 3 * d, cy - diam / 2f + 3 * d, numero.toString(), if (coleta) escuroFundo else ouro, if (coleta) ouro else escuroFundo, d)
+        if (numero != null && numero > 0) selo(cv, cx - diam / 2f + 3 * d, cy - diam / 2f + 3 * d, numero.toString(), if (coleta) escuroFundo else visivel, if (coleta) visivel else escuroFundo, d)
         // + itens (canto de cima, à direita)
         if (mais > 0) selo(cv, cx + diam / 2f - 3 * d, cy - diam / 2f + 3 * d, "+$mais", 0xFFFFFFFF.toInt(), escuroFundo, d)
         return bmp

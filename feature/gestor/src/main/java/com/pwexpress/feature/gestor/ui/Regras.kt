@@ -144,7 +144,7 @@ internal fun CampoParametro(p: Param, valor: JsonElement?, onSalvar: (JsonElemen
             }
             else -> {
                 val atual = prim?.content?.toDoubleOrNull() ?: p.padraoNum
-                PwPasso(atual, { if (!bloqueado) onSalvar(JsonPrimitive(it)) }, Modifier.fillMaxWidth(), passo = p.passo, min = p.min ?: 0.0, max = p.max ?: 1e9, unidade = p.unidade)
+                PwPasso(atual, { if (!bloqueado) onSalvar(JsonPrimitive(it)) }, Modifier.fillMaxWidth(), passo = p.passo, min = p.min ?: 0.0, max = p.max ?: 1e9, unidade = p.unidade, confirmar = true)
             }
         }
     }

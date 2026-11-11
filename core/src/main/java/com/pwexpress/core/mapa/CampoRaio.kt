@@ -1,6 +1,8 @@
 package com.pwexpress.core.mapa
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,25 +64,36 @@ private var centroExemplo: Pair<Double, Double> = -27.5954 to -48.5482
 @Composable
 fun CampoRaio(valor: Double, unidade: String, min: Double, max: Double, passo: Double, onSalvar: (Double) -> Unit, habilitado: Boolean = true, dupla: Boolean = false) {
     val c = Pw.cores
+    // barra e número mudam o rascunho; salva só no ✓
     var v by remember(valor) { mutableFloatStateOf(valor.toFloat()) }
     var mapa by remember { mutableStateOf(false) }
     var centro by remember { mutableStateOf(centroExemplo) }
-    // salva quando para de mexer
-    LaunchedEffect(v) { if (v.toDouble() != valor) { delay(500); onSalvar(v.toDouble()) } }
+    val mudou = v.toDouble() != valor
     val metros = if (unidade == "km") v * 1000.0 else v.toDouble()
-    val texto = when {
-        v <= 0f -> "sem limite"
-        unidade == "km" -> "${com.pwexpress.core.designsystem.numeroBr(v.toDouble(), 1)} km"
-        v >= 1000f -> "${com.pwexpress.core.designsystem.numeroBr(v / 1000.0, 1)} km"
-        else -> "${v.toInt()} m"
+    val faixa = min.toFloat()..max.toFloat().coerceAtLeast(min.toFloat() + 1f)
+    val controles: @Composable () -> Unit = {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                PwBarraBolinha(v, { v = it }, faixa, passo.toFloat(), Modifier.weight(1f), habilitado)
+                Spacer(Modifier.width(10.dp))
+                PwBotaoIcone(PwIcones.Mapa, if (mapa) "Esconder o mapa" else "Ver no mapa", { mapa = !mapa }, ativo = mapa, tamanho = 38.dp)
+            }
+            Spacer(Modifier.height(6.dp))
+            // número à mão (útil para raios grandes, que a barra deixa difícil acertar)
+            com.pwexpress.core.designsystem.PwPasso(v.toDouble(), { n -> v = n.toFloat().coerceIn(faixa) }, Modifier.fillMaxWidth(), passo = passo, min = min, max = max, unidade = unidade)
+            if (v <= 0f) Text("0 = sem limite", color = c.texto3, fontSize = 12.sp)
+            if (mudou && habilitado) {
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    com.pwexpress.core.designsystem.PwBotaoOuro("Salvar ${if (v <= 0f) "sem limite" else if (unidade == "km") "${com.pwexpress.core.designsystem.numeroBr(v.toDouble(), 1)} km" else "${v.toInt()} m"}",
+                        onClick = { onSalvar(v.toDouble()) }, icone = PwIcones.Check, altura = 44.dp, modifier = Modifier.weight(1f))
+                    PwBotaoIcone(PwIcones.X, "Desfazer", { v = valor.toFloat() }, tamanho = 44.dp)
+                }
+            }
+        }
     }
     Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            PwBarraBolinha(v, { v = it }, min.toFloat()..max.toFloat().coerceAtLeast(min.toFloat() + 1f), passo.toFloat(), Modifier.weight(1f), habilitado)
-            Spacer(Modifier.width(10.dp))
-            Text(texto, color = c.texto, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.width(78.dp))
-            PwBotaoIcone(PwIcones.Mapa, if (mapa) "Esconder o mapa" else "Ver no mapa", { mapa = !mapa }, ativo = mapa, tamanho = 38.dp)
-        }
+        controles()
         if (mapa) {
             val forma = RoundedCornerShape(16.dp)
             // a segunda entrega fica a 2,4× o raio inicial: ao aumentar o raio, dá para ver quando encostam
@@ -96,6 +109,11 @@ fun CampoRaio(valor: Double, unidade: String, min: Double, max: Double, passo: D
                     circulo = if (metros > 0) centro to metros else null,
                     enquadrar = "${centro.first},${centro.second},${metros.toInt()}",
                     onToque = { la, lo -> centro = la to lo; centroExemplo = centro },
+                    tituloTelaCheia = "Raio",
+                    // na tela cheia: o mesmo ajuste do raio embaixo
+                    rodapeTelaCheia = {
+                        Column(Modifier.fillMaxWidth().clip(forma).background(c.vidroForte).border(1.dp, c.borda, forma).padding(14.dp)) { controles() }
+                    },
                 )
             }
             Text(

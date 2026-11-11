@@ -1123,15 +1123,18 @@ internal fun RotasDoPedidoG(pedidoId: String, status: String, chave: String) {
         if (rotas.size > 1) { Espaco(6); com.pwexpress.core.designsystem.PwFiltros(rotas.mapIndexed { i, r -> (if (previa) "Rota ${i + 1}" else "#${r.str("numero")}") to 0 }, aberta.coerceAtMost(rotas.lastIndex), { aberta = it }) }
         val r = rotas[aberta.coerceAtMost(rotas.lastIndex)]
         val editaveis = rotas.filter { !previa && it.str("status") in EDITAVEIS }
-        androidx.compose.runtime.key(r.str("id"), versao) { CartaoRotaG(r, previa, editaveis.filter { it.str("id") != r.str("id") }, sug, ocupado, ::rodar, ::rpc, pedidoId, revisando) }
+        androidx.compose.runtime.key(r.str("id"), versao) { CartaoRotaG(r, previa, editaveis.filter { it.str("id") != r.str("id") }, sug, ocupado, ::rodar, ::rpc, pedidoId, revisando, podeMontar = status == "recebido") }
     }
 }
+
+/** Pedido na prévia: depois de montar, o editor do percurso abre sozinho na rota. */
+private var abrirPercursoDepois by androidx.compose.runtime.mutableStateOf(false)
 
 @Composable
 private fun CartaoRotaG(
     r: kotlinx.serialization.json.JsonObject, previa: Boolean, outras: List<kotlinx.serialization.json.JsonObject>, sug: kotlinx.serialization.json.JsonObject?, ocupado: Boolean,
     rodar: (String, suspend () -> Result<*>) -> Unit, rpc: (String, kotlinx.serialization.json.JsonObjectBuilder.() -> Unit) -> (suspend () -> Result<*>),
-    pedidoId: String = "", revisando: Boolean = false,
+    pedidoId: String = "", revisando: Boolean = false, podeMontar: Boolean = false,
 ) {
     val c = Pw.cores
     val id = r.str("id") ?: return
@@ -1219,11 +1222,20 @@ private fun CartaoRotaG(
         }, habilitado = !ocupado && (valorTxt.isBlank() || vn != null), modifier = Modifier.padding(top = 8.dp).height(56.dp))
     }
     if (editavel && valorTxt.isBlank()) TextoDica("Vazio: a rota vale a soma dos pedidos.")
+    // na prévia: monta as rotas (seguras, ninguém recebe) e já abre o editor do percurso
+    if (previa && podeMontar && pedidoId.isNotEmpty()) {
+        Espaco(6)
+        PwBotaoVidro("Editar percurso no mapa", onClick = {
+            abrirPercursoDepois = true
+            rodar("Rotas montadas e seguras: ajuste o percurso e solte quando quiser.", rpc("aprovar_e_montar") { put("p_pedido", pedidoId) })
+        }, icone = PwIcones.Route, habilitado = !ocupado, modifier = Modifier.fillMaxWidth())
+        TextoDica("Monta as rotas seguras (ninguém recebe ainda) e abre o editor.")
+    }
     // editar o caminho desta rota (as ruas por onde o motoboy passa)
     if (!previa) {
         val dadosG by Gestao.dados.collectAsState()
         val corridaG = dadosG.corridas.firstOrNull { it.id == id }
-        var editarCaminho by remember(id) { mutableStateOf(false) }
+        var editarCaminho by remember(id) { mutableStateOf(abrirPercursoDepois.also { abrirPercursoDepois = false }) }
         if (corridaG != null && corridaG.status !in setOf("concluida", "cancelada") && corridaG.paradas.size >= 2) {
             Espaco(6)
             PwBotaoVidro("Editar percurso no mapa", onClick = { editarCaminho = true }, icone = PwIcones.Route, modifier = Modifier.fillMaxWidth())
@@ -1257,18 +1269,31 @@ private fun CartaoRotaG(
         }, icone = PwIcones.Check, habilitado = !ocupado, modifier = Modifier.padding(top = 6.dp))
     }
     if (mudaPagamento) {
+        // modalidade desta rota: uma só (mesmo com várias ligadas nos Ajustes); os valores dela aparecem logo abaixo
         Espaco(8)
-        PwBotaoVidro((if (verRegras) "Esconder" else "Mudar") + " como o motoboy é pago" + if (regrasSalvas.isNotEmpty()) " (${regrasSalvas.size})" else "",
+        PwRotulo("Como o motoboy desta rota é pago")
+        Espaco(4)
+        val modos = listOf("zonas" to "Zonas", "rota" to "Por km", "percentual" to "Percentual", "por_entrega" to "Por entrega", "fixo" to "Fixo")
+        val listaModos = (regras["pag_modos"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }.orEmpty()
+        val atualModo = listaModos.singleOrNull() ?: (regras["pag_modo"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.takeIf { listaModos.isEmpty() }
+            ?: r.obj("pagamento")?.str("modo")?.takeIf { it != "combinado" }
+        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            modos.forEach { (k, rot) ->
+                PwPilula(rot, ICONE_MODO[k] ?: PwIcones.Wallet, {
+                    regras["pag_modos"] = kotlinx.serialization.json.JsonArray(listOf(kotlinx.serialization.json.JsonPrimitive(k)))
+                    regras["pag_modo"] = kotlinx.serialization.json.JsonPrimitive(k)
+                    verRegras = true
+                }, ligada = atualModo == k)
+            }
+        }
+        TextoDica(if (atualModo == null) "Agora: cálculos combinados (como nos Ajustes). Toque numa modalidade para usar só ela nesta rota." else "Toque para trocar. Os valores da modalidade aparecem abaixo, com a prévia.")
+        Espaco(8)
+        PwBotaoVidro((if (verRegras) "Esconder" else "Mudar") + " os valores do pagamento" + if (regrasSalvas.isNotEmpty()) " (${regrasSalvas.size})" else "",
             onClick = { verRegras = !verRegras }, icone = PwIcones.SlidersHorizontal, modifier = Modifier.fillMaxWidth())
         if (verRegras) {
             TextoDica(if (previa) "Vale para a rota deste pedido, para quem pegar, por cima do cadastro do motoboy. Salve e a prévia mostra o valor novo."
                 else "Valem só para esta rota, para quem pegar, por cima do cadastro do motoboy. Mude e veja a prévia acima antes de salvar.")
-            // modelo em um toque (os parâmetros ficam logo abaixo)
-            val modos = listOf("zonas" to "Zonas", "rota" to "Por km", "percentual" to "Percentual", "por_entrega" to "Por entrega", "fixo" to "Fixo")
-            val atualModo = (regras["pag_modo"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: (r.obj("pagamento")?.str("modo"))
-            Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                modos.forEach { (k, rot) -> PwPilula(rot, ICONE_MODO[k] ?: PwIcones.Wallet, { regras["pag_modo"] = kotlinx.serialization.json.JsonPrimitive(k) }, ligada = atualModo == k) }
-            }
             (sug?.get("regras_comuns") as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it as? kotlinx.serialization.json.JsonObject }?.forEach { rc ->
                 PwPilula("Usar as de costume (${rc.long("vezes")}×)", PwIcones.Sparkles, { regras.clear(); rc.obj("regras")?.let { regras.putAll(it) } })
             }

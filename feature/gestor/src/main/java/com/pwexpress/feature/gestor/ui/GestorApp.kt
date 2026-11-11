@@ -62,6 +62,8 @@ object GestorNav {
 fun GestorApp(
     modifier: Modifier = Modifier,
     topo: @Composable () -> Unit,
+    /** Faixa logo abaixo do topo, em todas as telas (ex.: "Voltar à corrida"). Empurra o conteúdo, não cobre nada. */
+    faixa: (@Composable () -> Unit)? = null,
     meuId: String?,
 ) {
     var aba by rememberSaveable { mutableStateOf("mapa") }
@@ -129,6 +131,7 @@ fun GestorApp(
         val atual = pilha.lastOrNull()
         Column(Modifier.fillMaxSize()) {
             if (atual == null) topo()
+            faixa?.invoke()
             Box(Modifier.weight(1f)) {
                 when (atual) {
                     is TelaG.Corrida -> DetalheCorridaG(atual.id, onVoltar = ::voltar)

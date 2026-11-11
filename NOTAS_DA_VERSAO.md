@@ -1,3 +1,14 @@
+## Delibra · atualização
+
+**Novidades desta versão**
+- **Prévia do pedido mais completa**: escolha uma só modalidade de pagamento do motoboy (zona, km, entrega, percentual ou fixo) e o valor ali mesmo; "Editar percurso no mapa" já na revisão, antes de confirmar.
+- **Minha empresa redesenhada**: prévia de como fica, ícone, cor e fontes mostrando o texto de verdade.
+- **Nome do app e texto do topo separados**: ex. logo "PW" + "Express" no topo, e "PW Express" no resto.
+- **Números com confirmação**: digite o valor à mão nos ajustes e raios; só salva no ✓ (✗ desfaz).
+- **Raio do cliente em tela cheia** com os mesmos controles.
+- **Corrida**: Chat, Gestor e tela cheia numa barra só, sem cobrir Maps/Waze; "Voltar à corrida" virou uma faixa sob o topo, sem tapar o menu.
+- **Animações**: círculo de carregamento sem falha no canto; atualização só com o círculo animado (sem bolinha verde nem porcentagem).
+
 ## Delibra · grande atualização
 
 **Importante:** esta versão vem com a assinatura digital nova. Se o celular disser que não dá para atualizar, desinstale a versão antiga e instale esta (só desta vez).

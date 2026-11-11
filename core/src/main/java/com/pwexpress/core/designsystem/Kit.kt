@@ -52,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.compositeOver
@@ -318,21 +319,63 @@ fun PwInterruptor(titulo: String, ligado: Boolean, onMudar: (Boolean) -> Unit, m
 
 /** Número com botões − e + (ajustes de configuração). */
 @Composable
-fun PwPasso(valor: Double, onMudar: (Double) -> Unit, modifier: Modifier = Modifier, passo: Double = 1.0, min: Double = 0.0, max: Double = 1e9, unidade: String? = null) {
+fun PwPasso(valor: Double, onMudar: (Double) -> Unit, modifier: Modifier = Modifier, passo: Double = 1.0, min: Double = 0.0, max: Double = 1e9, unidade: String? = null,
+            /** true = − / + e o número digitado mudam um rascunho; salva só no ✓. */
+            confirmar: Boolean = false) {
     val c = Pw.cores
     val forma = RoundedCornerShape(14.dp)
-    fun ajustar(d: Double) = onMudar(((valor + d) * 1000).let { Math.round(it) / 1000.0 }.coerceIn(min, max))
-    Row(modifier.clip(forma).background(c.campo).border(1.dp, c.bordaForte, forma), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(48.dp).clickable(enabled = valor > min) { ajustar(-passo) }, contentAlignment = Alignment.Center) {
-            Icon(PwIcones.Minus, "Diminuir", tint = if (valor > min) c.ouro else c.texto3, modifier = Modifier.size(18.dp))
+    var rascunho by androidx.compose.runtime.remember(valor) { androidx.compose.runtime.mutableStateOf<Double?>(null) }
+    var texto by androidx.compose.runtime.remember(valor) { androidx.compose.runtime.mutableStateOf(numeroBr(valor, 2)) }
+    var focado by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val atual = rascunho ?: valor
+    fun limpar(n: Double) = (n * 1000).let { Math.round(it) / 1000.0 }.coerceIn(min, max)
+    fun definir(n: Double) {
+        val v = limpar(n)
+        texto = numeroBr(v, 2)
+        if (confirmar) rascunho = v else onMudar(v)
+    }
+    fun ler(t: String) = t.replace(".", "").replace(",", ".").replace(" ", "").toDoubleOrNull()
+    val mudou = confirmar && rascunho != null && rascunho != valor
+    Column(modifier) {
+        Row(Modifier.fillMaxWidth().clip(forma).background(c.campo).border(1.dp, if (focado || mudou) c.ouro else c.bordaForte, forma), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(48.dp).clickable(enabled = atual > min) { definir(atual - passo) }, contentAlignment = Alignment.Center) {
+                Icon(PwIcones.Minus, "Diminuir", tint = if (atual > min) c.ouro else c.texto3, modifier = Modifier.size(18.dp))
+            }
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                if (unidade == "R$") Text("R$ ", color = c.texto3, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                // dá para digitar o número direto
+                androidx.compose.foundation.text.BasicTextField(
+                    texto, { t ->
+                        texto = t.filter { it.isDigit() || it == ',' || it == '.' || it == '-' }.take(12)
+                        ler(texto)?.let { n -> if (confirmar) rascunho = n.coerceIn(min, max) }
+                    },
+                    textStyle = androidx.compose.ui.text.TextStyle(color = c.texto, fontWeight = FontWeight.Bold, fontSize = 16.sp, fontFamily = Archivo, textAlign = androidx.compose.ui.text.style.TextAlign.Center),
+                    singleLine = true, cursorBrush = androidx.compose.ui.graphics.SolidColor(c.ouro),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal, imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = {
+                        val n = ler(texto)
+                        if (n == null) texto = numeroBr(atual, 2)
+                        else if (confirmar) { onMudar(limpar(n)); rascunho = null } else definir(n)
+                    }),
+                    modifier = Modifier.widthIn(min = 48.dp, max = 130.dp).onFocusChanged { f ->
+                        focado = f.isFocused
+                        // saiu do campo sem confirmar: no modo direto aplica, no modo ✓ fica como rascunho
+                        if (!f.isFocused && !confirmar) ler(texto)?.let { if (limpar(it) != valor) definir(it) else texto = numeroBr(valor, 2) }
+                    },
+                )
+                if (unidade != null && unidade != "R$") Text(" $unidade", color = c.texto3, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Box(Modifier.size(48.dp).clickable(enabled = atual < max) { definir(atual + passo) }, contentAlignment = Alignment.Center) {
+                Icon(PwIcones.Plus, "Aumentar", tint = if (atual < max) c.ouro else c.texto3, modifier = Modifier.size(18.dp))
+            }
         }
-        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            if (unidade == "R$") Text("R$ ", color = c.texto3, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            Text(numeroBr(valor, 2), color = c.texto, fontWeight = FontWeight.Bold, fontSize = 16.sp, fontFamily = Archivo)
-            if (unidade != null && unidade != "R$") Text(" $unidade", color = c.texto3, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-        }
-        Box(Modifier.size(48.dp).clickable(enabled = valor < max) { ajustar(passo) }, contentAlignment = Alignment.Center) {
-            Icon(PwIcones.Plus, "Aumentar", tint = if (valor < max) c.ouro else c.texto3, modifier = Modifier.size(18.dp))
+        if (mudou) {
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                PwBotaoOuro("Salvar ${if (unidade == "R$") "R$ " else ""}${numeroBr(rascunho!!, 2)}${if (unidade != null && unidade != "R$") " $unidade" else ""}",
+                    onClick = { onMudar(limpar(rascunho!!)); rascunho = null }, icone = PwIcones.Check, altura = 44.dp, modifier = Modifier.weight(1f))
+                PwBotaoIcone(PwIcones.X, "Desfazer", { rascunho = null; texto = numeroBr(valor, 2) }, tamanho = 44.dp)
+            }
         }
     }
 }

@@ -164,7 +164,7 @@ fun JanelaAtualizacao() {
                             }
                             verificando -> {
                                 drawCircle(c.borda, style = Stroke(esp))
-                                rotate(cometa - angulo) { drawArc(Brush.sweepGradient(listOf(Color.Transparent, c.ouroClaro, c.ouro)), 0f, 110f, false, style = Stroke(esp, cap = StrokeCap.Round)) }
+                                rotate(cometa - angulo) { drawArc(Brush.sweepGradient(0f to Color.Transparent, 0.06f to c.ouro.copy(alpha = 0.15f), 0.30f to c.ouroClaro, 0.31f to Color.Transparent, 1f to Color.Transparent), 0f, 110f, false, style = Stroke(esp, cap = StrokeCap.Round)) }
                             }
                             emDia -> drawCircle(Brush.sweepGradient(listOf(verde, c.ouroClaro, verde)), style = Stroke(esp))
                             else -> drawCircle(grad, style = Stroke(esp))
@@ -173,12 +173,6 @@ fun JanelaAtualizacao() {
                     Box(Modifier.size(170.dp).clip(androidx.compose.foundation.shape.CircleShape)
                         .background(Brush.radialGradient(listOf((if (emDia) verde else c.ouro).copy(alpha = 0.22f * pulso), Color.Transparent))))
                     Box(Modifier.graphicsLayer { translationY = flutua * density }) { PwSeloLogo(132.dp) }
-                    if (emDia) Box(Modifier.align(Alignment.BottomEnd).padding(end = 52.dp, bottom = 52.dp).size(44.dp).graphicsLayer { scaleX = pronto.value.coerceAtLeast(0.01f); scaleY = scaleX }
-                        .clip(androidx.compose.foundation.shape.CircleShape).background(verde), contentAlignment = Alignment.Center) {
-                        Icon(PwIcones.Check, "Em dia", tint = Color(0xFF052E1A), modifier = Modifier.size(24.dp))
-                    }
-                    if (baixando) Text("${(anim * 100).toInt()}%", color = c.texto, fontFamily = ArchivoLargo, fontWeight = FontWeight.Black, fontSize = 15.sp,
-                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp).clip(RoundedCornerShape(99.dp)).background(c.fundo2).padding(horizontal = 12.dp, vertical = 4.dp))
                 }
                 if (obrigatoria) PwSelo("ATUALIZAÇÃO OBRIGATÓRIA", c.ouro, icone = PwIcones.ShieldCheck)
 
@@ -186,7 +180,7 @@ fun JanelaAtualizacao() {
                     is EstadoAtualizacao.Baixando -> {
                         Titulo("Baixando…")
                         val mb = { b: Long -> "%.1f".format(b / 1_048_576.0).replace('.', ',') }
-                        Text("${mb(e.baixado)} de ${mb(e.total)} MB · ${(e.fracao * 100).toInt()}%", color = c.texto2, fontFamily = Archivo, textAlign = TextAlign.Center)
+                        Text("${mb(e.baixado)} de ${mb(e.total)} MB", color = c.texto2, fontFamily = Archivo, textAlign = TextAlign.Center)
                         Barra(anim)
                         Texto("Pode deixar o app aberto. O Android vai pedir para confirmar a instalação.")
                         PwBotaoVidro("Cancelar", onClick = { Atualizador.cancelarDownload() }, modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth())

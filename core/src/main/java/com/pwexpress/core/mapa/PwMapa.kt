@@ -194,6 +194,7 @@ private fun MapaBase(
     /** Aproximar, afastar, ir até mim e estabelecimentos à mão (tela cheia e mapas que ocupam a tela). */
     controles: Boolean = false,
     controlesLocais: Boolean = true,
+    atribuicaoAcima: Int = 0,
 ) {
     val ctx = LocalContext.current
     val arrastou by rememberUpdatedState(onArrastou)
@@ -294,6 +295,13 @@ private fun MapaBase(
         }
     }
 
+    // o "i" dos créditos do mapa fica acima dos painéis e barras de cada tela (não cobre botões)
+    LaunchedEffect(mapa, margemBaixo, atribuicaoAcima) {
+        val m = mapa ?: return@LaunchedEffect
+        m.uiSettings.attributionGravity = android.view.Gravity.BOTTOM or android.view.Gravity.START
+        val d = densidade
+        m.uiSettings.setAttributionMargins((8 * d).toInt(), 0, 0, ((margemBaixo + atribuicaoAcima + 6) * d).toInt())
+    }
     LaunchedEffect(mapa, irPara) {
         val m = mapa ?: return@LaunchedEffect
         val p = irPara ?: return@LaunchedEffect
@@ -584,18 +592,26 @@ fun PwMapa(
     controlesLocais: Boolean = true,
     /** Onde fica o botão de tela cheia no mapa pequeno. */
     botaoTelaCheiaEm: androidx.compose.ui.Alignment = androidx.compose.ui.Alignment.TopStart,
+    /** false = a tela põe o próprio botão de tela cheia e abre com [abrirTelaCheia]. */
+    botaoTelaCheia: Boolean = true,
+    /** Mude (para > 0) para abrir a tela cheia. */
+    abrirTelaCheia: Int = 0,
+    /** Sobe o "i" dos créditos do mapa (dp) acima de barras da própria tela. */
+    atribuicaoAcima: Int = 0,
 ) {
     var cheio by remember { mutableStateOf(false) }
+    LaunchedEffect(abrirTelaCheia) { if (abrirTelaCheia > 0) cheio = true }
     var enquadrarCheio by remember { mutableStateOf(0) }
     val base: @Composable (Modifier, Boolean) -> Unit = { mod, telaCheia ->
         MapaBase(paradas, rota, minhaPosicao, mod, marcadores, onToque, if (telaCheia) (enquadrar to enquadrarCheio) else enquadrar, onMarcador, seguir, trilhas,
             onCentro, inicio, zoomInicio, if (telaCheia) 0 else margemBaixo, irPara, focar, caminhoAuto, rotas, circulo, percursos, comPings, percursoTeste,
-            calor, restanteDe, legenda, euComFoto, if (telaCheia) botoesTelaCheia else null, destacar, onArrastou, onParada, controles = telaCheia || controles, controlesLocais = controlesLocais)
+            calor, restanteDe, legenda, euComFoto, if (telaCheia) botoesTelaCheia else null, destacar, onArrastou, onParada, controles = telaCheia || controles, controlesLocais = controlesLocais,
+            atribuicaoAcima = if (telaCheia) 0 else atribuicaoAcima)
     }
     androidx.compose.foundation.layout.Box(modifier) {
         if (!cheio) base(Modifier.matchParentSize(), false)
         else androidx.compose.foundation.layout.Box(Modifier.matchParentSize().background(Pw.cores.fundo))
-        if (maximizavel) com.pwexpress.core.designsystem.PwBotaoIcone(
+        if (maximizavel && botaoTelaCheia) com.pwexpress.core.designsystem.PwBotaoIcone(
             PwIcones.Maximize2, "Tela cheia", { cheio = true },
             modifier = Modifier.align(botaoTelaCheiaEm).padding(10.dp), tamanho = 40.dp,
         )

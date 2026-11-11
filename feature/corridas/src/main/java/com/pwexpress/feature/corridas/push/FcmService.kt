@@ -39,20 +39,20 @@ class FcmService : FirebaseMessagingService() {
             "cancelada" -> {
                 Alarme.pararOferta(applicationContext)
                 PwNotificacoes.cartao(applicationContext, 4100, PwNotificacoes.CANAL_AVISOS, "Corrida cancelada",
-                    "O gestor cancelou a corrida. Se você estava a caminho, pode parar.", PwNotificacoes.GRAD_VERMELHO)
+                    "O gestor cancelou a corrida. Se você estava a caminho, pode parar.", PwNotificacoes.GRAD_VERMELHO, icone = "x")
                 PwDestaque.mostrar("Corrida cancelada", "O gestor cancelou. Se estava a caminho, pode parar.", EstiloDestaque.CANCELADA, duracaoMs = 7_000)
                 runBlocking { withTimeoutOrNull(8_000) { Corridas.sincronizarAgora() } }
             }
             "rota_estendida" -> {
                 PwNotificacoes.cartao(applicationContext, 4200, PwNotificacoes.CANAL_AVISOS, "Sua rota cresceu",
-                    "Entraram mais paradas no fim da sua rota. O que você já ia ganhar fica garantido.", PwNotificacoes.GRAD_OURO)
+                    "Entraram mais paradas no fim da sua rota. O que você já ia ganhar fica garantido.", PwNotificacoes.GRAD_OURO, icone = "mais")
                 PwDestaque.mostrar("Sua rota cresceu", "Mais paradas no fim da rota. Seu valor não diminui.", EstiloDestaque.EXTENSAO, duracaoMs = 7_000)
                 runBlocking { withTimeoutOrNull(8_000) { Corridas.sincronizarAgora() } }
             }
             "planejada_aberta" -> {
                 PwNotificacoes.cartao(applicationContext, 4300 + ((message.data["corrida_id"]?.hashCode() ?: 0) and 0xFF), PwNotificacoes.CANAL_PLANEJADAS,
                     "Rota planejada sem motoboy", "Ninguém reservou e o horário está chegando. Pegue antes dos outros.", PwNotificacoes.GRAD_AZUL,
-                    abrir = PwNotificacoes.abrirApp(applicationContext, 4300, "rotas"))
+                    abrir = PwNotificacoes.abrirApp(applicationContext, 4300, "rotas"), icone = "calendario")
                 runBlocking { withTimeoutOrNull(6_000) { Corridas.carregarPlanejadas(); Corridas.carregarRotas() } }
             }
             "chat" -> {

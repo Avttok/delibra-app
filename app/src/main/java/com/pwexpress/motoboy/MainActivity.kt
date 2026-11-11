@@ -119,6 +119,15 @@ class MainActivity : ComponentActivity() {
 
                     LaunchedEffect(abrirAba.value) { abrirAba.value?.let {
                         if (it == "planejadas" || it == "rotas") { aba = "corridas"; painel = Painel.MOTOBOY; naConfig = false }
+                        // avisos do gestor: abre o painel do gestor no pedido / na rota
+                        if (it.startsWith("gestor:")) {
+                            painel = Painel.GESTOR; prefs.edit { putString("painel", Painel.GESTOR.name) }; naConfig = false; noPerfil = false
+                            val partes = it.split(":")
+                            when (partes.getOrNull(1)) {
+                                "pedido" -> partes.getOrNull(2)?.takeIf { id -> id.isNotBlank() }?.let { id -> GestorNav.abrirPedido(id) }
+                                "corrida" -> partes.getOrNull(2)?.takeIf { id -> id.isNotBlank() }?.let { id -> GestorNav.abrir(com.pwexpress.feature.gestor.ui.TelaG.Corrida(id)) }
+                            }
+                        }
                         if (it.startsWith("chat")) { it.substringAfter("chat:", "").takeIf { c -> c.isNotBlank() }?.let { c -> com.pwexpress.core.chat.Chat.conversaPedida.value = c }; com.pwexpress.core.chat.Chat.abrir.value = true }
                         abrirAba.value = null } }
                     val chatAberto by com.pwexpress.core.chat.Chat.abrir.collectAsState()

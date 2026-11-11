@@ -58,6 +58,20 @@ class FcmService : FirebaseMessagingService() {
                     abrir = PwNotificacoes.abrirApp(applicationContext, 4300, "rotas"), icone = "calendario")
                 runBlocking { withTimeoutOrNull(6_000) { Corridas.carregarPlanejadas(); Corridas.carregarRotas() } }
             }
+            // avisos do gestor: pedido novo, rota sem motoboy, cadastro de cliente
+            "pedido_novo", "rota_sem_motoboy", "cadastro_novo" -> {
+                val t = message.data["tipo"]!!
+                val alvo = when (t) {
+                    "pedido_novo" -> "gestor:pedido:${message.data["pedido_id"].orEmpty()}"
+                    "rota_sem_motoboy" -> "gestor:corrida:${message.data["corrida_id"].orEmpty()}"
+                    else -> "gestor:clientes"
+                }
+                val idN = 4400 + ((message.data["pedido_id"] ?: message.data["corrida_id"] ?: message.data["cadastro_id"] ?: t).hashCode() and 0xFF)
+                PwNotificacoes.cartao(applicationContext, idN, PwNotificacoes.CANAL_AVISOS,
+                    message.data["titulo"] ?: "Aviso", message.data["texto"] ?: "", when (t) { "rota_sem_motoboy" -> PwNotificacoes.GRAD_VERMELHO; "cadastro_novo" -> PwNotificacoes.GRAD_AZUL; else -> PwNotificacoes.GRAD_OURO },
+                    abrir = PwNotificacoes.abrirApp(applicationContext, idN, alvo),
+                    icone = when (t) { "rota_sem_motoboy" -> "alerta"; "cadastro_novo" -> "pessoa"; else -> "rota" })
+            }
             "chat" -> {
                 val conversa = message.data["conversa_id"] ?: return
                 PwNotificacoes.mensagemChat(applicationContext, conversa, message.data["titulo"] ?: "Conversa", message.data["texto"] ?: "Nova mensagem")

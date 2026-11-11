@@ -1,3 +1,39 @@
+## Delibra · novidades
+
+**Para o motoboy**
+- **Pedir para cancelar a corrida**: deu problema no caminho? Peça ao gestor pelo app, com o motivo. Ele aprova ou nega, e você é avisado na hora.
+- **Joguinho enquanto espera**: toque várias vezes no botão de status e jogue "Corre, motoboy!". Chegou corrida, o jogo fecha sozinho.
+- **Rota mandada no chat**: abra a rota ou o pedido que o gestor mandou, veja as paradas e quanto recebe, e responda "Posso fazer" ou "Agora não".
+- **Seu veículo**: se o gestor deixar, você mesmo cadastra a placa, o modelo, a cor e a CNH.
+- **Trocar a senha** quando quiser, no seu perfil.
+- **Coleta certa**: na coleta aparecem só os pacotes das suas entregas, agrupados (ex.: 7× Documentos).
+- **Menos bateria e internet**: o GPS manda menos pontos nas retas e mais nas curvas, sem perder o caminho.
+- **Aviso de suspensão** claro, com até quando vale.
+
+**Para o gestor**
+- **Passar a rota para outro motoboy** mesmo depois de aceita (enquanto nada foi coletado).
+- **Responder pedidos de cancelamento** numa faixa no topo, com aprovar, negar, penalizar ou marcar abandono.
+- **Penalidades** de cada motoboy e cliente: pontos, histórico, perdoar e tirar suspensão.
+- **Juntar pedidos mais fácil**: um painel só na revisão mostra como o pedido se junta com outros; toque e mude só para ele. Para juntar rotas, cartões com quantas entregas ficam.
+- **Ver pedido** dentro da rota, para voltar ao pedido de origem.
+- **Confirmação** antes de voltar um pedido para a revisão.
+- **Quem conhece a região sai na frente**: o sistema aprende onde cada motoboy entrega e dá preferência a ele naquela área.
+- **Compartilhar motoboys** com outras empresas (todas, algumas ou nenhuma), no geral e por motoboy, se o Dev liberar.
+- **Perfis completos**: toque na foto ou no nome no chat e veja números, conquistas, veículo e bairros.
+- **Minha empresa**: nome diferente em cada lugar (entrada, notificações, atalho, site do cliente, acessos) e prévias de como fica.
+- **Conferir pagamento** do Mercado Pago dentro do pedido.
+- **Editar percurso**: toque num ponto para escolher e toque onde ele deve ir, também com o mapa em tela cheia.
+- **Mapas em tela cheia** com as ferramentas da tela: raio e centro da zona, dia dos percursos.
+
+**Em todo o app**
+- **Números do seu jeito**: escolha entre a barra ou digitar, no ícone ao lado; só salva no ✓.
+- **Volta para a última tela** que você estava.
+- **Topo mais limpo**: troca motoboy/gestor e o chat numa pílula só; a foto não fica mais apertada.
+- **Supervisor em azul** (verde é só para online).
+- **Legenda "Feitas / A fazer"** não fica mais atrás dos botões do mapa.
+- **Meta Quest**: o app abre numa janela do tamanho certo e se ajusta a telas largas.
+- Tudo o que é novo tem ajuste para ligar, desligar e mudar.
+
 ## Delibra · atualização
 
 **Novidades desta versão**

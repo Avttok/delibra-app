@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -269,7 +270,7 @@ private fun DrawScope.desenharMoto(cx: Float, cy: Float, wf: Float, ouro: Color,
     val w = wf * 0.3f; val h = w * 2.6f
     // farol no chão
     drawOval(Brush.radialGradient(listOf(ouro.copy(alpha = 0.32f), Color.Transparent), Offset(cx, cy - h), h * 0.9f), Offset(cx - h * 0.7f, cy - h * 1.9f), Size(h * 1.4f, h * 1.4f))
-    androidx.compose.ui.graphics.drawscope.rotate(inclinar, Offset(cx, cy)) {
+    rotate(inclinar, Offset(cx, cy)) {
         drawRoundRect(Color.Black.copy(alpha = 0.4f), Offset(cx - w / 2 + 5, cy - h / 2 + 8), Size(w, h), CornerRadius(w / 2))
         // rodas
         drawRoundRect(Color(0xFF27272A), Offset(cx - w * 0.28f, cy - h / 2 - 4), Size(w * 0.56f, h * 0.26f), CornerRadius(w * 0.2f))

@@ -406,6 +406,15 @@ object Gestao {
 
     suspend fun apagarLinha(nome: String, id: String) = acao { PwCore.rpc.rest("DELETE", "/rest/v1/$nome?id=eq.$id").exigirOk(::traduzir); Unit }
 
+    /** Confere no Mercado Pago (pelo site) o último pagamento do pedido. Devolve o status. */
+    suspend fun verificarPagamento(pedido: String): Result<String?> = acao {
+        val r = PwCore.rpc.site("/api/pagamentos/verificar", buildJsonObject { put("pedido_id", pedido) }).exigirOk(::traduzir)
+        val o = runCatching { Json.parseToJsonElement(r.corpo) as? JsonObject }.getOrNull()
+        val st = (o?.get("status") as? kotlinx.serialization.json.JsonPrimitive)?.content
+        atualizar()
+        st
+    }
+
     /** Chama uma função do banco e devolve o JSON da resposta. */
     suspend fun rpcJson(funcao: String, args: JsonObject = JsonObject(emptyMap())): Result<JsonElement> = acao {
         PwCore.rpc.chamar(funcao, args).exigirOk(::traduzir).let { r -> if (r.corpo.isBlank()) JsonNull else Json.parseToJsonElement(r.corpo) }
@@ -539,6 +548,23 @@ object Gestao {
         "valor_invalido" to "Valor inválido.",
         "ajuste_invalido" to "Ajuste inválido.",
         "holerite_fechado" to "O holerite desse período já foi fechado. Reabra antes de mudar.",
+        "motoboy_suspenso" to "Esse motoboy está suspenso por penalidades.",
+        "cliente_bloqueado" to "Esse cliente está bloqueado por penalidades.",
+        "chamado_ja_respondido" to "Esse pedido de cancelamento já foi respondido.",
+        "chamado_nao_encontrado" to "Pedido de cancelamento não encontrado.",
+        "pontos_invalidos" to "Pontos inválidos (1 a 1000).",
+        "penalidade_nao_encontrada" to "Penalidade não encontrada (pode já ter sido perdoada).",
+        "ja_coletou" to "O motoboy já coletou: não dá mais para passar a rota.",
+        "corrida_sem_motoboy" to "Essa rota não está com nenhum motoboy agora.",
+        "mesmo_motoboy" to "A rota já está com esse motoboy.",
+        "passar_desligado" to "Passar rota está desligado em Ajustes → Despacho.",
+        "compartilhar_desligado" to "O Dev não liberou compartilhar motoboys entre empresas.",
+        "modo_invalido" to "Opção inválida.",
+        "limite_motoboys" to "Seu plano chegou ao limite de motoboys.",
+        "limite_gestores" to "Seu plano chegou ao limite de gestores.",
+        "limite_clientes" to "Seu plano chegou ao limite de clientes.",
+        "pag_token_invalido" to "Esse token não parece do Mercado Pago (começa com APP_USR- ou TEST-).",
+        "rota_compartilhada_desligada" to "Abrir rota pelo chat está desligado.",
     )
 
     fun traduzir(codigo: String): String? = erros[codigo]

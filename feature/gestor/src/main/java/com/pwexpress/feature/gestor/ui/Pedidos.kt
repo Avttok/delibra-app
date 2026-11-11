@@ -270,6 +270,22 @@ private fun JanelaPedido(p: PedidoG, empresa: String?, onFechar: () -> Unit) {
                     PwBotaoVidro("Cartão", onClick = { rodar("Pagamento confirmado: o pedido segue para as rotas.", fechar = false) { Gestao.confirmarPagamentoPedido(p.id, "cartao") } },
                         icone = PwIcones.Wallet, modifier = Modifier.weight(1f))
                 }
+                Spacer(Modifier.size(8.dp))
+                // o cliente pagou pelo site (PIX/cartão no Mercado Pago): confere lá na hora
+                PwBotaoOuro("Verificar no Mercado Pago", onClick = {
+                    rodar("Conferido no Mercado Pago.", fechar = false) {
+                        Gestao.verificarPagamento(p.id).map { st ->
+                            com.pwexpress.core.designsystem.PwToast.mostrar(when (st) {
+                                "aprovado" -> "Pago! O pedido segue para as rotas."
+                                "sem_pagamento" -> "O cliente ainda não começou o pagamento pelo site."
+                                "pendente", "em_processo" -> "Ainda não caiu. O cliente pode estar pagando agora."
+                                "recusado" -> "O pagamento foi recusado pelo Mercado Pago."
+                                "expirado" -> "O PIX venceu sem pagamento."
+                                else -> "Situação: ${st ?: "desconhecida"}."
+                            })
+                        }
+                    }
+                }, icone = PwIcones.CreditCard, modifier = Modifier.fillMaxWidth())
             }
         }
         if (p.status !in setOf("cancelado", "recusado") && (p.status != "recebido" || Gestao.dados.value.config.logico("revisao_previa_rotas", true)))

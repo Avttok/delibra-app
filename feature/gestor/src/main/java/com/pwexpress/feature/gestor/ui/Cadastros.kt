@@ -632,6 +632,9 @@ private fun PercursosMembroG(id: String, teste: Boolean) {
             paradas = emptyList(), rota = null, minhaPosicao = null, modifier = Modifier.fillMaxWidth().height(300.dp),
             percursos = regs.mapIndexed { i, r -> com.pwexpress.core.mapa.PercursoMapa.de(r, destaque = destaque == i, apagado = destaque != null && destaque != i) },
             percursoTeste = teste, enquadrar = "$id-$dia-${regs.size}-$destaque",
+            tituloTelaCheia = "Percursos de ${dados.membro(id)?.nome?.substringBefore(" ").orEmpty()}",
+            // tela cheia: troca o dia sem sair do mapa
+            rodapeTelaCheia = { com.pwexpress.core.mapa.SeletorDia(dia, { dia = it }) },
             marcadores = dados.posicao(id)?.takeIf { coordenadaValida(it.lat, it.lng) }?.let { p -> listOf(MarcadorMapa(id, p.lat!!, p.lng!!, String.format("#%06X", 0xFFFFFF and corMotoboy(p.status, c).toArgb()), dados.membro(id)?.nome?.substringBefore(" ").orEmpty(), foto = dados.membro(id)?.foto)) }.orEmpty(),
         )
     }

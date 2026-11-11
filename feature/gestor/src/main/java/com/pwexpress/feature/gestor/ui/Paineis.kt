@@ -294,7 +294,7 @@ fun MapaG(onCorrida: (String) -> Unit) {
         titulo = "Mapa",
         subtitulo = "$emServico em serviço · ${todos.size} motoboy${if (todos.size == 1) "" else "s"} · ${ativas.size} rota${if (ativas.size == 1) "" else "s"} ativa${if (ativas.size == 1) "" else "s"}",
         mapa = { margem, enquadrar ->
-            PwMapa(maximizavel = false,
+            PwMapa(maximizavel = false, controles = true, controlesLocais = false,
                 paradas = paradasMapa.map { it.second }, rota = null, rotas = rotasMapa, caminhoAuto = false, minhaPosicao = null, marcadores = marcadores, modifier = Modifier.fillMaxSize(),
                 enquadrar = enquadrar, onMarcador = ::escolher, seguir = selecionado.takeIf { seguir && destaque == null }, destacar = selecionado,
                 onArrastou = { if (seguir) seguir = false }, irPara = irPara,
@@ -540,7 +540,7 @@ fun CorridasG(onAbrir: (String) -> Unit, onNova: () -> Unit) {
             val caminhos by androidx.compose.runtime.produceState(emptyList<String>(), ativas.map { it.id + (it.rota?.length ?: 0) }) {
                 value = ativas.mapNotNull { cor -> cor.rota ?: com.pwexpress.core.mapa.Caminho.entre(cor.paradas.map { it.lat to it.lng }) }
             }
-            PwMapa(maximizavel = false, paradas = pinos, rota = null, rotas = caminhos, caminhoAuto = false, minhaPosicao = null, marcadores = online, modifier = Modifier.fillMaxSize(), enquadrar = "${pinos.size}-$enquadrar", margemBaixo = margem)
+            PwMapa(maximizavel = false, controles = true, controlesLocais = false, paradas = pinos, rota = null, rotas = caminhos, caminhoAuto = false, minhaPosicao = null, marcadores = online, modifier = Modifier.fillMaxSize(), enquadrar = "${pinos.size}-$enquadrar", margemBaixo = margem)
         },
         acoesGaveta = {
             if (selecionando) {

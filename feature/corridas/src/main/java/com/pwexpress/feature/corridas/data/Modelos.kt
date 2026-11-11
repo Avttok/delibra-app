@@ -247,6 +247,8 @@ data class RotaHolerite(val id: String, val numero: Long, val concluidaEm: Long?
 data class Holerite(
     val inicio: String, val fim: String, val status: String, val rotas: Int, val entregas: Int, val km: Double,
     val valoresVisiveis: Boolean, val total: Double?, val ajustes: List<Pair<String, Double>>, val itens: List<RotaHolerite>,
+    /** Salário, diárias, horas e mínimo do período (descrição, detalhe, valor). */
+    val fixos: List<Triple<String, String?, Double?>> = emptyList(),
 )
 
 internal fun JsonObject.paraPeriodo(): PeriodoHolerite {
@@ -266,6 +268,9 @@ internal fun JsonObject.paraHolerite(): Holerite {
             val o = e as? JsonObject ?: return@mapNotNull null
             RotaHolerite(s(o, "id") ?: return@mapNotNull null, s(o, "numero")?.toLongOrNull() ?: 0, s(o, "concluida_em")?.let { instante(it) },
                 s(o, "entregas")?.toIntOrNull() ?: 0, s(o, "km")?.toDoubleOrNull() ?: 0.0, s(o, "clientes"), s(o, "valor")?.toDoubleOrNull())
+        }.orEmpty(),
+        fixos = (this["fixos"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { e ->
+            (e as? JsonObject)?.let { f -> Triple(s(f, "descricao") ?: "", s(f, "detalhe"), s(f, "valor")?.toDoubleOrNull()) }
         }.orEmpty(),
     )
 }

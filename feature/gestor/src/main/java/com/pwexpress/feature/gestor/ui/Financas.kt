@@ -350,6 +350,19 @@ private fun HoleriteG(linha: JsonObject, ini: String, fim: String, teste: Boolea
                 Text(moedaBr(r.dbl("valor")), color = c.texto, fontWeight = FontWeight.SemiBold)
             }
         }
+        // salário, diárias, horas e mínimo do período (modelo de pagamento do motoboy)
+        x.arr("fixos").takeIf { it.isNotEmpty() }?.let { fx ->
+            PwRotulo("Salário, diárias e horas")
+            fx.forEach { f ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(f.str("descricao").orEmpty(), color = c.texto, fontSize = 13.5.sp)
+                        f.str("detalhe")?.let { Text(it, color = c.texto3, fontSize = 12.sp) }
+                    }
+                    Text(moedaBr(f.dbl("valor")), color = c.texto, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             PwRotulo("Ajustes do período"); Spacer(Modifier.width(8.dp))
             com.pwexpress.core.designsystem.PwDica("Ajustes", "Bônus (valor positivo) ou desconto (com −). O motoboy não vê o motivo: o total do ajuste aparece repartido entre as rotas do holerite dele.")

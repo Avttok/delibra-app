@@ -60,7 +60,7 @@ fun SimuladorScreen(onFechar: () -> Unit, kmhPadrao: Double) {
 
     PwTelaCheia("Simulador de GPS", onFechar, subtitulo = "Modo teste · o GPS de verdade fica pausado enquanto ligado") {
         Box(Modifier.fillMaxWidth().height(300.dp).clip(RoundedCornerShape(20.dp))) {
-            PwMapa(maximizavel = false,
+            PwMapa(tituloTelaCheia = "Simulador de GPS",
                 paradas = ativa?.paradas?.map { PinoMapa(it.lat, it.lng, it.tipo == TipoParada.COLETA, it.id == proxima?.id, it.status == StatusParada.CONCLUIDA) }.orEmpty(),
                 rota = ativa?.rotaPlanejada, minhaPosicao = null,
                 marcadores = listOfNotNull(

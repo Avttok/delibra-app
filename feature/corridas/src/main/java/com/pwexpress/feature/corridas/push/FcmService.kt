@@ -21,9 +21,10 @@ class FcmService : FirebaseMessagingService() {
             "oferta" -> {
                 // toca primeiro (não depende de rede), depois busca os detalhes e enriquece a notificação
                 val id = message.data["oferta_id"]
-                Alarme.mostrarOferta(applicationContext, ofertaId = id)
+                // a checagem em segundo plano pode já ter tocado esta oferta
+                if (id == null || Alarme.ofertaTocada != id) Alarme.mostrarOferta(applicationContext, ofertaId = id)
                 runBlocking { withTimeoutOrNull(8_000) { Corridas.sincronizarAgora() } }
-                Corridas.oferta.value?.takeIf { id == null || it.id == id }?.let { Alarme.mostrarOferta(applicationContext, it) }
+                Corridas.oferta.value?.takeIf { (id == null || it.id == id) && Alarme.ofertaCompleta != it.id }?.let { Alarme.mostrarOferta(applicationContext, it) }
             }
             "planejada_nova", "planejada_voltou", "planejada_reservada", "planejada_liberada",
             "planejada_reagendada", "planejada_lembrete", "planejada_atrasada" -> {

@@ -227,7 +227,11 @@ object PwNotificacoes {
     }
 
     /** Mensagem do chat: estilo de conversa (remetente e prévia), tocando no canal de Conversas. */
+    /** Quando cada conversa avisou pela última vez (push e checagem não avisam em dobro). */
+    val chatAvisadoEm = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
     fun mensagemChat(ctx: Context, conversa: String, titulo: String, texto: String) {
+        chatAvisadoEm[conversa] = System.currentTimeMillis()
         val id = 5000 + (conversa.hashCode() and 0x3FF)
         val abrir = abrirApp(ctx, id, "chat:$conversa")
         val eu = androidx.core.app.Person.Builder().setName("Você").build()

@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Android 16: notificação "ao vivo" da corrida em andamento -->
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+    <!-- áudio no chat (só quando a pessoa grava) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <application>
         <receiver android:name="com.pwexpress.core.update.InstaladorReceiver" android:exported="false" />
     </application>

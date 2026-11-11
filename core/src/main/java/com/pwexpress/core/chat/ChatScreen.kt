@@ -35,6 +35,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -247,6 +250,27 @@ private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: 
     var autores by remember(id) { mutableStateOf<Map<String, Contato>>(emptyMap()) }
     LaunchedEffect(id) { autores = Chat.autores(id).associateBy { it.id } }
     val nomes = remember(contatos, autores) { contatos.associateBy { it.id } + autores }
+    var respondendo by remember(id) { mutableStateOf<Mensagem?>(null) }
+    var editando by remember(id) { mutableStateOf<Mensagem?>(null) }
+    var menuMsg by remember(id) { mutableStateOf<String?>(null) }
+    var membros by remember(id) { mutableStateOf<List<MembroChat>>(emptyList()) }
+    var verMembros by remember(id) { mutableStateOf(false) }
+    LaunchedEffect(id) { while (true) { membros = Chat.membros(id); delay(15_000) } }
+    val perfilEu by com.pwexpress.core.perfil.Perfis.perfil.collectAsState()
+    val editarMin = perfilEu?.numero("chat_editar_min", 15.0) ?: 15.0
+    val audioLigado = perfilEu?.logico("chat_audio_ligado", true) != false && perfilEu?.logico("dev_chat_audio_ligado", true) != false
+    val audioMax = (perfilEu?.numero("dev_chat_audio_max_s", 60.0) ?: 60.0).coerceIn(5.0, 600.0)
+    val gravador = remember(id) { GravadorAudio(ctx) }
+    var gravandoDesde by remember(id) { mutableStateOf<Long?>(null) }
+    var agoraG by remember { mutableStateOf(0L) }
+    LaunchedEffect(gravandoDesde) {
+        while (gravandoDesde != null) {
+            agoraG = System.currentTimeMillis()
+            if (agoraG - (gravandoDesde ?: agoraG) > audioMax * 1000) break
+            delay(250)
+        }
+    }
+    androidx.compose.runtime.DisposableEffect(id) { onDispose { gravador.cancelar() } }
 
     suspend fun recarregar() { Chat.mensagens(id).onSuccess { novo -> val antes = msgs?.size; msgs = novo; if (antes != novo.size && novo.isNotEmpty()) estado.animateScrollToItem(novo.lastIndex) } }
     LaunchedEffect(id) { while (true) { recarregar(); Chat.marcarLida(id); delay(4_000) } }
@@ -257,10 +281,35 @@ private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: 
         if (t.isEmpty() && anexo == null) return
         enviando = true
         escopo.launch {
-            Chat.enviar(id, t.ifEmpty { null }, anexo).onSuccess { texto = ""; if (anexo != null) Chat.anexoPendente.value = null; recarregar() }
-                .onFailure { PwToast.mostrar(it.message ?: "Não foi.", TipoAviso.ERRO) }
+            val ed = editando
+            if (ed != null && anexo == null) {
+                Chat.editar(ed.id, t).onSuccess { texto = ""; editando = null; recarregar() }.onFailure { PwToast.mostrar(it.message ?: "Não foi.", TipoAviso.ERRO) }
+            } else {
+                Chat.enviar(id, t.ifEmpty { null }, anexo, respondendo?.id).onSuccess { texto = ""; respondendo = null; if (anexo != null) Chat.anexoPendente.value = null; recarregar() }
+                    .onFailure { PwToast.mostrar(it.message ?: "Não foi.", TipoAviso.ERRO) }
+            }
             enviando = false
         }
+    }
+    fun pararGravacao(mandarAudio: Boolean) {
+        val desde = gravandoDesde ?: return
+        gravandoDesde = null
+        val arq = gravador.parar()
+        val dur = (System.currentTimeMillis() - desde) / 1000.0
+        if (!mandarAudio || arq == null || dur < 1.0) { arq?.delete(); return }
+        enviando = true
+        escopo.launch {
+            val bytes = withContext(Dispatchers.IO) { runCatching { arq.readBytes() }.getOrNull() }
+            arq.delete()
+            if (bytes == null) PwToast.mostrar("Não deu para ler o áudio.", TipoAviso.ERRO)
+            else Chat.enviarAudio(id, bytes, minOf(dur, audioMax), respondendo?.id).onSuccess { respondendo = null; recarregar() }.onFailure { PwToast.mostrar(it.message ?: "Não foi.", TipoAviso.ERRO) }
+            enviando = false
+        }
+    }
+    LaunchedEffect(agoraG) { val d = gravandoDesde; if (d != null && agoraG - d > audioMax * 1000) pararGravacao(true) }
+    val pedirMicrofone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        if (ok) { if (gravador.comecar()) gravandoDesde = System.currentTimeMillis() else PwToast.mostrar("Não deu para usar o microfone.", TipoAviso.ERRO) }
+        else PwToast.mostrar("Libere o microfone para mandar áudio.", TipoAviso.AVISO)
     }
     val galeria = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -275,7 +324,8 @@ private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: 
 
     Column(Modifier.fillMaxSize().imePadding()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            PwCabecalho(conv?.nome ?: "Conversa", onVoltar, subtitulo = when (conv?.tipo) { "geral" -> "Toda a equipe"; "grupo" -> "${conv.membros} pessoas"; else -> nomes[conv?.outro]?.papel }) {
+            PwCabecalho(conv?.nome ?: "Conversa", onVoltar, subtitulo = when (conv?.tipo) { "geral" -> "Toda a equipe"; "grupo", "corrida" -> "${conv.membros} pessoas" + if (conv.arquivada) " · histórico" else ""; "empresa" -> "Atendimento da empresa"; else -> nomes[conv?.outro]?.papel }) {
+                if (conv?.tipo != "geral" && conv?.tipo != "direta") PwBotaoIcone(PwIcones.Users, "Membros", { verMembros = !verMembros })
                 if (conv?.tipo == "direta") SelosCargo(nomes[conv.outro]?.papeis.orEmpty())
                 if (conv?.tipo == "direta" && conv.outro != null) PwBotaoIcone(PwIcones.UserRound, "Ver perfil", { com.pwexpress.core.perfil.PerfilAberto.abrir(conv.outro) })
                 if (conv != null && conv.souMembro) PwBotaoIcone(if (conv.silenciada) PwIcones.BellRing else PwIcones.BellOff, if (conv.silenciada) "Voltar a avisar" else "Silenciar",
@@ -289,6 +339,7 @@ private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: 
                 }
             }
         }
+        if (verMembros) MembrosChat(id, conv, membros, meuId, gestor || dev, contatos, onMudou = { escopo.launch { membros = Chat.membros(id); Chat.carregar() } }, onSaiu = onVoltar)
         Box(Modifier.weight(1f).fillMaxWidth()) {
             val l = msgs
             if (l == null) PwCarregando()
@@ -307,12 +358,24 @@ private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: 
                             Spacer(Modifier.width(8.dp))
                         }
                         val forma = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = if (minha) 16.dp else 4.dp, bottomEnd = if (minha) 4.dp else 16.dp)
+                        Column(horizontalAlignment = if (minha) Alignment.End else Alignment.Start) {
                         Column(
                             Modifier.widthIn(max = 290.dp).clip(forma)
-                                .background(if (minha) c.ouro.copy(alpha = 0.18f) else c.vidroForte)
-                                .border(1.dp, if (minha) c.ouro.copy(alpha = 0.5f) else c.borda, forma)
+                                .background(if (m.automatica) c.ouro.copy(alpha = 0.08f) else if (minha) c.ouro.copy(alpha = 0.18f) else c.vidroForte)
+                                .border(1.dp, if (minha || m.automatica) c.ouro.copy(alpha = 0.5f) else c.borda, forma)
+                                .pointerInput(m.id) { detectTapGestures(onLongPress = { if (!m.apagada) menuMsg = if (menuMsg == m.id) null else m.id }, onTap = { if (menuMsg != null) menuMsg = null }) }
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
                         ) {
+                            if (m.automatica) Text("Resposta automática", color = c.ouro, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            m.respostaA?.let { rid -> l.firstOrNull { it.id == rid } }?.let { q ->
+                                Row(Modifier.padding(bottom = 4.dp).clip(RoundedCornerShape(8.dp)).background(c.texto.copy(alpha = 0.06f)).padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Box(Modifier.width(3.dp).height(26.dp).background(c.ouro, RoundedCornerShape(2.dp))); Spacer(Modifier.width(6.dp))
+                                    Column {
+                                        Text(q.autor?.let { nomes[it]?.nome } ?: "Empresa", color = c.ouro, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                        Text(if (q.apagada) "Mensagem apagada" else q.texto ?: if (q.anexo?.tipo == "audio") "Áudio" else "Anexo", color = c.texto2, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                }
+                            }
                             if (emGrupo && primeira) Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(autor?.nome ?: "Alguém", color = c.ouro, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1,
                                     modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable(enabled = m.autor != null) { m.autor?.let { com.pwexpress.core.perfil.PerfilAberto.abrir(it) } })
@@ -322,17 +385,41 @@ private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: 
                             else {
                                 m.anexo?.let { a ->
                                     if (a.tipo == "foto" && a.caminho != null) FotoChat(a.caminho) { fotoAberta = it }
+                                    else if (a.tipo == "audio") AudioChat(a)
                                     else CartaoAnexo(a) { onAbrirAnexo(a) }
                                 }
                                 m.texto?.let { Text(it, color = c.texto, fontSize = 15.sp) }
                             }
                             Row(Modifier.align(if (minha) Alignment.End else Alignment.Start), verticalAlignment = Alignment.CenterVertically) {
-                                Text(quando(m.quando), color = c.texto3, fontSize = 10.5.sp)
-                                if (!m.apagada && (minha || gestor || dev)) {
-                                    Spacer(Modifier.width(6.dp))
-                                    Icon(PwIcones.Trash2, "Apagar mensagem", tint = c.texto3, modifier = Modifier.size(14.dp).clip(CircleShape).clickable { escopo.launch { Chat.apagar(m.id); recarregar() } })
+                                Text((if (m.editada && !m.apagada) "editada · " else "") + quando(m.quando), color = c.texto3, fontSize = 10.5.sp)
+                                if (minha && !m.apagada) {
+                                    val outros = membros.filter { it.id != meuId }
+                                    val vista = outros.isNotEmpty() && outros.all { it.lidaEm >= m.quando }
+                                    Spacer(Modifier.width(4.dp))
+                                    Icon(PwIcones.CheckCheck, if (vista) "Vista" else "Enviada", tint = if (vista) Color(0xFF38BDF8) else c.texto3, modifier = Modifier.size(14.dp))
                                 }
                             }
+                        }
+                        if (m.reacoes.isNotEmpty()) Row(Modifier.padding(top = 3.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            m.reacoes.forEach { (e, quem) ->
+                                val eu = meuId != null && meuId in quem
+                                Text("$e ${quem.size}", fontSize = 12.sp, color = c.texto, modifier = Modifier.clip(RoundedCornerShape(99.dp))
+                                    .background(if (eu) c.ouro.copy(alpha = 0.2f) else c.vidro).border(1.dp, if (eu) c.ouro else c.borda, RoundedCornerShape(99.dp))
+                                    .clickable(enabled = conv?.arquivada != true) { escopo.launch { Chat.reagir(m.id, e); recarregar() } }.padding(horizontal = 7.dp, vertical = 2.dp))
+                            }
+                        }
+                        if (menuMsg == m.id) Row(
+                            Modifier.padding(top = 4.dp).clip(RoundedCornerShape(99.dp)).background(c.vidroForte).border(1.dp, c.borda, RoundedCornerShape(99.dp)).padding(horizontal = 6.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (conv?.arquivada != true) listOf("👍", "❤️", "😂", "😮", "🙏", "✅").forEach { e ->
+                                Text(e, fontSize = 20.sp, modifier = Modifier.clip(CircleShape).clickable { menuMsg = null; escopo.launch { Chat.reagir(m.id, e); recarregar() } }.padding(4.dp))
+                            }
+                            if (conv?.arquivada != true) PwBotaoIcone(PwIcones.Reply, "Responder", { respondendo = m; editando = null; menuMsg = null }, tamanho = 32.dp)
+                            if (minha && m.anexo == null && conv?.arquivada != true && System.currentTimeMillis() - m.quando < editarMin * 60_000)
+                                PwBotaoIcone(PwIcones.Pencil, "Editar", { editando = m; respondendo = null; texto = m.texto.orEmpty(); menuMsg = null }, tamanho = 32.dp)
+                            if (minha || gestor || dev) PwBotaoIcone(PwIcones.Trash2, "Apagar", { menuMsg = null; escopo.launch { Chat.apagar(m.id); recarregar() } }, tamanho = 32.dp)
+                        }
                         }
                     }
                 }
@@ -346,6 +433,21 @@ private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: 
                 PwBotaoIcone(PwIcones.X, "Cancelar", { Chat.anexoPendente.value = null }, tamanho = 32.dp)
             }
         }
+        if (conv?.arquivada == true) {
+            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                Icon(PwIcones.Archive, null, tint = c.texto3, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(8.dp))
+                Text("A corrida terminou: esta conversa fica no histórico, só para ler.", color = c.texto2, fontSize = 13.sp)
+            }
+            return@Column
+        }
+        (respondendo ?: editando)?.let { alvo ->
+            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).clip(RoundedCornerShape(14.dp)).background(c.vidro).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(if (editando != null) PwIcones.Pencil else PwIcones.Reply, null, tint = c.ouro, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(8.dp))
+                Text(if (editando != null) "Editando a mensagem" else "Respondendo ${alvo.autor?.let { nomes[it]?.nome }.orEmpty()}: ${alvo.texto ?: "anexo"}",
+                    color = c.texto, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                PwBotaoIcone(PwIcones.X, "Cancelar", { if (editando != null) texto = ""; respondendo = null; editando = null }, tamanho = 30.dp)
+            }
+        }
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.Bottom) {
             PwBotaoIcone(PwIcones.ImagePlus, "Mandar foto", { galeria.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, habilitado = !enviando)
             Spacer(Modifier.width(8.dp))
@@ -355,7 +457,16 @@ private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: 
                 BasicTextField(texto, { texto = it.take(4000) }, textStyle = TextStyle(color = c.texto, fontSize = 15.sp), cursorBrush = SolidColor(c.ouro), maxLines = 5, modifier = Modifier.fillMaxWidth())
             }
             Spacer(Modifier.width(8.dp))
-            PwBotaoIcone(PwIcones.Send, "Enviar", { mandar() }, ativo = texto.isNotBlank(), habilitado = !enviando && texto.isNotBlank())
+            if (audioLigado && texto.isBlank() && editando == null) {
+                val desde = gravandoDesde
+                if (desde != null) Text("${((agoraG - desde) / 1000).coerceAtLeast(0)}s", color = c.vermelho, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 6.dp, bottom = 12.dp))
+                PwBotaoIcone(if (desde != null) PwIcones.Square else PwIcones.Mic, if (desde != null) "Parar e mandar o áudio" else "Gravar áudio", {
+                    if (desde != null) pararGravacao(true)
+                    else if (androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        if (gravador.comecar()) gravandoDesde = System.currentTimeMillis() else PwToast.mostrar("Não deu para usar o microfone.", TipoAviso.ERRO)
+                    } else pedirMicrofone.launch(android.Manifest.permission.RECORD_AUDIO)
+                }, ativo = desde != null, habilitado = !enviando, cor = if (desde != null) c.vermelho else null)
+            } else PwBotaoIcone(PwIcones.Send, "Enviar", { mandar() }, ativo = texto.isNotBlank(), habilitado = !enviando && texto.isNotBlank())
         }
     }
     fotoAberta?.let { url ->

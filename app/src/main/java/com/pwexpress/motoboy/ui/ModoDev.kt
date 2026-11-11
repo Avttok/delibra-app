@@ -84,21 +84,23 @@ private fun rotuloDe(modo: String, foco: String?, lista: List<EmpresaDev>) = whe
     else -> "Tudo"
 }
 
-/** Selo flutuante (só para o Dev), por cima de todas as telas: mostra e troca o modo. */
+/**
+ * Aba do modo Dev (só para o Dev): uma lingueta pequena na borda esquerda, por cima de todas as
+ * telas, que não cobre botões nem painéis. Toque abre a janela para trocar.
+ */
 @Composable
 fun SeloModoDev(modifier: Modifier = Modifier) {
     val c = Pw.cores
     val rotulo by ModoDevApp.rotulo.collectAsState()
     LaunchedEffect(Unit) { lerModo()?.let { (m, f, l) -> ModoDevApp.rotulo.value = rotuloDe(m, f, l) } }
-    val forma = RoundedCornerShape(99.dp)
-    Row(
-        modifier.clip(forma).background(c.fundo2.copy(alpha = 0.94f)).border(1.dp, c.dev.copy(alpha = 0.6f), forma)
-            .clickable { ModoDevApp.abrir() }.padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    val forma = RoundedCornerShape(topEnd = 14.dp, bottomEnd = 14.dp)
+    Column(
+        modifier.clip(forma).background(c.fundo2.copy(alpha = 0.92f)).border(1.dp, c.dev.copy(alpha = 0.6f), forma)
+            .clickable { ModoDevApp.abrir() }.padding(start = 6.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Icon(PwIcones.CodeXml, null, tint = c.dev, modifier = Modifier.size(15.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(rotulo ?: "Modo Dev", color = c.texto, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 140.dp))
+        Icon(PwIcones.CodeXml, "Modo Dev: ${rotulo ?: ""}", tint = c.dev, modifier = Modifier.size(16.dp))
+        Text((rotulo ?: "Dev").take(3).uppercase(), color = c.texto2, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 

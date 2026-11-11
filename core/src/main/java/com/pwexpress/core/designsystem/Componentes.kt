@@ -124,7 +124,7 @@ fun PwBotaoOuro(
     tamanhoTexto: Int = 17,
 ) {
     val c = Pw.cores
-    val forma = RoundedCornerShape(18.dp)
+    val forma = RoundedCornerShape(16.dp)
     Row(
         modifier
             .fillMaxWidth()
@@ -156,7 +156,7 @@ fun PwBotaoVidro(
     cor: Color? = null,
 ) {
     val c = Pw.cores
-    val forma = RoundedCornerShape(14.dp)
+    val forma = RoundedCornerShape(16.dp)
     val tinta = cor ?: c.texto
     Row(
         modifier
@@ -208,9 +208,17 @@ fun PwSeloLogo(tamanho: Dp, modifier: Modifier = Modifier, descricao: String? = 
     val empresa by com.pwexpress.core.marca.MarcaEmpresa.marca.collectAsState()
     val url = empresa?.logoUrl
     if (!delibra && url != null) {
-        coil.compose.AsyncImage(url, empresa?.nome ?: descricao, modifier.size(tamanho).clip(RoundedCornerShape(tamanho * 0.22f)),
-            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-            error = painterResource(R.drawable.pwex_marca_ouro))
+        // logo da empresa solta (sem caixa), com um brilho da cor da empresa por trás, como a PW era
+        val corMarca = empresa?.cor?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() } ?: Pw.cores.ouro
+        Box(modifier.size(tamanho), contentAlignment = Alignment.Center) {
+            Box(Modifier.matchParentSize().drawBehind {
+                drawCircle(Brush.radialGradient(listOf(corMarca.copy(alpha = 0.55f), corMarca.copy(alpha = 0.18f), Color.Transparent), center, size.minDimension * 0.62f),
+                    size.minDimension * 0.62f, center)
+            })
+            coil.compose.AsyncImage(url, empresa?.nome ?: descricao, Modifier.fillMaxSize().padding(tamanho * 0.04f),
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                error = painterResource(R.drawable.pwex_marca_ouro))
+        }
         return
     }
     val marca = Pw.cores.marca

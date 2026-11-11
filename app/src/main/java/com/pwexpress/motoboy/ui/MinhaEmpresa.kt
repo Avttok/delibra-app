@@ -72,15 +72,6 @@ private fun JsonObject.n(k: String) = (this[k] as? JsonPrimitive)?.doubleOrNull 
 
 private val MODELO = mapOf("percentual" to "Percentual do faturamento", "licenca" to "Licença mensal", "isento" to "Isento")
 
-/** Recorta o centro num quadrado de 512 px (PNG), o formato dos ícones. */
-private fun quadrado(bytes: ByteArray): ByteArray? {
-    val b = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
-    val m = minOf(b.width, b.height)
-    val q = Bitmap.createBitmap(b, (b.width - m) / 2, (b.height - m) / 2, m, m)
-    val s = Bitmap.createScaledBitmap(q, 512, 512, true)
-    return ByteArrayOutputStream().also { s.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
-}
-
 /**
  * Minha empresa (dono ou Dev): ícone que entra no lugar do Delibra no app, no site e no atalho do
  * celular, e o plano da empresa com a plataforma (o mesmo do site em Minha empresa).
@@ -116,13 +107,20 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
         return r.ok
     }
 
+    var editando by remember { mutableStateOf<Bitmap?>(null) }
     val galeria = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        val id = org?.t("id")
-        if (uri == null || id == null) return@rememberLauncherForActivityResult
+        if (uri == null) return@rememberLauncherForActivityResult
+        escopo.launch {
+            editando = withContext(Dispatchers.IO) { runCatching { ctx.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } }.getOrNull() }
+            if (editando == null) PwToast.mostrar("Não deu para abrir esta imagem.", TipoAviso.ERRO)
+        }
+    }
+    fun enviar(png: ByteArray) {
+        val id = org?.t("id") ?: return
+        editando = null
         enviando = true
         escopo.launch {
             val ok = runCatching {
-                val png = withContext(Dispatchers.IO) { ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() }?.let(::quadrado) } ?: error("imagem")
                 val caminho = "$id/icone-${System.currentTimeMillis()}.png"
                 val up = PwCore.rpc.enviarArquivo("marcas", caminho, png, "image/png")
                 if (!up.ok) error("envio ${up.codigo}")
@@ -133,6 +131,7 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
             else PwToast.mostrar("Não deu para salvar o ícone. Tente outra imagem.", TipoAviso.ERRO)
         }
     }
+    editando?.let { b -> EditorIconeApp(b, marca?.cor ?: org?.t("cor"), onCancelar = { editando = null }, onPronto = ::enviar); return }
 
     PwJanela("Minha empresa", onFechar) {
         if (!carregou) { PwCarregando(); return@PwJanela }
@@ -162,7 +161,7 @@ fun JanelaMinhaEmpresa(onFechar: () -> Unit) {
                 })
             }
             Spacer(Modifier.height(6.dp))
-            Text("Imagem quadrada, de preferência 512 × 512. Se não for quadrada, o centro é recortado.", color = c.texto3, fontSize = 12.sp)
+            Text("PNG com fundo transparente fica melhor; se a imagem tiver fundo, o editor tira. Ajuste zoom, posição e margem antes de salvar.", color = c.texto3, fontSize = 12.sp)
             Spacer(Modifier.height(14.dp))
             com.pwexpress.core.designsystem.PwCampo(nomeApp, { nomeApp = it.take(30) }, "Nome do app (no lugar de Delibra)", Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))

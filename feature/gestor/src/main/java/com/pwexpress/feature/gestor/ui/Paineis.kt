@@ -365,8 +365,9 @@ fun MapaG(onCorrida: (String) -> Unit) {
         }
     }
 
+    // a janela já rola sozinha: rolagem dentro de rolagem fechava o app
     if (camadasAbertas) com.pwexpress.core.designsystem.PwJanela("Camadas do mapa", { camadasAbertas = false }) {
-        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             TextoDica("Escolha o que aparece no mapa. Fica guardado neste aparelho.")
             com.pwexpress.core.designsystem.PwInterruptor("Rotas planejadas", verRotas, { verRotas = it }, descricao = "O caminho das rotas ativas (toque numa parada para abrir a rota).", icone = PwIcones.Route)
             com.pwexpress.core.designsystem.PwInterruptor("Paradas das rotas", verParadas, { verParadas = it }, descricao = "Coletas e entregas numeradas, com ícone.", icone = PwIcones.MapPin)

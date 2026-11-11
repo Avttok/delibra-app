@@ -1,5 +1,14 @@
 ## Delibra · grande atualização
 
+**Importante:** esta versão vem com a assinatura digital nova. Se o celular disser que não dá para atualizar, desinstale a versão antiga e instale esta (só desta vez).
+
+**Novidades desta versão**
+- **Modo Dev**: selo flutuante para ver o app como Tudo, Em branco ou uma empresa.
+- Sua conta toda em blocos de 2 colunas; liga/desliga mostram o estado.
+- "Como chegou no valor" desenhado pelas ruas (o gestor pode escolher linha reta em Ajustes → Distância do orçamento).
+- Notificações em cartões coloridos com ícone de cada tipo.
+- Mais espaço entre cartões, botões e textos; nomes no mapa não se encavalam.
+
 **Sua marca no app**
 - A empresa pode ter **ícone e nome do app próprios**: aparecem no lugar de "Delibra" no topo, nas telas de entrada e nas notificações.
 - Em Ajustes → **Ícone na tela inicial**, o motoboy coloca o atalho com o ícone e o nome da empresa no celular.

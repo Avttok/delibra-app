@@ -146,7 +146,8 @@ object Alarme {
         val texto = if (planejada) "${quando?.let { "Para $it · " } ?: ""}$ent · reserve antes dos outros" else "$ent · pegue antes dos outros"
         val ver = NotificationCompat.Action.Builder(null, if (planejada) "Ver e reservar" else "Ver e pegar", abrir).build()
         PwNotificacoes.aviso(ctx, 3600 + ((corridaId?.hashCode() ?: 0) and 0x1FF),
-            if (planejada) PwNotificacoes.CANAL_PLANEJADAS else PwNotificacoes.CANAL_AVISOS, titulo, texto, null, abrir, listOf(ver))
+            if (planejada) PwNotificacoes.CANAL_PLANEJADAS else PwNotificacoes.CANAL_AVISOS, titulo, texto, null, abrir, listOf(ver),
+            icone = "rota", cores = if (planejada) PwNotificacoes.GRAD_AZUL else PwNotificacoes.GRAD_VERDE)
     }
 
     fun planejada(ctx: Context, tipo: String, corridaId: String?, agendadaPara: String?) {
@@ -171,6 +172,8 @@ object Alarme {
             ctx, 3000 + ((corridaId?.hashCode() ?: tipo.hashCode()) and 0x3FF),
             if (tipo == "planejada_atrasada") PwNotificacoes.CANAL_AVISOS else PwNotificacoes.CANAL_PLANEJADAS,
             titulo, texto, longo, abrir, listOf(ver),
+            icone = when (tipo) { "planejada_lembrete" -> "relogio"; "planejada_atrasada" -> "alerta"; "planejada_liberada" -> "x"; "planejada_reservada" -> "check"; else -> "calendario" },
+            cores = when (tipo) { "planejada_atrasada", "planejada_liberada" -> PwNotificacoes.GRAD_VERMELHO; "planejada_reservada" -> PwNotificacoes.GRAD_VERDE; else -> null },
         )
     }
 

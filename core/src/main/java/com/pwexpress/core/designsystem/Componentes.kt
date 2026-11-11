@@ -93,6 +93,8 @@ fun PwCartao(
             }
             .border(1.dp, borda, forma)
             .padding(padding),
+        // respiro entre o que vai dentro do cartão: nada encosta (botão, texto, caixas)
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         content = content,
     )
 }
@@ -314,9 +316,11 @@ fun PwLinhaInfo(icone: ImageVector?, rotulo: String, valor: String, destaque: Bo
             Icon(icone, null, tint = c.texto3, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(10.dp))
         }
-        Text(rotulo, Modifier.weight(1f), color = c.texto2, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.width(8.dp))
-        Text(valor, color = if (destaque) c.ouro else c.texto, fontWeight = FontWeight.SemiBold, fontFamily = Archivo, maxLines = 1)
+        // o rótulo nunca some: o valor longo quebra em até 2 linhas e corta com "…"
+        Text(rotulo, Modifier.weight(1f), color = c.texto2, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.width(12.dp))
+        Text(valor, Modifier.weight(1f, fill = false), color = if (destaque) c.ouro else c.texto, fontWeight = FontWeight.SemiBold, fontFamily = Archivo,
+            maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.End)
     }
 }
 

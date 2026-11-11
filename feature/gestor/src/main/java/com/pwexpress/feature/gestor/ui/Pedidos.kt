@@ -814,16 +814,27 @@ private fun OrcamentoNoMapaG(o: kotlinx.serialization.json.JsonObject, pontos: L
         ?.let { (it["valor"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull() }
     val pinos = listOf(com.pwexpress.core.mapa.PinoMapa(coleta.lat!!, coleta.lng!!, true, false, false, icone = "store", numero = 1)) +
         entregas.mapIndexed { i, e -> com.pwexpress.core.mapa.PinoMapa(e.lat!!, e.lng!!, false, false, false, numero = i + 2) }
-    val linhasMapa = entregas.map { e -> com.pwexpress.core.mapa.TrilhaMapa(listOf(coleta.lat to coleta.lng, e.lat!! to e.lng!!)) }
+    // pelas ruas (padrão): o caminho que o motoboy faz; linha reta só quando o gestor escolheu assim
+    val reta = (o["trajeto"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "reta"
+    val caminhos = remember(coleta.lat, coleta.lng, entregas.size, reta) { androidx.compose.runtime.mutableStateMapOf<Int, List<Pair<Double, Double>>>() }
+    LaunchedEffect(coleta.lat, coleta.lng, entregas.size, reta) {
+        if (reta) return@LaunchedEffect
+        entregas.forEachIndexed { i, e ->
+            com.pwexpress.core.mapa.Navegacao.rota(coleta.lat to coleta.lng, e.lat!! to e.lng!!)?.pontos?.takeIf { it.size >= 2 }?.let { caminhos[i] = it }
+        }
+    }
+    val linhasMapa = entregas.mapIndexed { i, e -> com.pwexpress.core.mapa.TrilhaMapa(caminhos[i] ?: listOf(coleta.lat to coleta.lng, e.lat!! to e.lng!!)) }
     val rotulos = entregas.mapIndexedNotNull { i, e ->
-        valorEntrega(i)?.let { v -> com.pwexpress.core.mapa.MarcadorMapa("orc_$i", (coleta.lat + e.lat!!) / 2, (coleta.lng + e.lng!!) / 2, corHex(c.ouro), moedaBr(v), pino = false, prioridade = 2) }
+        val meio = caminhos[i]?.let { it[it.size / 2] } ?: (((coleta.lat + e.lat!!) / 2) to ((coleta.lng + e.lng!!) / 2))
+        valorEntrega(i)?.let { v -> com.pwexpress.core.mapa.MarcadorMapa("orc_$i", meio.first, meio.second, corHex(c.ouro), moedaBr(v), pino = false, prioridade = 2) }
     }
     val forma = RoundedCornerShape(16.dp)
     Box(Modifier.fillMaxWidth().padding(vertical = 6.dp).height(220.dp).clip(forma).border(1.dp, c.borda, forma)) {
         com.pwexpress.core.mapa.PwMapa(paradas = pinos, rota = null, minhaPosicao = null, caminhoAuto = false, trilhas = linhasMapa, marcadores = rotulos, legenda = false,
             modifier = Modifier.fillMaxSize(), enquadrar = pinos.size, tituloTelaCheia = "Como chegou no valor")
     }
-    TextoDica("Cada linha vai da coleta até uma entrega; o valor no meio é o que aquela entrega custou.")
+    TextoDica(if (reta) "Linha reta da coleta até cada entrega (ajuste do gestor); o valor no meio é o que aquela entrega custou."
+        else "O caminho pelas ruas da coleta até cada entrega; o valor no meio é o que aquela entrega custou.")
 }
 
 /** "Mudar o cálculo": cada linha (quantidade × valor), os percentuais, o mínimo e o motivo. Igual ao site. */

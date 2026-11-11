@@ -49,6 +49,19 @@ object PwNotificacoes {
     val GRAD_AZUL = intArrayOf(0xFF142B6B.toInt(), 0xFF3B82F6.toInt(), 0xFF93C5FD.toInt())
     val GRAD_VIOLETA = intArrayOf(0xFF3B1577.toInt(), 0xFF7C3AED.toInt(), 0xFFC4B5FD.toInt())
 
+    /** Ícones (Lucide, 24×24) que entram no cartão de cada tipo de aviso. */
+    val ICONES: Map<String, List<String>> = mapOf(
+        "rota" to listOf("M6 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z", "M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15", "M18 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"),
+        "calendario" to listOf("M8 2v4", "M16 2v4", "M3 10h18", "M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"),
+        "relogio" to listOf("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z", "M12 6v6l4 2"),
+        "alerta" to listOf("m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3", "M12 9v4", "M12 17h.01"),
+        "x" to listOf("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z", "m15 9-6 6", "m9 9 6 6"),
+        "check" to listOf("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z", "m9 12 2 2 4-4"),
+        "info" to listOf("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z", "M12 16v-4", "M12 8h.01"),
+        "sino" to listOf("M10.27 21a2 2 0 0 0 3.46 0", "M3.26 15.33A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.67C19.41 13.96 18 12.5 18 8A6 6 0 0 0 6 8c0 4.5-1.41 5.96-2.74 7.33"),
+        "mais" to listOf("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z", "M8 12h8", "M12 8v8"),
+    )
+
     const val DOURADO = 0xFFD4AF37.toInt()
     const val VIOLETA = 0xFFA78BFA.toInt()
 
@@ -130,12 +143,18 @@ object PwNotificacoes {
     fun aviso(
         ctx: Context, id: Int, canal: String, titulo: String, texto: String,
         longo: String? = null, abrir: PendingIntent? = abrirApp(ctx, id), acoes: List<NotificationCompat.Action> = emptyList(),
-        silencioso: Boolean = false,
+        silencioso: Boolean = false, icone: String? = null, cores: IntArray? = null,
     ) {
+        // todo aviso ganha o cartão colorido com ícone do tipo (a cor e o ícone vêm do canal se não vierem)
+        val cor = cores ?: when (canal) { CANAL_PLANEJADAS -> GRAD_AZUL; CANAL_SILENCIOSO -> GRAD_VIOLETA; else -> GRAD_OURO }
+        val ic = icone ?: when (canal) { CANAL_PLANEJADAS -> "calendario"; CANAL_SILENCIOSO -> "info"; else -> "sino" }
+        val img = runCatching { banner(ctx, titulo, texto, cor, ic) }.getOrNull()
         val b = base(ctx, canal)
             .setContentTitle(titulo)
             .setContentText(texto)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(longo ?: texto))
+            .setColor(cor[1])
+            .setStyle(if (img != null) NotificationCompat.BigPictureStyle().bigPicture(img).bigLargeIcon(null as Bitmap?).setSummaryText(longo ?: texto)
+                else NotificationCompat.BigTextStyle().bigText(longo ?: texto))
             .setAutoCancel(true)
             .setContentIntent(abrir)
             .setSilent(silencioso)
@@ -147,7 +166,7 @@ object PwNotificacoes {
      * Faixa com degradê, a logo e o título (a imagem que aparece ao expandir a notificação).
      * Fica no lugar dos cartões cinza de antes: cada assunto tem sua cor.
      */
-    fun banner(ctx: Context, titulo: String, texto: String?, cores: IntArray): Bitmap {
+    fun banner(ctx: Context, titulo: String, texto: String?, cores: IntArray, icone: String? = null): Bitmap {
         val w = 1080; val h = 420
         val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val tela = Canvas(b)
@@ -160,12 +179,22 @@ object PwNotificacoes {
         p.shader = null; p.style = Paint.Style.STROKE; p.strokeWidth = 6f; p.color = 0x33FFFFFF
         tela.drawCircle(w * 0.92f, h * 0.95f, 170f, p); tela.drawCircle(w * 0.92f, h * 0.95f, 250f, p)
         p.style = Paint.Style.FILL
+        // selo do tipo (rota, calendário, alerta…) no canto, como no aviso verde do app
+        ICONES[icone]?.let { caminhos ->
+            val cx = w - 110f; val cy = 110f; val raio = 64f
+            p.color = 0x33FFFFFF; tela.drawCircle(cx, cy, raio, p)
+            val tr = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2.2f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+                color = if (android.graphics.Color.luminance(cores[1]) > 0.45f) 0xFF0A0A0A.toInt() else 0xFFFFFFFF.toInt() }
+            tela.save(); tela.translate(cx - 36f, cy - 36f); tela.scale(3f, 3f)
+            caminhos.forEach { d -> runCatching { androidx.core.graphics.PathParser.createPathFromPathData(d) }.getOrNull()?.let { tela.drawPath(it, tr) } }
+            tela.restore()
+        }
         // logo num círculo escuro
         logoRedonda(ctx)?.let { tela.drawBitmap(it, null, android.graphics.RectF(60f, (h - 180) / 2f, 240f, (h + 180) / 2f), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)) }
         val claro = android.graphics.Color.luminance(cores[1]) > 0.45f
         val tinta = if (claro) 0xFF0A0A0A.toInt() else 0xFFFFFFFF.toInt()
         val tp = android.text.TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = tinta; textSize = 62f; typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD) }
-        val larg = w - 300 - 60
+        val larg = w - 300 - (if (icone != null) 200 else 60)
         val l1 = android.text.StaticLayout.Builder.obtain(titulo, 0, titulo.length, tp, larg).setMaxLines(2).setEllipsize(android.text.TextUtils.TruncateAt.END).build()
         val sub = texto.orEmpty()
         val tp2 = android.text.TextPaint(tp).apply { textSize = 40f; typeface = android.graphics.Typeface.DEFAULT; alpha = 215 }
@@ -181,8 +210,9 @@ object PwNotificacoes {
     fun cartao(
         ctx: Context, id: Int, canal: String, titulo: String, texto: String, cores: IntArray,
         abrir: PendingIntent? = abrirApp(ctx, id), acoes: List<NotificationCompat.Action> = emptyList(), silencioso: Boolean = false,
+        icone: String? = null,
     ) {
-        val img = runCatching { banner(ctx, titulo, texto, cores) }.getOrNull()
+        val img = runCatching { banner(ctx, titulo, texto, cores, icone) }.getOrNull()
         val b = base(ctx, canal)
             .setContentTitle(titulo)
             .setContentText(texto)

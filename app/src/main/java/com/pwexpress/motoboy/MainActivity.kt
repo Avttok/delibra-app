@@ -276,6 +276,8 @@ class MainActivity : ComponentActivity() {
                         )
                     } else if (simEstado.ativo) LaunchedEffect(Unit) { com.pwexpress.feature.tracking.Simulador.desligar() }
                     if (simulador && podeSimular) com.pwexpress.motoboy.ui.SimuladorScreen(onFechar = { simulador = false }, kmhPadrao = perfil?.numero("simulador_velocidade_kmh", 35.0) ?: 35.0)
+                    if (perfil?.dev == true && s != null) com.pwexpress.motoboy.ui.SeloModoDev(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = 14.dp, bottom = 100.dp))
+                    com.pwexpress.motoboy.ui.JanelaModoDev()
                     JanelaAtualizacao()
                     LaunchedEffect(Unit) { while (true) { delay(15 * 60_000L); Atualizador.verificarObrigatoria() } }
                     // tour na primeira vez de cada painel (depois, no menu da conta)

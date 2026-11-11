@@ -153,7 +153,7 @@ fun CarteiraScreen(modifier: Modifier = Modifier) {
                 // ------------------------------------------------ como fica o total: rotas + ajustes = a receber
                 holerite?.let { h ->
                     val rotas = h.itens.mapNotNull { it.valor }.sum()
-                    if (h.valoresVisiveis || h.ajustes.isNotEmpty()) PwCartao {
+                    if (h.valoresVisiveis || h.ajustes.isNotEmpty() || h.fixos.isNotEmpty()) PwCartao {
                         PwRotulo(if (h.valoresVisiveis) "Como fica o total" else "Ajustes")
                         Spacer(Modifier.height(6.dp))
                         @Composable fun linha(r: String, v: String?, cor: androidx.compose.ui.graphics.Color = c.texto, forte: Boolean = false) =
@@ -162,13 +162,17 @@ fun CarteiraScreen(modifier: Modifier = Modifier) {
                                 if (v != null) Text(v, color = cor, fontWeight = if (forte) FontWeight.Black else FontWeight.SemiBold, fontSize = if (forte) 16.sp else 14.sp)
                             }
                         if (h.valoresVisiveis) linha("${h.itens.size} rota${if (h.itens.size == 1) "" else "s"} concluída${if (h.itens.size == 1) "" else "s"}", moedaBr(rotas))
+                        h.fixos.forEach { (desc, detalhe, v) ->
+                            linha(desc + (detalhe?.let { " · $it" } ?: ""), v?.let { moedaBr(it) })
+                        }
                         h.ajustes.forEach { (motivo, v) ->
                             linha(motivo.ifBlank { if (v >= 0) "Bônus" else "Desconto" }, if (h.valoresVisiveis) (if (v >= 0) "+ " else "− ") + moedaBr(kotlin.math.abs(v)) else null, if (v >= 0) c.verde else c.vermelho)
                         }
                         if (h.valoresVisiveis) {
                             androidx.compose.material3.HorizontalDivider(color = c.borda, modifier = Modifier.padding(vertical = 4.dp))
-                            linha(if (atual?.status == "pago") "Pago" else "Você recebe", moedaBr(h.total ?: (rotas + h.ajustes.sumOf { it.second })), c.ouro, forte = true)
-                            Text("Cada rota já vem com a sua parte (nunca passa do valor da rota). Os ajustes são bônus ou descontos do gestor.", color = c.texto3, fontSize = 12.sp)
+                            linha(if (atual?.status == "pago") "Pago" else "Você recebe", moedaBr(h.total ?: (rotas + h.fixos.sumOf { it.third ?: 0.0 } + h.ajustes.sumOf { it.second })), c.ouro, forte = true)
+                            Text(if (h.fixos.isNotEmpty()) "Salário, diárias e horas entram pelo seu modelo de pagamento. Os ajustes são bônus ou descontos do gestor."
+                                 else "Cada rota já vem com a sua parte (nunca passa do valor da rota). Os ajustes são bônus ou descontos do gestor.", color = c.texto3, fontSize = 12.sp)
                         }
                     }
                 }

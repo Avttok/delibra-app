@@ -3,6 +3,13 @@
 **Importante:** esta versão vem com a assinatura digital nova. Se o celular disser que não dá para atualizar, desinstale a versão antiga e instale esta (só desta vez).
 
 **Novidades desta versão**
+- **Corridas chegam mesmo sem o aviso do servidor**: com você online, o app confere sozinho a cada poucos segundos e, se achar uma corrida, toca alto e acende a tela, com o app fechado.
+- **Chat no meio da corrida**: botão Chat (com as não lidas) no mapa da corrida.
+- **Gestor e motoboy na mesma conta**: botão "Gestor" na corrida leva ao painel, e "Voltar à corrida" traz de volta.
+- **Avisos para o gestor**: pedido novo, rota sem motoboy e cadastro de cliente (dá para desligar em Ajustes → Pedidos).
+- **Salário fixo, diária e hora** no pagamento do motoboy, mais mínimo garantido no período. Aparecem no holerite.
+- **Empresas (Dev)**: números, equipe com último acesso, mover pessoas, plano mensal/anual/vitalício, suspender com motivo, limites e excluir empresa.
+- **Mapas**: tela cheia na corrida e no simulador; aproximar, afastar, ir até mim e estabelecimentos na tela cheia.
 - **Avisos (push) corrigidos**: o servidor recusava os avisos, por isso a tela não acendia com rota nova. No Console Dev → Sistema dá para testar o aviso no próprio celular.
 - **Foto de perfil**: salva assim que você escolhe, com mensagem clara se algo der errado; trocar a foto não apaga mais cargos nem a marca da empresa.
 - **Visual do seu jeito**: 8 fontes (Sua conta → Fonte) e muitas cores novas, inclusive vermelho para todos e degradês (pôr do sol, oceano, aurora, neon, fogo).

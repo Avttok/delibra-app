@@ -63,9 +63,18 @@ object Alarme {
      * Oferta de corrida no estilo "chamada recebida": valor, distância, contagem regressiva e
      * os botões Aceitar / Recusar (funcionam direto da notificação). Toca até responder.
      */
+    /** Última oferta que já tocou (push e checagem em segundo plano não tocam duas vezes). */
+    @Volatile var ofertaTocada: String? = null
+        private set
+    /** Já tocou com os detalhes completos? */
+    @Volatile var ofertaCompleta: String? = null
+        private set
+
     fun mostrarOferta(ctx: Context, oferta: Oferta? = null, ofertaId: String? = null) {
         criarCanais(ctx)
         val id = oferta?.id ?: ofertaId
+        if (id != null) ofertaTocada = id
+        if (oferta != null) ofertaCompleta = oferta.id
         val abrir = Intent(ctx, OfertaActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val pi = PendingIntent.getActivity(ctx, 10, abrir, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val aceitar = PendingIntent.getActivity(

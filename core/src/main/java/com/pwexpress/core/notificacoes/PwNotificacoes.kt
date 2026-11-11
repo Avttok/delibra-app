@@ -59,6 +59,7 @@ object PwNotificacoes {
         "check" to listOf("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z", "m9 12 2 2 4-4"),
         "info" to listOf("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z", "M12 16v-4", "M12 8h.01"),
         "sino" to listOf("M10.27 21a2 2 0 0 0 3.46 0", "M3.26 15.33A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.67C19.41 13.96 18 12.5 18 8A6 6 0 0 0 6 8c0 4.5-1.41 5.96-2.74 7.33"),
+        "pessoa" to listOf("M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2", "M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"),
         "mais" to listOf("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z", "M8 12h8", "M12 8v8"),
     )
 
@@ -227,7 +228,11 @@ object PwNotificacoes {
     }
 
     /** Mensagem do chat: estilo de conversa (remetente e prévia), tocando no canal de Conversas. */
+    /** Quando cada conversa avisou pela última vez (push e checagem não avisam em dobro). */
+    val chatAvisadoEm = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
     fun mensagemChat(ctx: Context, conversa: String, titulo: String, texto: String) {
+        chatAvisadoEm[conversa] = System.currentTimeMillis()
         val id = 5000 + (conversa.hashCode() and 0x3FF)
         val abrir = abrirApp(ctx, id, "chat:$conversa")
         val eu = androidx.core.app.Person.Builder().setName("Você").build()

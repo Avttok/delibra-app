@@ -56,6 +56,37 @@ class PwApp : Application() {
                     }
                 }
         }
+        // oferta achada pela checagem (push atrasou ou falhou): toca alto e acende a tela do mesmo jeito.
+        // Some do servidor (expirou, outro pegou)? Para de tocar.
+        escopo.launch {
+            var anterior: String? = null
+            Corridas.oferta.collect { o ->
+                if (o == null) {
+                    if (anterior != null) runCatching { com.pwexpress.feature.corridas.push.Alarme.pararOferta(this@PwApp) }
+                    anterior = null
+                    return@collect
+                }
+                anterior = o.id
+                if (com.pwexpress.feature.corridas.push.Alarme.ofertaCompleta != o.id)
+                    runCatching { com.pwexpress.feature.corridas.push.Alarme.mostrarOferta(this@PwApp, o) }
+            }
+        }
+        // chat em segundo plano (reserva do push): mensagem nova numa conversa com o chat fechado → avisa
+        escopo.launch {
+            val vistas = HashMap<String, Int>()
+            var primeira = true
+            com.pwexpress.core.chat.Chat.conversas.collect { lista ->
+                if (PwCore.auth.sessao.value == null) { vistas.clear(); primeira = true; return@collect }
+                for (cv in lista) {
+                    val antes = vistas[cv.id] ?: if (primeira) cv.naoLidas else 0
+                    val recente = (PwNotificacoes.chatAvisadoEm[cv.id] ?: 0L) > System.currentTimeMillis() - 90_000
+                    if (!primeira && cv.naoLidas > antes && !cv.silenciada && !cv.ultimaMinha && !recente && !com.pwexpress.core.chat.Chat.abrir.value)
+                        runCatching { PwNotificacoes.mensagemChat(this@PwApp, cv.id, cv.nome, cv.previa ?: "Nova mensagem") }
+                    vistas[cv.id] = cv.naoLidas
+                }
+                if (lista.isNotEmpty()) primeira = false
+            }
+        }
         // checagem em segundo plano: com o GPS ligado (serviço em primeiro plano) o app segue vivo,
         // então confere corrida, oferta e cancelamentos mesmo com a tela apagada (o push pode atrasar)
         escopo.launch {
@@ -65,9 +96,10 @@ class PwApp : Application() {
                 if (PwCore.auth.sessao.value != null && modo != com.pwexpress.feature.tracking.Modo.OFFLINE) {
                     runCatching { Corridas.sincronizarAgora() }
                     if (ciclo % 6 == 0) runCatching { Corridas.carregarPlanejadas(); Corridas.carregarRotas() }
+                    if (ciclo % 3 == 0) runCatching { com.pwexpress.core.chat.Chat.carregar() }
                     ciclo++
                 }
-                kotlinx.coroutines.delay(if (modo == com.pwexpress.feature.tracking.Modo.EM_CORRIDA) 8_000 else 12_000)
+                kotlinx.coroutines.delay(if (modo == com.pwexpress.feature.tracking.Modo.OFFLINE) 12_000 else 7_000)
             }
         }
         // configurações do servidor (core:perfil) → ritmo do GPS (feature:tracking)

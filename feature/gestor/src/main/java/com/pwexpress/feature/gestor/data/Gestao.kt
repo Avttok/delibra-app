@@ -412,11 +412,14 @@ object Gestao {
     }
 
     /** Exceções (peças do lego) de um cliente, motoboy ou tipo de pedido. */
-    suspend fun politicas(escopo: String, alvo: String): Map<String, JsonElement> = tabela("politicas", "select=chave,valor&escopo=eq.$escopo&alvo=eq.${enc(alvo)}")
-        .associate { it.str("chave")!! to (it["valor"] ?: JsonNull) }
+    /** Tipo de pedido: as regras são da empresa (o banco guarda "empresa:tipo"); a função já resolve. */
+    suspend fun politicas(escopo: String, alvo: String): Map<String, JsonElement> =
+        (rpcJson("politicas_do_alvo", buildJsonObject { put("p_escopo", escopo); put("p_alvo", alvo) }).getOrNull() as? JsonObject).orEmpty()
 
-    suspend fun contagemPoliticas(): Map<Pair<String, String>, Int> = tabela("politicas", "select=escopo,alvo")
-        .groupingBy { (it.str("escopo") ?: "") to (it.str("alvo") ?: "") }.eachCount()
+    suspend fun contagemPoliticas(): Map<Pair<String, String>, Int> =
+        ((rpcJson("contagem_politicas").getOrNull() as? kotlinx.serialization.json.JsonArray) ?: kotlinx.serialization.json.JsonArray(emptyList()))
+            .mapNotNull { it as? JsonObject }
+            .associate { ((it.str("escopo") ?: "") to (it.str("alvo") ?: "")) to ((it["n"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull()?.toInt() ?: 0) }
 
     /** valor null = volta ao padrão. */
     suspend fun definirPolitica(escopo: String, alvo: String, chave: String, valor: JsonElement?) = acao {

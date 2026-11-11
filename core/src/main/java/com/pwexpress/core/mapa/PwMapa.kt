@@ -191,6 +191,9 @@ private fun MapaBase(
     destacar: String? = null,
     onArrastou: (() -> Unit)? = null,
     onParada: ((Int) -> Unit)? = null,
+    /** Aproximar, afastar, ir até mim e estabelecimentos à mão (tela cheia e mapas que ocupam a tela). */
+    controles: Boolean = false,
+    controlesLocais: Boolean = true,
 ) {
     val ctx = LocalContext.current
     val arrastou by rememberUpdatedState(onArrastou)
@@ -507,11 +510,24 @@ private fun MapaBase(
     androidx.compose.foundation.layout.Box(modifier) {
         AndroidView(factory = { mapView }, modifier = Modifier.matchParentSize())
         if (legenda && trilhas.any { it.pontos.size >= 2 }) LegendaLinhas(aFazer.isNotEmpty(), Modifier.align(androidx.compose.ui.Alignment.BottomStart).padding(start = 10.dp, bottom = (margemBaixo + 10).dp))
-        if (botoes != null) androidx.compose.foundation.layout.Column(
+        if (botoes != null || controles) androidx.compose.foundation.layout.Column(
             Modifier.align(androidx.compose.ui.Alignment.CenterEnd).padding(end = 12.dp),
             verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
-            content = botoes,
-        )
+        ) {
+            botoes?.invoke(this)
+            if (controles) {
+                if (botoes != null) androidx.compose.foundation.layout.Spacer(Modifier.size(4.dp))
+                com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.Plus, "Aproximar", { mapa?.animateCamera(CameraUpdateFactory.zoomIn(), 250) }, tamanho = 44.dp)
+                com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.Minus, "Afastar", { mapa?.animateCamera(CameraUpdateFactory.zoomOut(), 250) }, tamanho = 44.dp)
+                minhaPosicao?.let { eu ->
+                    com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.LocateFixed, "Ir até mim", {
+                        mapa?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(eu.first, eu.second), maxOf(mapa?.cameraPosition?.zoom ?: 15.0, 15.0)), 500)
+                    }, tamanho = 44.dp)
+                }
+                if (controlesLocais) com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.Store, if (comLocais) "Esconder estabelecimentos" else "Mostrar estabelecimentos",
+                    { Estabelecimentos.definir(!comLocais) }, tamanho = 44.dp, ativo = comLocais)
+            }
+        }
     }
 }
 
@@ -562,20 +578,26 @@ fun PwMapa(
     onArrastou: (() -> Unit)? = null,
     /** Toque numa parada (índice na lista [paradas]). */
     onParada: ((Int) -> Unit)? = null,
+    /** Mostra aproximar/afastar/ir até mim também no mapa pequeno (mapas que já ocupam a tela). Na tela cheia, sempre. */
+    controles: Boolean = false,
+    /** Botão de estabelecimentos junto dos controles (desligue se a tela já tem o dela). */
+    controlesLocais: Boolean = true,
+    /** Onde fica o botão de tela cheia no mapa pequeno. */
+    botaoTelaCheiaEm: androidx.compose.ui.Alignment = androidx.compose.ui.Alignment.TopStart,
 ) {
     var cheio by remember { mutableStateOf(false) }
     var enquadrarCheio by remember { mutableStateOf(0) }
     val base: @Composable (Modifier, Boolean) -> Unit = { mod, telaCheia ->
         MapaBase(paradas, rota, minhaPosicao, mod, marcadores, onToque, if (telaCheia) (enquadrar to enquadrarCheio) else enquadrar, onMarcador, seguir, trilhas,
             onCentro, inicio, zoomInicio, if (telaCheia) 0 else margemBaixo, irPara, focar, caminhoAuto, rotas, circulo, percursos, comPings, percursoTeste,
-            calor, restanteDe, legenda, euComFoto, if (telaCheia) botoesTelaCheia else null, destacar, onArrastou, onParada)
+            calor, restanteDe, legenda, euComFoto, if (telaCheia) botoesTelaCheia else null, destacar, onArrastou, onParada, controles = telaCheia || controles, controlesLocais = controlesLocais)
     }
     androidx.compose.foundation.layout.Box(modifier) {
         if (!cheio) base(Modifier.matchParentSize(), false)
         else androidx.compose.foundation.layout.Box(Modifier.matchParentSize().background(Pw.cores.fundo))
         if (maximizavel) com.pwexpress.core.designsystem.PwBotaoIcone(
             PwIcones.Maximize2, "Tela cheia", { cheio = true },
-            modifier = Modifier.align(androidx.compose.ui.Alignment.TopStart).padding(10.dp), tamanho = 40.dp,
+            modifier = Modifier.align(botaoTelaCheiaEm).padding(10.dp), tamanho = 40.dp,
         )
     }
     if (cheio) androidx.compose.ui.window.Dialog(

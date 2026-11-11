@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -84,7 +86,13 @@ import java.io.File
  * [admin] = conta gestor + motoboy (pode ignorar a localização em corridas de teste).
  */
 @Composable
-fun CorridaScreen(corrida: Corrida, admin: Boolean = false, modifier: Modifier = Modifier) {
+fun CorridaScreen(
+    corrida: Corrida, admin: Boolean = false, modifier: Modifier = Modifier,
+    /** Chat à mão no meio da corrida (conversa com o gestor e a equipe). */
+    chatLigado: Boolean = false,
+    /** Conta gestor + motoboy: vai ao painel sem largar a corrida. */
+    onPainelGestor: (() -> Unit)? = null,
+) {
     val ctx = LocalContext.current
     val c = Pw.cores
     val scope = rememberCoroutineScope()
@@ -140,7 +148,11 @@ fun CorridaScreen(corrida: Corrida, admin: Boolean = false, modifier: Modifier =
             // feito (pelas ruas, do servidor) + onde estou agora; a fazer: daqui até as paradas que faltam
             val feito = com.pwexpress.core.mapa.rememberTrilhaCorrida(corrida.id, ativa = true)
             val eu = posicao?.let { it.lat to it.lng }
-            PwMapa(maximizavel = false,
+            PwMapa(botaoTelaCheiaEm = Alignment.CenterStart, tituloTelaCheia = "Corrida ${corrida.numeroExibicao}",
+                botoesTelaCheia = if (parada != null) ({
+                    com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.Navigation, "Abrir no Maps", { abrirMaps(ctx, parada) }, tamanho = 44.dp)
+                    com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.Route, "Abrir no Waze", { abrirWaze(ctx, parada) }, tamanho = 44.dp)
+                }) else null,
                 paradas = pinos,
                 rota = corrida.rotaPlanejada,
                 minhaPosicao = eu,
@@ -172,6 +184,20 @@ fun CorridaScreen(corrida: Corrida, admin: Boolean = false, modifier: Modifier =
                 Spacer(Modifier.width(10.dp))
                 if (corrida.valoresVisiveis && corrida.valorMotoboy != null) PwValor(moeda(corrida.valorMotoboy), Modifier.widthIn(max = 150.dp), tamanhoMax = 22, cor = c.texto)
                 else Text("${corrida.paradas.count { it.tipo == TipoParada.ENTREGA && it.status == StatusParada.CONCLUIDA }}/${corrida.paradas.count { it.tipo == TipoParada.ENTREGA }} entregas", color = c.texto, fontFamily = ArchivoLargo, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
+            }
+            // chat e painel do gestor, sem sair da corrida
+            if (chatLigado || onPainelGestor != null) {
+                val naoLidas by com.pwexpress.core.chat.Chat.naoLidas.collectAsState()
+                Row(Modifier.align(Alignment.BottomStart).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (chatLigado) Box {
+                        BotaoMapa("Chat", PwIcones.MessageCircle) { com.pwexpress.core.chat.Chat.abrir.value = true }
+                        if (naoLidas > 0) Box(
+                            Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-4).dp).size(20.dp).clip(RoundedCornerShape(99.dp)).background(c.vermelho),
+                            contentAlignment = Alignment.Center,
+                        ) { Text(if (naoLidas > 9) "9+" else "$naoLidas", color = androidx.compose.ui.graphics.Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+                    }
+                    if (onPainelGestor != null) BotaoMapa("Gestor", PwIcones.ShieldCheck, onPainelGestor)
+                }
             }
             // navegação externa, sempre à mão
             if (parada != null) {

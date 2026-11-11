@@ -49,6 +49,7 @@ import com.pwexpress.core.designsystem.PwLinhaInfo
 import com.pwexpress.core.designsystem.PwNumero
 import com.pwexpress.core.designsystem.PwRotulo
 import com.pwexpress.core.designsystem.PwSegmentado
+import com.pwexpress.core.designsystem.PwTelaCheia
 import com.pwexpress.core.designsystem.PwToast
 import com.pwexpress.core.designsystem.PwVazio
 import com.pwexpress.core.designsystem.TipoAviso
@@ -109,8 +110,8 @@ internal fun DevEmpresasG() {
                 TextoDica(listOfNotNull(
                     o.str("nome").takeIf { o.str("nome_app") != null },
                     SITUACOES.firstOrNull { it.first == o.str("status") }?.second,
-                    when (modelo) { "percentual" -> "${numeroBr(o.dbl("cobranca_pct") ?: 0.0)}%"; "licenca" -> "${moedaBr(o.dbl("mensalidade"))}/mês"; else -> "isenta" },
-                    "${o.int("motoboys") ?: 0} motoboys",
+                    when (modelo) { "percentual" -> "${numeroBr(o.dbl("cobranca_pct") ?: 0.0)}%"; "licenca" -> moedaBr(o.dbl("mensalidade")) + when (o.str("cobranca_periodo")) { "anual" -> "/ano"; "vitalicia" -> " vitalícia"; else -> "/mês" }; else -> "isenta" },
+                    "${o.int("motoboys") ?: 0} motoboys", "${o.int("rotas_30d") ?: 0} rotas em 30 dias",
                 ).joinToString(" · "))
             }
             Icon(PwIcones.ChevronRight, null, tint = c.texto3, modifier = Modifier.size(18.dp))
@@ -121,46 +122,75 @@ internal fun DevEmpresasG() {
     @Suppress("UNUSED_VARIABLE") val semUso = escopo
 }
 
+private val PERIODOS = listOf("mensal" to "Mensal", "anual" to "Anual", "vitalicia" to "Vitalícia")
+private val ALCANCES = listOf("nunca" to "Nunca", "sem_livre" to "Sem livre", "sempre" to "Sempre", "parceiros" to "Parceiras")
+private val PAPEIS_ROT = mapOf("gestor" to "Gestor", "supervisor" to "Supervisor", "motoboy" to "Motoboy", "cliente" to "Cliente")
+
+private fun quandoFoi(iso: String?): String {
+    val ms = com.pwexpress.feature.gestor.data.iso(iso) ?: return "nunca"
+    val min = (System.currentTimeMillis() - ms) / 60_000
+    return when { min < 2 -> "agora"; min < 60 -> "há $min min"; min < 1440 -> "há ${min / 60} h"; else -> dataHora(ms).substringBefore(" ") }
+}
+
+/** Uma empresa no Dev (igual ao site): dados, plano, situação, limites, alcance, números, equipe, clientes e excluir. */
 @Composable
 private fun EditarEmpresaG(o: JsonObject, onFechar: () -> Unit, onSalvo: () -> Unit) {
+    val c = Pw.cores
     val escopo = rememberCoroutineScope()
+    val id = o.str("id").orEmpty()
     var nome by remember { mutableStateOf(o.str("nome").orEmpty()) }
     var nomeApp by remember { mutableStateOf(o.str("nome_app").orEmpty()) }
+    var documento by remember { mutableStateOf(o.str("documento").orEmpty()) }
     var status by remember { mutableIntStateOf(SITUACOES.indexOfFirst { it.first == o.str("status") }.coerceAtLeast(0)) }
+    var motivo by remember { mutableStateOf(o.str("suspensa_motivo").orEmpty()) }
     var modelo by remember { mutableIntStateOf(MODELOS.indexOfFirst { it.first == o.str("cobranca_modelo") }.coerceAtLeast(0)) }
+    var periodo by remember { mutableIntStateOf(PERIODOS.indexOfFirst { it.first == o.str("cobranca_periodo") }.coerceAtLeast(0)) }
     var pct by remember { mutableStateOf(numeroBr(o.dbl("cobranca_pct") ?: 5.0)) }
     var mensal by remember { mutableStateOf(numeroBr(o.dbl("mensalidade") ?: 0.0)) }
     var dia by remember { mutableStateOf((o.int("vencimento_dia") ?: 10).toString()) }
+    val lim = o.obj("limites")
+    var limMoto by remember { mutableStateOf(lim?.int("motoboys")?.toString().orEmpty()) }
+    var limGest by remember { mutableStateOf(lim?.int("gestores")?.toString().orEmpty()) }
+    var limCli by remember { mutableStateOf(lim?.int("clientes")?.toString().orEmpty()) }
+    var alcance by remember { mutableIntStateOf(ALCANCES.indexOfFirst { it.first == o.str("compartilhar") }.coerceAtLeast(0)) }
+    var aposMin by remember { mutableStateOf((o.int("compartilhar_apos_min") ?: 3).toString()) }
+    var receber by remember { mutableStateOf(o.str("receber_de_outras") == "true") }
+    var obs by remember { mutableStateOf(o.str("observacoes").orEmpty()) }
     var salvando by remember { mutableStateOf(false) }
     var erro by remember { mutableStateOf<String?>(null) }
+    var det by remember { mutableStateOf<JsonObject?>(null) }
+    var todas by remember { mutableStateOf<List<JsonObject>>(emptyList()) }
+    var versao by remember { mutableIntStateOf(0) }
+    var movendo by remember { mutableStateOf<JsonObject?>(null) }
+    var excluir by remember { mutableStateOf(false) }
+    LaunchedEffect(versao) {
+        Gestao.rpcJson("dev_empresa_detalhe", buildJsonObject { put("p_org", id) }).onSuccess { det = it as? JsonObject }.onFailure { erro = it.message }
+        Gestao.rpcJson("dev_organizacoes").onSuccess { j -> todas = (j as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty() }
+    }
     fun num(s: String) = s.trim().replace(".", "").replace(",", ".").toDoubleOrNull()
-    PwJanela(o.str("nome") ?: "Empresa", onFechar) {
-        PwCampo(nome, { nome = it }, "Nome da empresa")
-        PwCampo(nomeApp, { nomeApp = it.take(30) }, "Nome do app (vazio = Delibra)")
-        PwRotulo("Situação")
-        PwSegmentado(SITUACOES.map { it.second to null }, status, { status = it })
-        PwRotulo("Cobrança da plataforma")
-        PwSegmentado(MODELOS.map { it.second to null }, modelo, { modelo = it })
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            when (MODELOS[modelo].first) {
-                "percentual" -> PwCampo(pct, { pct = it }, "Percentual", Modifier.weight(1f), teclado = KeyboardType.Decimal, sufixo = "%")
-                "licenca" -> PwCampo(mensal, { mensal = it }, "Mensalidade", Modifier.weight(1f), teclado = KeyboardType.Decimal, prefixo = "R$ ")
-                else -> {}
-            }
-            if (MODELOS[modelo].first != "isento") PwCampo(dia, { dia = it.filter(Char::isDigit).take(2) }, "Vence dia", Modifier.weight(1f), teclado = KeyboardType.Number)
-        }
+    val ehLicenca = MODELOS[modelo].first == "licenca"
+    val vitalicia = ehLicenca && PERIODOS[periodo].first == "vitalicia"
+    val bloqueada = SITUACOES[status].first in setOf("suspensa", "cancelada")
+
+    PwTelaCheia(o.str("nome_app") ?: o.str("nome") ?: "Empresa", onFechar, subtitulo = SITUACOES[status].second, rodape = {
         PwErro(erro)
         PwBotaoOuro(if (salvando) "Salvando…" else "Salvar", icone = PwIcones.Check, habilitado = !salvando && nome.trim().length >= 2, onClick = {
-            salvando = true
+            salvando = true; erro = null
             escopo.launch {
-                val id = o.str("id") ?: return@launch
                 val r = Gestao.rpcJson("dev_salvar_organizacao", buildJsonObject {
                     put("p", buildJsonObject {
-                        put("id", id); put("nome", nome.trim()); put("status", SITUACOES[status].first); put("cobranca_modelo", MODELOS[modelo].first)
+                        put("id", id); put("nome", nome.trim()); put("documento", documento.trim()); put("status", SITUACOES[status].first)
+                        put("suspensa_motivo", motivo.trim()); put("cobranca_modelo", MODELOS[modelo].first); put("cobranca_periodo", PERIODOS[periodo].first)
                         num(pct)?.let { put("cobranca_pct", it) }; num(mensal)?.let { put("mensalidade", it) }
                         dia.toIntOrNull()?.coerceIn(1, 28)?.let { put("vencimento_dia", it) }
+                        put("limites", buildJsonObject {
+                            limMoto.toIntOrNull()?.takeIf { it > 0 }?.let { put("motoboys", it) }
+                            limGest.toIntOrNull()?.takeIf { it > 0 }?.let { put("gestores", it) }
+                            limCli.toIntOrNull()?.takeIf { it > 0 }?.let { put("clientes", it) }
+                        })
+                        put("compartilhar", ALCANCES[alcance].first); aposMin.toIntOrNull()?.coerceIn(0, 240)?.let { put("compartilhar_apos_min", it) }
+                        put("receber_de_outras", receber); put("observacoes", obs)
                         o.str("dono_id")?.let { put("dono_id", it) }
-                        o.str("compartilhar")?.let { put("compartilhar", it) }
                     })
                 })
                 val rn = Gestao.rpcJson("definir_marca_organizacao", buildJsonObject { put("p_org", id); put("p_nome_app", nomeApp.trim()); put("p_so_nome", true) })
@@ -169,7 +199,165 @@ private fun EditarEmpresaG(o: JsonObject, onFechar: () -> Unit, onSalvo: () -> U
                 else erro = (r.exceptionOrNull() ?: rn.exceptionOrNull())?.message
             }
         })
-        TextoDica("Ícone, alcance entre empresas e parceiras: no site, em Dev → Empresas.")
+    }) {
+        // ------------------------------------------------ números
+        det?.obj("numeros")?.let { n ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PwNumero("Pedidos 30 dias", "${n.int("pedidos_30d") ?: 0}", Modifier.weight(1f), icone = PwIcones.Package)
+                PwNumero("Rotas 30 dias", "${n.int("rotas_30d") ?: 0}", Modifier.weight(1f), icone = PwIcones.Route)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PwNumero("Faturado 30 dias", moedaBr(n.dbl("faturado_30d")), Modifier.weight(1f), icone = PwIcones.Wallet, destaque = true)
+                PwNumero("Faturado total", moedaBr(n.dbl("faturado_total")), Modifier.weight(1f), icone = PwIcones.Receipt)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PwNumero("Rotas agora", "${n.int("em_andamento") ?: 0}", Modifier.weight(1f), icone = PwIcones.Bike)
+                PwNumero("Último pedido", quandoFoi(n.str("ultimo_pedido")), Modifier.weight(1f), icone = PwIcones.Clock)
+            }
+        } ?: PwCarregando()
+
+        // ------------------------------------------------ dados
+        PwRotulo("Dados")
+        PwCampo(nome, { nome = it }, "Nome da empresa")
+        PwCampo(nomeApp, { nomeApp = it.take(30) }, "Nome do app (vazio = Delibra)")
+        PwCampo(documento, { documento = it }, "CNPJ", teclado = KeyboardType.Number)
+
+        // ------------------------------------------------ situação
+        PwRotulo("Situação")
+        PwSegmentado(SITUACOES.map { it.second to null }, status, { status = it })
+        if (bloqueada) {
+            PwCampo(motivo, { motivo = it.take(160) }, "Motivo (a equipe vê ao entrar)", dica = "Ex.: mensalidade em atraso")
+            TextoDica("Suspensa ou cancelada: gestores e motoboys desta empresa ficam sem acesso até você reativar.")
+        }
+
+        // ------------------------------------------------ plano
+        PwRotulo("Cobrança da plataforma")
+        PwSegmentado(MODELOS.map { it.second to null }, modelo, { modelo = it })
+        if (ehLicenca) PwSegmentado(PERIODOS.map { it.second to null }, periodo, { periodo = it })
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            when (MODELOS[modelo].first) {
+                "percentual" -> PwCampo(pct, { pct = it }, "Percentual", Modifier.weight(1f), teclado = KeyboardType.Decimal, sufixo = "%")
+                "licenca" -> PwCampo(mensal, { mensal = it }, when (PERIODOS[periodo].first) { "anual" -> "Valor por ano"; "vitalicia" -> "Valor único"; else -> "Valor por mês" },
+                    Modifier.weight(1f), teclado = KeyboardType.Decimal, prefixo = "R$ ")
+                else -> {}
+            }
+            if (MODELOS[modelo].first != "isento" && !vitalicia) PwCampo(dia, { dia = it.filter(Char::isDigit).take(2) }, "Vence dia", Modifier.weight(1f), teclado = KeyboardType.Number)
+        }
+        TextoDica(when {
+            MODELOS[modelo].first == "percentual" -> "A plataforma fica com esse percentual de cada rota concluída (sai da parte da empresa, não do motoboy)."
+            vitalicia -> "A empresa paga uma vez e usa sem mensalidade."
+            ehLicenca && PERIODOS[periodo].first == "anual" -> "A empresa paga uma vez por ano."
+            ehLicenca -> "A empresa paga todo mês."
+            else -> "Nada é cobrado desta empresa."
+        })
+
+        // ------------------------------------------------ limites
+        PwRotulo("Limites do plano (vazio = sem limite)")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PwCampo(limMoto, { limMoto = it.filter(Char::isDigit).take(4) }, "Motoboys", Modifier.weight(1f), teclado = KeyboardType.Number)
+            PwCampo(limGest, { limGest = it.filter(Char::isDigit).take(4) }, "Gestores", Modifier.weight(1f), teclado = KeyboardType.Number)
+            PwCampo(limCli, { limCli = it.filter(Char::isDigit).take(5) }, "Clientes", Modifier.weight(1f), teclado = KeyboardType.Number)
+        }
+
+        // ------------------------------------------------ alcance entre empresas
+        PwRotulo("Rotas desta empresa chegam a motoboys de outras?")
+        PwSegmentado(ALCANCES.map { it.second to null }, alcance, { alcance = it })
+        if (ALCANCES[alcance].first == "sem_livre") PwCampo(aposMin, { aposMin = it.filter(Char::isDigit).take(3) }, "Esperar (minutos) antes de abrir", teclado = KeyboardType.Number)
+        if (ALCANCES[alcance].first == "parceiros") TextoDica("Escolha as parceiras no site, em Dev → Empresas.")
+        com.pwexpress.core.designsystem.PwInterruptor("Motoboys desta empresa recebem rotas de outras", receber, { receber = it })
+        PwCampo(obs, { obs = it }, "Anotações (só você vê)", linhas = 2)
+
+        // ------------------------------------------------ equipe
+        val equipe = det?.arr("equipe").orEmpty()
+        PwRotulo("Equipe (${equipe.size})")
+        if (det != null && equipe.isEmpty()) TextoDica("Ninguém nesta empresa ainda.")
+        equipe.forEach { p ->
+            PwCartao {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text((p.str("nome") ?: "Sem nome") + if (p.str("dono") == "true") " · dono" else "", color = c.texto, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val papeis = (p["papeis"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }.orEmpty()
+                        TextoDica(listOfNotNull(papeis.joinToString(", ") { PAPEIS_ROT[it] ?: it }.ifBlank { null }, p.str("email")).joinToString(" · "))
+                        TextoDica(listOfNotNull("Entrou ${quandoFoi(p.str("ultimo_acesso"))}", p.int("versao_app")?.let { "build $it" },
+                            p.str("status")?.takeIf { it != "offline" }?.let { if (it == "em_corrida") "em corrida" else "online" }).joinToString(" · "))
+                    }
+                    com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.ArrowLeftRight, "Mover", { movendo = p }, tamanho = 36.dp)
+                }
+            }
+        }
+
+        // ------------------------------------------------ clientes
+        val clientes = det?.arr("clientes_lista").orEmpty()
+        if (clientes.isNotEmpty()) {
+            PwRotulo("Clientes (${clientes.size})")
+            clientes.take(30).forEach { k -> PwLinhaInfo(PwIcones.Building2, k.str("nome").orEmpty(), "${k.int("pedidos") ?: 0} pedidos") }
+            if (clientes.size > 30) TextoDica("E mais ${clientes.size - 30}.")
+        }
+
+        // ------------------------------------------------ histórico de cobrança
+        val lic = det?.arr("licencas").orEmpty()
+        if (lic.isNotEmpty()) {
+            PwRotulo("Histórico de cobrança")
+            lic.forEach { l ->
+                val m = l.str("modelo")
+                PwLinhaInfo(PwIcones.Receipt, (MODELOS.firstOrNull { it.first == m }?.second ?: m.orEmpty()) +
+                    (if (m == "licenca") " " + (PERIODOS.firstOrNull { it.first == l.str("periodo") }?.second?.lowercase() ?: "") else ""),
+                    (if (m == "percentual") "${numeroBr(l.dbl("pct") ?: 0.0)}%" else if (m == "licenca") moedaBr(l.dbl("valor")) else "—") +
+                        " · desde ${l.str("inicio")?.let { dataBrCurta(it) } ?: "?"}${if (l.str("fim") == null) "" else " até ${dataBrCurta(l.str("fim")!!)}"}")
+            }
+        }
+
+        // ------------------------------------------------ excluir
+        PwBotaoVidro("Excluir empresa", onClick = { excluir = true }, icone = PwIcones.Trash2, modifier = Modifier.fillMaxWidth())
+    }
+
+    movendo?.let { p ->
+        PwJanela("Mover ${p.str("nome") ?: ""}", { movendo = null }) {
+            TextoDica("A pessoa passa para a outra empresa (sai desta).")
+            (todas.filter { it.str("id") != id }.map { it.str("id") to (it.str("nome") ?: "") } + listOf(null to "Sem empresa")).forEach { (destino, rotulo) ->
+                PwBotaoVidro(rotulo, onClick = {
+                    escopo.launch {
+                        Gestao.rpcJson("dev_mover_pessoa", buildJsonObject { put("p_usuario", p.str("id")); put("p_org", destino) })
+                            .onSuccess { PwToast.mostrar("Pessoa movida."); movendo = null; versao++ }
+                            .onFailure { erro = if (it.message?.contains("limite_") == true) "A empresa de destino chegou ao limite do plano." else it.message; movendo = null }
+                    }
+                }, modifier = Modifier.fillMaxWidth())
+            }
+        }
+    }
+    if (excluir) ExcluirEmpresaG(id, o.str("nome").orEmpty(), onFechar = { excluir = false }, onExcluida = { excluir = false; onSalvo() })
+}
+
+private fun dataBrCurta(iso: String) = if (iso.length >= 10) "${iso.substring(8, 10)}/${iso.substring(5, 7)}/${iso.substring(0, 4)}" else iso
+
+@Composable
+private fun ExcluirEmpresaG(id: String, nome: String, onFechar: () -> Unit, onExcluida: () -> Unit) {
+    val escopo = rememberCoroutineScope()
+    var conf by remember { mutableStateOf("") }
+    var senha by remember { mutableStateOf("") }
+    var erro by remember { mutableStateOf<String?>(null) }
+    var ocupado by remember { mutableStateOf(false) }
+    PwJanela("Excluir $nome", onFechar) {
+        TextoDica("Apaga a empresa com clientes, pedidos, rotas, faturas, holerites, zonas e chat dela. As contas das pessoas continuam, sem empresa. Não dá para desfazer.")
+        PwCampo(conf, { conf = it }, "Digite o nome: $nome")
+        PwCampo(senha, { senha = it }, "Sua senha", senha = true)
+        PwErro(erro)
+        PwBotaoOuro(if (ocupado) "Excluindo…" else "Excluir de vez", icone = PwIcones.Trash2, habilitado = !ocupado && conf == nome && senha.isNotBlank(), onClick = {
+            ocupado = true; erro = null
+            escopo.launch {
+                Gestao.rpcJson("dev_excluir_organizacao", buildJsonObject { put("p_org", id); put("p_senha", senha); put("p_confirmar", conf) })
+                    .onSuccess { j ->
+                        val r = j as? JsonObject
+                        when (r?.str("erro")) {
+                            "senha_incorreta" -> erro = "Senha incorreta (${r.int("restantes") ?: 0} tentativas)."
+                            "muitas_tentativas" -> erro = "Muitas tentativas. Espere 15 minutos."
+                            else -> { PwToast.mostrar("Empresa excluída. ${r?.int("contas_sem_empresa") ?: 0} conta(s) ficaram sem empresa."); onExcluida() }
+                        }
+                    }
+                    .onFailure { erro = if (it.message?.contains("confirmacao") == true) "Digite o nome exatamente como está." else it.message }
+                ocupado = false
+            }
+        })
     }
 }
 

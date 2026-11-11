@@ -21,9 +21,10 @@ class FcmService : FirebaseMessagingService() {
             "oferta" -> {
                 // toca primeiro (não depende de rede), depois busca os detalhes e enriquece a notificação
                 val id = message.data["oferta_id"]
-                Alarme.mostrarOferta(applicationContext, ofertaId = id)
+                // a checagem em segundo plano pode já ter tocado esta oferta
+                if (id == null || Alarme.ofertaTocada != id) Alarme.mostrarOferta(applicationContext, ofertaId = id)
                 runBlocking { withTimeoutOrNull(8_000) { Corridas.sincronizarAgora() } }
-                Corridas.oferta.value?.takeIf { id == null || it.id == id }?.let { Alarme.mostrarOferta(applicationContext, it) }
+                Corridas.oferta.value?.takeIf { (id == null || it.id == id) && Alarme.ofertaCompleta != it.id }?.let { Alarme.mostrarOferta(applicationContext, it) }
             }
             "planejada_nova", "planejada_voltou", "planejada_reservada", "planejada_liberada",
             "planejada_reagendada", "planejada_lembrete", "planejada_atrasada" -> {
@@ -56,6 +57,20 @@ class FcmService : FirebaseMessagingService() {
                     "Rota planejada sem motoboy", "Ninguém reservou e o horário está chegando. Pegue antes dos outros.", PwNotificacoes.GRAD_AZUL,
                     abrir = PwNotificacoes.abrirApp(applicationContext, 4300, "rotas"), icone = "calendario")
                 runBlocking { withTimeoutOrNull(6_000) { Corridas.carregarPlanejadas(); Corridas.carregarRotas() } }
+            }
+            // avisos do gestor: pedido novo, rota sem motoboy, cadastro de cliente
+            "pedido_novo", "rota_sem_motoboy", "cadastro_novo" -> {
+                val t = message.data["tipo"]!!
+                val alvo = when (t) {
+                    "pedido_novo" -> "gestor:pedido:${message.data["pedido_id"].orEmpty()}"
+                    "rota_sem_motoboy" -> "gestor:corrida:${message.data["corrida_id"].orEmpty()}"
+                    else -> "gestor:clientes"
+                }
+                val idN = 4400 + ((message.data["pedido_id"] ?: message.data["corrida_id"] ?: message.data["cadastro_id"] ?: t).hashCode() and 0xFF)
+                PwNotificacoes.cartao(applicationContext, idN, PwNotificacoes.CANAL_AVISOS,
+                    message.data["titulo"] ?: "Aviso", message.data["texto"] ?: "", when (t) { "rota_sem_motoboy" -> PwNotificacoes.GRAD_VERMELHO; "cadastro_novo" -> PwNotificacoes.GRAD_AZUL; else -> PwNotificacoes.GRAD_OURO },
+                    abrir = PwNotificacoes.abrirApp(applicationContext, idN, alvo),
+                    icone = when (t) { "rota_sem_motoboy" -> "alerta"; "cadastro_novo" -> "pessoa"; else -> "rota" })
             }
             "chat" -> {
                 val conversa = message.data["conversa_id"] ?: return

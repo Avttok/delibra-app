@@ -119,6 +119,15 @@ class MainActivity : ComponentActivity() {
 
                     LaunchedEffect(abrirAba.value) { abrirAba.value?.let {
                         if (it == "planejadas" || it == "rotas") { aba = "corridas"; painel = Painel.MOTOBOY; naConfig = false }
+                        // avisos do gestor: abre o painel do gestor no pedido / na rota
+                        if (it.startsWith("gestor:")) {
+                            painel = Painel.GESTOR; prefs.edit { putString("painel", Painel.GESTOR.name) }; naConfig = false; noPerfil = false
+                            val partes = it.split(":")
+                            when (partes.getOrNull(1)) {
+                                "pedido" -> partes.getOrNull(2)?.takeIf { id -> id.isNotBlank() }?.let { id -> GestorNav.abrirPedido(id) }
+                                "corrida" -> partes.getOrNull(2)?.takeIf { id -> id.isNotBlank() }?.let { id -> GestorNav.abrir(com.pwexpress.feature.gestor.ui.TelaG.Corrida(id)) }
+                            }
+                        }
                         if (it.startsWith("chat")) { it.substringAfter("chat:", "").takeIf { c -> c.isNotBlank() }?.let { c -> com.pwexpress.core.chat.Chat.conversaPedida.value = c }; com.pwexpress.core.chat.Chat.abrir.value = true }
                         abrirAba.value = null } }
                     val chatAberto by com.pwexpress.core.chat.Chat.abrir.collectAsState()
@@ -183,6 +192,20 @@ class MainActivity : ComponentActivity() {
                                 com.pwexpress.core.designsystem.PwCarregando(texto = "Carregando sua conta…")
                             }
                         }
+                        p?.empresaBloqueada != null -> Box(conteudo.fillMaxSize().padding(28.dp), contentAlignment = Alignment.Center) {
+                            // empresa suspensa/cancelada pelo Dev: ninguém da equipe trabalha até reativar
+                            LaunchedEffect(Unit) { runCatching { Tracking.definirModo(Modo.OFFLINE) } }
+                            androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
+                                com.pwexpress.core.designsystem.PwLogoGrande(130.dp)
+                                com.pwexpress.core.designsystem.PwVazio(
+                                    (if (p.empresaBloqueada == "cancelada") "O acesso desta empresa foi encerrado." else "O acesso desta empresa está suspenso.") +
+                                        (p.empresaBloqueadaMotivo?.let { "\nMotivo: $it" } ?: "") + "\nFale com o suporte da plataforma para reativar.",
+                                    icone = PwIcones.Lock,
+                                )
+                                com.pwexpress.core.designsystem.PwBotaoVidro("Tentar de novo", onClick = { scope.launch { Perfis.carregar() } }, icone = PwIcones.RefreshCw)
+                                com.pwexpress.core.designsystem.PwBotaoVidro("Sair da conta", onClick = ::sair, icone = com.pwexpress.core.designsystem.PwIcones.LogOut)
+                            }
+                        }
                         p?.soCliente == true -> Box(conteudo.fillMaxSize().padding(28.dp), contentAlignment = Alignment.Center) {
                             androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 com.pwexpress.core.designsystem.PwLogoGrande(150.dp)
@@ -231,7 +254,8 @@ class MainActivity : ComponentActivity() {
                         }
                         o != null -> OfertaScreen(o, onFim = { }, modifier = conteudo)
                         !preparado -> PrimeiraConfiguracao(onPronto = { preparado = true }, modifier = conteudo)
-                        a != null -> CorridaScreen(a, admin = p?.admin == true, modifier = conteudo)
+                        a != null -> CorridaScreen(a, admin = p?.admin == true, modifier = conteudo, chatLigado = chatLigado,
+                            onPainelGestor = if (podeTrocar) ({ trocar(Painel.GESTOR) }) else null)
                         naConfig && efetivo == Painel.MOTOBOY -> com.pwexpress.motoboy.ui.ConfigMotoApp(onVoltar = { naConfig = false }, modifier = conteudo)
                         else -> Box(conteudo.fillMaxSize()) {
                             val comPlanejadas = p?.modulo("corridas_planejadas") != false
@@ -266,6 +290,14 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    // gestor + motoboy no painel do gestor com corrida ou oferta: volta com um toque
+                    if (efetivo == Painel.GESTOR && podeTrocar && (a != null || o != null) && !chatAberto && !noPerfil) {
+                        com.pwexpress.core.designsystem.PwPilula(
+                            if (o != null) "Corrida nova! Ver oferta" else "Voltar à corrida ${a?.numeroExibicao ?: ""}".trim(),
+                            PwIcones.Bike, { trocar(Painel.MOTOBOY) },
+                            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 96.dp),
+                        )
+                    }
                     if (conta && s != null) {
                         JanelaConta(
                             s.email, efetivo, podeTrocar,

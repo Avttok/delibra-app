@@ -53,6 +53,9 @@ data class Perfil(
     /** Líder de equipe (o gestor escolhe o que ele pode). */
     val supervisor: Boolean = false,
     val permissoes: Map<String, Boolean> = emptyMap(),
+    /** Empresa suspensa ou cancelada pelo Dev ("suspensa"/"cancelada"); null = acesso normal. */
+    val empresaBloqueada: String? = null,
+    val empresaBloqueadaMotivo: String? = null,
 ) {
     /** Supervisor pode fazer isto? (gestor e Dev podem tudo) */
     fun pode(acao: String, padrao: Boolean = true): Boolean = dev || !supervisor || (permissoes[acao] ?: padrao)
@@ -279,6 +282,9 @@ object Perfis {
             devOculto = bool("dev_oculto"),
             supervisor = bool("supervisor") && !bool("dev"),
             permissoes = (o["permissoes"] as? JsonObject)?.mapValues { (it.value as? JsonPrimitive)?.booleanOrNull ?: false } ?: emptyMap(),
+            empresaBloqueada = ((o["organizacao"] as? JsonObject)?.get("status") as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
+                ?.takeIf { it in setOf("suspensa", "cancelada") && !bool("dev") },
+            empresaBloqueadaMotivo = ((o["organizacao"] as? JsonObject)?.get("suspensa_motivo") as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content,
             soCliente = (o["papeis"] as? kotlinx.serialization.json.JsonArray)?.map { it.jsonPrimitive.content }?.let { p -> "cliente" in p && p.none { it in listOf("gestor", "motoboy", "dev", "supervisor") } } ?: false,
         )
     }

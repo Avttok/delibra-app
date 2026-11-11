@@ -35,6 +35,8 @@ class FcmService : FirebaseMessagingService() {
                     message.data["entregas"]?.toIntOrNull() ?: 1, message.data["sugerida"] == "true", message.data["agendada_para"])
                 runBlocking { withTimeoutOrNull(6_000) { Corridas.carregarRotas() } }
             }
+            "teste" -> com.pwexpress.core.notificacoes.PwNotificacoes.cartao(applicationContext, 4900, com.pwexpress.core.notificacoes.PwNotificacoes.CANAL_AVISOS,
+                message.data["titulo"] ?: "Teste de aviso", message.data["texto"] ?: "O push está funcionando.", com.pwexpress.core.notificacoes.PwNotificacoes.GRAD_VERDE, icone = "check")
             "corrida_voltou" -> Alarme.avisarSilencioso(applicationContext, "Uma corrida que você recusou voltou ao lançamento")
             "cancelada" -> {
                 Alarme.pararOferta(applicationContext)

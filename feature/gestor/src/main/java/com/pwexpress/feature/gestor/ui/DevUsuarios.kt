@@ -376,3 +376,131 @@ internal fun DevOcultoG() {
         }, descricao = "Ligado: você some de chats, grupos, registros, exclusões, ranking e listas para quem não é Dev.", icone = PwIcones.EyeOff, cor = c.dev)
     }
 }
+
+private val NIVEIS_PERM = listOf("editar" to "Muda", "ver" to "Só vê", "oculto" to "Escondido")
+
+/** Dev: o que os gestores podem (igual ao site): ações e, em cada área/grupo de Ajustes, muda, só vê ou escondido. */
+@Composable
+internal fun DevPermissoesG() {
+    val c = Pw.cores
+    val escopo = rememberCoroutineScope()
+    var orgs by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var org by remember { mutableStateOf<String?>(null) }
+    var proprias by remember { mutableStateOf<Map<String, String>?>(null) }
+    var padrao by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var areaAberta by remember { mutableStateOf<String?>("sistema") }
+    var escolherOrg by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        Gestao.rpcJson("dev_organizacoes").onSuccess { j -> orgs = (j as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let { o -> (o.str("id") ?: return@let null) to (o.str("nome") ?: "Empresa") } } }
+    }
+    LaunchedEffect(org) {
+        proprias = null
+        Gestao.rpcJson("dev_permissoes", buildJsonObject { put("p_org", org?.let { JsonPrimitive(it) } ?: JsonNull) }).onSuccess { j ->
+            val o = j as? JsonObject
+            proprias = (o?.get("proprias") as? JsonObject)?.mapValues { (it.value as? JsonPrimitive)?.content.orEmpty() }.orEmpty()
+            padrao = (o?.get("padrao") as? JsonObject)?.mapValues { (it.value as? JsonPrimitive)?.content.orEmpty() }.orEmpty()
+        }
+    }
+    fun definir(alvo: String, nivel: String?) {
+        proprias = proprias.orEmpty().toMutableMap().apply { if (nivel == null) remove(alvo) else put(alvo, nivel) }
+        escopo.launch {
+            Gestao.rpcJson("dev_definir_permissao", buildJsonObject { put("p_org", org?.let { JsonPrimitive(it) } ?: JsonNull); put("p_alvo", alvo); put("p_nivel", nivel?.let { JsonPrimitive(it) } ?: JsonNull) })
+                .onFailure { PwToast.mostrar(it.message ?: "Erro", TipoAviso.ERRO) }
+        }
+    }
+    PwBotaoVidro("Para: ${org?.let { id -> orgs.firstOrNull { it.first == id }?.second } ?: "Padrão (todas as empresas)"}", onClick = { escolherOrg = !escolherOrg }, icone = PwIcones.Building2, modifier = Modifier.fillMaxWidth())
+    if (escolherOrg) Column {
+        (listOf<Pair<String?, String>>(null to "Padrão (todas as empresas)") + orgs.map { it.first to it.second }).forEach { (id, nome) ->
+            Text(nome, color = if (id == org) c.ouro else c.texto, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { org = id; escolherOrg = false }.padding(10.dp))
+        }
+    }
+    TextoDica(if (org == null) "Vale para todas as empresas, menos no que você mudar dentro de cada uma." else "Só esta empresa: o que você marcar vence o padrão. Toque de novo para voltar ao padrão.")
+    val p = proprias ?: run { PwCarregando(); return }
+    fun herdado(alvo: String, vararg acima: String): String {
+        p[alvo]?.let { return it }; padrao[alvo]?.let { return it }
+        acima.forEach { a -> p[a]?.let { return it }; padrao[a]?.let { return it } }
+        val area = (listOf(alvo) + acima).firstOrNull { it.startsWith("area:") }?.removePrefix("area:")
+        return if (area == "sistema") "oculto" else "editar"
+    }
+    @Composable
+    fun Seletor(alvo: String, vararg acima: String) {
+        val atual = p[alvo]
+        val vale = atual ?: herdado(alvo, *acima)
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            NIVEIS_PERM.forEach { (v, r) ->
+                val ativo = vale == v
+                val cor = when (v) { "editar" -> c.verde; "ver" -> c.azul; else -> c.vermelho }
+                Text(r, color = if (ativo) cor else c.texto3, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (ativo) cor.copy(alpha = if (atual == null) 0.08f else 0.18f) else c.campo)
+                        .clickable { definir(alvo, if (atual == v) null else v) }.padding(horizontal = 9.dp, vertical = 6.dp))
+            }
+        }
+    }
+    PwRotulo("Ações")
+    com.pwexpress.feature.gestor.data.ACOES_GESTOR.forEach { (k, r) ->
+        val alvo = "acao:$k"
+        val v = p[alvo] ?: padrao[alvo] ?: "sim"
+        PwInterruptor(r, v != "nao", { definir(alvo, if (it) "sim" else "nao") }, descricao = if (p[alvo] != null && org != null) "Marcado só nesta empresa" else null)
+    }
+    PwRotulo("Ajustes")
+    com.pwexpress.feature.gestor.data.AREAS_CONFIG.forEach { a ->
+        val alvoA = "area:${a.chave}"
+        PwCartao(padding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
+            Row(Modifier.fillMaxWidth().clickable { areaAberta = if (areaAberta == a.chave) null else a.chave }, verticalAlignment = Alignment.CenterVertically) {
+                Text(a.titulo, color = c.texto, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Icon(if (areaAberta == a.chave) PwIcones.ChevronUp else PwIcones.ChevronDown, null, tint = c.texto3, modifier = Modifier.size(16.dp))
+            }
+            Spacer(Modifier.height(6.dp)); Seletor(alvoA)
+            if (areaAberta == a.chave) com.pwexpress.feature.gestor.data.GRUPOS_CONFIG.filter { it.area == a.chave }.forEach { g ->
+                Column(Modifier.padding(top = 10.dp)) {
+                    Text(g.titulo, color = c.texto2, fontSize = 13.sp)
+                    Spacer(Modifier.height(4.dp)); Seletor("grupo:${g.chave}", alvoA)
+                }
+            }
+        }
+    }
+}
+
+/** Dev: apagar as contas de acesso de uma empresa ou de todas (menos as do Dev), mantendo ou não o histórico. */
+@Composable
+internal fun DevApagarContasG() {
+    val c = Pw.cores
+    val escopo = rememberCoroutineScope()
+    var orgs by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var org by remember { mutableStateOf<String?>(null) }
+    var papel by remember { mutableStateOf<String?>(null) }
+    var completo by remember { mutableStateOf(false) }
+    var senha by remember { mutableStateOf("") }
+    var ocupado by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        Gestao.rpcJson("dev_organizacoes").onSuccess { j -> orgs = (j as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let { o -> (o.str("id") ?: return@let null) to (o.str("nome") ?: "Empresa") } } }
+    }
+    PwCartao(cor = c.vermelho.copy(alpha = 0.5f)) {
+        PwRotulo("Contas de acesso")
+        TextoDica("Motoboys, gestores, supervisores e clientes (as do Dev ficam).")
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Chip("Todas as empresas", org == null) { org = null }
+            orgs.forEach { (id, n) -> Chip(n, org == id) { org = id } }
+        }
+        Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Chip("Todos os cargos", papel == null) { papel = null }
+            listOf("motoboy" to "Motoboys", "gestor" to "Gestores", "supervisor" to "Supervisores", "cliente" to "Clientes").forEach { (k, n) -> Chip(n, papel == k) { papel = k } }
+        }
+        PwInterruptor(if (completo) "Apagar tudo" else "Manter o histórico", completo, { completo = it },
+            descricao = if (completo) "Some o e-mail, as mensagens e as cópias. Nas rotas fica “Conta apagada”." else "As rotas continuam com o nome e fica uma cópia no registro.", cor = c.vermelho)
+        PwCampo(senha, { senha = it }, "Sua senha", senha = true, teclado = androidx.compose.ui.text.input.KeyboardType.Password)
+        PwBotaoPerigo(if (ocupado) "Apagando…" else "Apagar contas", {
+            ocupado = true
+            escopo.launch {
+                runCatching { PwCore.rpc.site("/api/dev/apagar-contas", buildJsonObject {
+                    put("senha", senha); put("org", org?.let { JsonPrimitive(it) } ?: JsonNull); put("papel", papel?.let { JsonPrimitive(it) } ?: JsonNull); put("completo", completo) }) }
+                    .onSuccess { r ->
+                        val o = runCatching { kotlinx.serialization.json.Json.parseToJsonElement(r.corpo) as? JsonObject }.getOrNull()
+                        if (r.ok) PwToast.mostrar("${o?.int("apagadas") ?: 0} conta(s) apagada(s).", titulo = "Contas apagadas")
+                        else PwToast.mostrar(if (o?.str("erro") == "senha_incorreta") "Senha incorreta." else "Não deu para apagar agora.", TipoAviso.ERRO)
+                    }.onFailure { PwToast.mostrar("Sem internet.", TipoAviso.ERRO) }
+                senha = ""; ocupado = false
+            }
+        }, cheio = true, habilitado = senha.isNotEmpty() && !ocupado, modifier = Modifier.fillMaxWidth())
+    }
+}

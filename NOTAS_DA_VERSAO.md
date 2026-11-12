@@ -1,26 +1,26 @@
 ## Delibra · novidades
 
-**Notificações**
-- **Notificação toda no cartão**: o aviso inteiro agora tem a cor do assunto (dourado, azul, verde, vermelho, violeta), fechado, aberto e quando desce na tela.
-
 **Para o gestor**
-- **Pagamento do motoboy redesenhado**: em pedidos e rotas, ligue e desligue cada cálculo (zonas, por km, percentual, por entrega, fixo), mude os valores dele ali mesmo e escolha como juntar. Muda antes e depois do motoboy pegar a rota.
-- **Ajuste na rota**: lance um valor a mais ou a menos e escolha se o motoboy vê o motivo.
-- **Holerite**: em cada ajuste, escolha o que o motoboy vê (tudo, só o valor ou nada).
-- **Voltar para revisão**: pedidos e rotas cancelados podem voltar para a revisão.
-- **Hoje mais completo**: gráfico de rotas por hora arrumado, blocos alinhados, entregas, canceladas, tempo médio, comparação com ontem e quem está na rua agora.
-- **Relatórios**: na Carteira, rotas, pedidos, motoboys e clientes do período em planilha (abre no Excel) ou por e-mail.
-- **Vagas por cargo**: ao criar ou editar uma conta, o cargo sem vaga já aparece travado. Cada empresa começa com 1 gestor, e só o suporte da plataforma cria gestores.
-- **Exportar conversa**: no chat, guarde ou mande a conversa inteira em texto.
-- **Verificação em dois passos**: no seu perfil, ligue o código do aplicativo autenticador (vale no app e no site).
-- **"Montagem da rota"**: o bloco de juntar pedidos aparece uma vez só.
+- **Preço do pedido mais fácil de mexer**: a cobrança do cliente ganhou o mesmo jeito do pagamento do motoboy. Você vê o total grande, liga e desliga cada parte (saída, distância, pontos, volumes, peso, carga perigosa, pressa, zonas) e vê a conta antes de salvar.
+- **Pagamento do motoboy em todo lugar**: o editor novo vale também em Ajustes → Motoboys e agora tem salário fixo, diária e por hora.
+- **Começar agora**: uma rota planejada pode começar na hora, sem esperar o horário.
+- **Há quanto tempo**: os cartões de pedidos e rotas mostram há quanto tempo foram criados e ficam em destaque quando passam do limite que você escolher (Ajustes → Pedidos).
+- **Objetos direto no ponto de entrega**: ao criar um pedido, cada entrega tem os seus pacotes, igual ao site do cliente. O pacote que vai para todas as entregas fica num botão.
+- **Apagar conta por inteiro**: ao excluir uma conta, escolha entre manter o histórico ou apagar tudo, até o e-mail.
+- **Ajustes revistos**: cada área mostra só o que você pode mudar. A área Sistema fica fechada, a não ser que o suporte libere.
 
 **Para o motoboy**
-- **Loja do jogo**: nomes e preços sem cortar, com quanto falta para comprar.
+- **Mais de uma rota ao mesmo tempo**: quando a empresa deixa, você pega outra rota sem largar a atual. Se ela ficar longe das que você já tem, aparece um aviso, mas a escolha é sua.
+- **Fica online sozinho**: aceitar uma rota já liga o modo online.
+- **Trajeto melhor quando online**: parado à espera de rota, o app marca o caminho com mais pontos e o gestor enxerga por onde você passou.
 
-**No site**
-- **Painel do gestor novo**: nas telas largas, o menu vira uma coluna à esquerda; no celular, a barra de baixo ficou no lugar certo.
-- **Site do cliente**: topo com o nome da empresa, resumo dos pedidos e abas novas.
-- **Cliente em mais de uma transportadora**: a mesma conta pede para várias e troca no topo. Nos cards das transportadoras aparece a distância de você.
-- **Fotos de perfil** sempre redondas e alinhadas.
-- **E-mail, WhatsApp e nota fiscal**: quando conectados, saem sozinhos (cadastro aprovado, fatura emitida, pedido entregue, link de acompanhar, nota e aviso de devolução). Cada um liga e desliga em Ajustes → Integrações.
+**No app e no site**
+- **Mapa em tela cheia**: o botão de expandir no mapa e nos pedidos esconde todas as barras e deixa só o mapa.
+- **Novidades na tela de atualização**: veja o que mudou antes e depois de atualizar.
+- **Voltar uma tela de cada vez**: o botão voltar leva para a tela anterior, não para o começo.
+- **Fotos de perfil**: a letra inicial fica bem no meio do círculo.
+
+**Site do cliente**
+- **Pedido mais curto**: os pacotes ficam no primeiro passo, junto com os endereços.
+- **Pacote para todas as entregas** fica num botão, para não poluir a tela.
+- **Cobrança automática**: com a cobrança conectada, a fatura emitida já sai com boleto ou PIX.

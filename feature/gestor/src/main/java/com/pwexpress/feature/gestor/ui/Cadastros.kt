@@ -873,7 +873,7 @@ private fun EditarMembroG(m: com.pwexpress.feature.gestor.data.MembroG, eu: Bool
 fun FinanceiroG(onVoltar: (() -> Unit)?) {
     var aba by remember { mutableIntStateOf(0) }
     val abas: @Composable () -> Unit = {
-        PwFiltros(listOf("Resumo" to 0, "Faturas" to 0, "Folha" to 0, "Clientes" to 0, "Extrato" to 0, "PIX" to 0), aba, { aba = it })
+        PwFiltros(listOf("Resumo" to 0, "Faturas" to 0, "Folha" to 0, "Clientes" to 0, "Extrato" to 0, "Relatórios" to 0, "PIX" to 0), aba, { aba = it })
     }
     when (aba) {
         0 -> ResumoCarteiraG(onVoltar, abas)
@@ -881,6 +881,7 @@ fun FinanceiroG(onVoltar: (() -> Unit)?) {
         2 -> FolhaG(onVoltar, abas)
         3 -> ClientesCarteiraG(onVoltar, abas)
         4 -> ExtratoCarteiraG(onVoltar, abas)
+        5 -> RelatoriosG(onVoltar, abas)
         else -> PixCarteiraG(onVoltar, abas)
     }
 }

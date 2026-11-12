@@ -19,6 +19,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -86,7 +87,6 @@ internal fun ValorClienteG(pedido: String, orc: JsonObject?, regrasIniciais: Jso
     val regras = remember(pedido) { mutableStateMapOf<String, JsonElement>().apply { putAll(regrasIniciais) } }
     var salvas by remember(pedido) { mutableStateOf(regrasIniciais) }
     var previa by remember(pedido) { mutableStateOf<JsonObject?>(null) }
-    var aberto by remember(pedido) { mutableStateOf<String?>(null) }
     val atual = JsonObject(regras.toMap())
     val mudou = atual != salvas
     val pode = !bloqueado && com.pwexpress.feature.gestor.data.Permissoes.estado.value.pode("editar_valor_pedido")
@@ -96,8 +96,6 @@ internal fun ValorClienteG(pedido: String, orc: JsonObject?, regrasIniciais: Jso
         previa = Gestao.rpcJson("previa_orcamento_pedido", buildJsonObject { put("p_pedido", pedido); put("p_regras", atual) }).getOrNull() as? JsonObject
     }
     val base = previa ?: orc
-    fun ligada(p: PecaPreco) = p.desliga.isEmpty() || !p.desliga.all { (k, v) -> regras[k] == v }
-
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(PwIcones.Wallet, null, tint = c.ouro, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
         Text("Valor cobrado do cliente", color = c.texto, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.weight(1f))
@@ -109,6 +107,32 @@ internal fun ValorClienteG(pedido: String, orc: JsonObject?, regrasIniciais: Jso
     }
     if (!pode) { TextoDica(if (bloqueado) "Pedido fechado: o preço não muda mais." else "A plataforma não liberou mudar o valor do pedido."); return }
     Spacer(Modifier.height(6.dp))
+    PecasPrecoG(regras, base)
+    if (mudou || salvas.isNotEmpty()) Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        PwBotaoOuro("Salvar preço", onClick = {
+            acao {
+                val r = Gestao.rpcJson("definir_regras_pedido", buildJsonObject { put("p_pedido", pedido); put("p_regras", atual) })
+                if (r.isSuccess) { salvas = atual; previa = null; Gestao.atualizar() }
+                r.map { }
+            }
+        }, icone = PwIcones.Check, habilitado = mudou, modifier = Modifier.weight(1f))
+        if (salvas.isNotEmpty()) PwBotaoVidro("Padrão", onClick = {
+            acao {
+                val r = Gestao.rpcJson("definir_regras_pedido", buildJsonObject { put("p_pedido", pedido); put("p_regras", JsonObject(emptyMap())) })
+                if (r.isSuccess) { salvas = JsonObject(emptyMap()); regras.clear(); Gestao.atualizar() }
+                r.map { }
+            }
+        }, icone = PwIcones.RotateCcw)
+    }
+    TextoDica("Muda só este pedido. O padrão do cliente fica no cadastro dele, e o geral em Ajustes → Preço.")
+}
+
+/** As peças do preço (liga, desliga e mexe nos valores). Muda só o mapa [regras]. */
+@Composable
+internal fun PecasPrecoG(regras: androidx.compose.runtime.snapshots.SnapshotStateMap<String, JsonElement>, base: JsonObject?) {
+    val c = Pw.cores
+    var aberto by remember { mutableStateOf<String?>(null) }
+    fun ligada(p: PecaPreco) = p.desliga.isEmpty() || !p.desliga.all { (k, v) -> regras[k] == v }
     PECAS.forEach { p ->
         val on = ligada(p)
         val v = base?.arr("linhas").orEmpty().filter { p.linha(it.str("chave"), it.str("rotulo").orEmpty()) }.sumOf { it.dbl("valor") ?: 0.0 }
@@ -136,21 +160,51 @@ internal fun ValorClienteG(pedido: String, orc: JsonObject?, regrasIniciais: Jso
             }
         }
     }
-    if (mudou || salvas.isNotEmpty()) Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        PwBotaoOuro("Salvar preço", onClick = {
-            acao {
-                val r = Gestao.rpcJson("definir_regras_pedido", buildJsonObject { put("p_pedido", pedido); put("p_regras", atual) })
-                if (r.isSuccess) { salvas = atual; previa = null; Gestao.atualizar() }
-                r.map { }
-            }
-        }, icone = PwIcones.Check, habilitado = mudou, modifier = Modifier.weight(1f))
-        if (salvas.isNotEmpty()) PwBotaoVidro("Padrão", onClick = {
-            acao {
-                val r = Gestao.rpcJson("definir_regras_pedido", buildJsonObject { put("p_pedido", pedido); put("p_regras", JsonObject(emptyMap())) })
-                if (r.isSuccess) { salvas = JsonObject(emptyMap()); regras.clear(); Gestao.atualizar() }
-                r.map { }
-            }
-        }, icone = PwIcones.RotateCcw)
+}
+
+/** Chaves cobertas pelos editores visuais nos Ajustes (somem da lista comum). */
+internal val CHAVES_PRECO_VISUAL = PECAS.flatMap { it.chaves }.toSet()
+
+/** Chaves do pagamento do motoboy que o editor visual cobre nos Ajustes. */
+internal val CHAVES_PAG_VISUAL: Set<String> get() = PARAMETROS.filter { it.grupo in setOf("pag_combinar", "pag_km", "pag_zonas", "pag_entrega", "pag_fixo") ||
+    it.chave in setOf("repasse_motoboy_pct", "pag_volta", "pag_volta_valor_km", "pag_volta_pct") }.map { it.chave }.toSet()
+
+/**
+ * Padrão da empresa no mesmo editor das rotas e pedidos (igual ao site): o pagamento do motoboy e o preço do cliente.
+ * Cada mudança salva sozinha como ajuste da empresa.
+ */
+@Composable
+internal fun AjusteVisualG(tipo: String, config: Map<String, JsonElement>, padraoDe: (com.pwexpress.feature.gestor.data.Param) -> JsonElement) {
+    val c = Pw.cores
+    val chaves = if (tipo == "pagamento") CHAVES_PAG_VISUAL else CHAVES_PRECO_VISUAL
+    val perm by com.pwexpress.feature.gestor.data.Permissoes.estado.collectAsState()
+    val regras = remember { mutableStateMapOf<String, JsonElement>() }
+    var antes by remember { mutableStateOf<Map<String, JsonElement>>(emptyMap()) }
+    var pronto by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        // o que a empresa já mudou do padrão vira "próprio"
+        val iniciais = PARAMETROS.filter { it.chave in chaves }.mapNotNull { p -> config[p.chave]?.takeIf { v -> v.toString() != padraoDe(p).toString() }?.let { p.chave to it } }.toMap()
+        regras.clear(); regras.putAll(iniciais); antes = iniciais; pronto = true
     }
-    TextoDica("Muda só este pedido. O padrão do cliente fica no cadastro dele, e o geral em Ajustes → Preço.")
+    val atual = regras.toMap()
+    LaunchedEffect(atual.toString()) {
+        if (!pronto || atual == antes) return@LaunchedEffect
+        delay(500)
+        val mudadas = atual.filter { (k, v) -> antes[k] != v }
+        val tiradas = antes.keys - atual.keys
+        var ok = true
+        mudadas.forEach { (k, v) -> if (perm.nivel(k) == "editar") Gestao.salvarConfig(k, v).onFailure { ok = false; com.pwexpress.core.designsystem.PwToast.mostrar(it.message ?: "Erro", com.pwexpress.core.designsystem.TipoAviso.ERRO) } }
+        tiradas.forEach { k -> PARAMETROS.firstOrNull { it.chave == k }?.let { p -> if (perm.nivel(k) == "editar") Gestao.salvarConfig(k, padraoDe(p)) } }
+        if (ok) { antes = atual; com.pwexpress.core.designsystem.PwToast.mostrar("Salvo.") }
+    }
+    com.pwexpress.core.designsystem.PwCartao(destaque = true) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(if (tipo == "pagamento") PwIcones.HandCoins else PwIcones.Tags, null, tint = c.ouro, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
+            Text(if (tipo == "pagamento") "Como o motoboy é pago (padrão)" else "Como o pedido é cobrado (padrão)", color = c.texto, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        }
+        TextoDica(if (tipo == "pagamento") "Ligue os cálculos que entram, mude os valores e escolha como juntar. Cada rota pode mudar depois. Salva sozinho."
+            else "Ligue as peças que entram no preço e mude os valores. Cada cliente e pedido podem mudar depois. Salva sozinho.")
+        Spacer(Modifier.height(6.dp))
+        if (tipo == "pagamento") EditorCalculosG(regras, null, null) else PecasPrecoG(regras, null)
+    }
 }

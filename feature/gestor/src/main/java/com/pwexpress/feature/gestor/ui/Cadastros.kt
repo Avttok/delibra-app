@@ -1212,8 +1212,12 @@ fun ConfiguracoesG(onVoltar: (() -> Unit)?, onAbrir: (TelaG) -> Unit = {}) {
             else -> PARAMETROS_VISIVEIS.filter { grupoArea[it.grupo] == a?.chave && (secao == null || it.grupo == secao) }
         }
         val souDev = com.pwexpress.core.perfil.Perfis.perfil.collectAsState().value?.dev == true
+        // pagamento do motoboy e preço do cliente no mesmo editor das rotas e pedidos
+        val visual = termo.isEmpty() && !soMudados && (a?.chave == "motoboys" || a?.chave == "preco")
+        if (visual) AjusteVisualG(if (a?.chave == "motoboys") "pagamento" else "preco", dados.config, ::padraoJson)
+        val cobertas = if (!visual) emptySet() else if (a?.chave == "motoboys") CHAVES_PAG_VISUAL else CHAVES_PRECO_VISUAL
         GRUPOS_CONFIG.forEach { g ->
-            val doGrupo = lista.filter { it.grupo == g.chave }
+            val doGrupo = lista.filter { it.grupo == g.chave && it.chave !in cobertas }
             if (doGrupo.isEmpty()) return@forEach
             Espaco(4)
             Text(g.titulo, color = c.texto, fontWeight = FontWeight.Bold, fontSize = 17.sp)

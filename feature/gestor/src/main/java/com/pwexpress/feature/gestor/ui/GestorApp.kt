@@ -40,6 +40,7 @@ sealed interface TelaG {
     data object Configuracoes : TelaG
     data object Dev : TelaG
     data object Excecoes : TelaG
+    data object Historico : TelaG
     data class CatalogoT(val cat: Catalogo) : TelaG
 }
 
@@ -69,7 +70,8 @@ fun GestorApp(
     // volta para onde a pessoa estava (Ajustes → lembrar_pagina)
     var aba by com.pwexpress.core.designsystem.lembrarPagina("gestor_aba", "mapa")
     var subOperacao by com.pwexpress.core.designsystem.lembrarPaginaNumero("gestor_sub_operacao", 0)   // 0 pedidos · 1 rotas
-    var subPessoas by com.pwexpress.core.designsystem.lembrarPaginaNumero("gestor_sub_pessoas", 0)     // 0 clientes · 1 equipe
+    var subPessoas by com.pwexpress.core.designsystem.lembrarPaginaNumero("gestor_sub_pessoas", 0)
+    var subMapa by com.pwexpress.core.designsystem.lembrarPaginaNumero("gestor_sub_mapa", 0)          // 0 mapa · 1 hoje     // 0 clientes · 1 equipe
     val pilha = remember { mutableStateListOf<TelaG>() }
     val dados by Gestao.dados.collectAsState()
     val teste by TemaApp.modoTeste.collectAsState()
@@ -147,10 +149,13 @@ fun GestorApp(
                     TelaG.Financeiro -> FinanceiroG(onVoltar = ::voltar)
                     TelaG.Configuracoes -> ConfiguracoesG(onVoltar = ::voltar, onAbrir = { abrir(it) })
                     TelaG.Excecoes -> ExcecoesG(onVoltar = ::voltar)
+                    TelaG.Historico -> HistoricoG(onVoltar = ::voltar)
                     is TelaG.CatalogoT -> CatalogoG(atual.cat, onVoltar = ::voltar)
                     TelaG.Dev -> DevG(onVoltar = ::voltar)
                     null -> when (aba) {
-                        "mapa" -> MapaG(onCorrida = { abrir(TelaG.Corrida(it)) })
+                        "mapa" -> ComSubAbas(listOf("Mapa" to PwIcones.Mapa, "Hoje" to PwIcones.LayoutDashboard), subMapa, { subMapa = it }) { i ->
+                            if (i == 0) MapaG(onCorrida = { abrir(TelaG.Corrida(it)) }) else HojeG(onAba = { a -> aba = a })
+                        }
                         "operacao" -> ComSubAbas(
                             if (comPedidos) listOf("Pedidos" to PwIcones.ClipboardList, "Rotas" to PwIcones.Route) else listOf("Rotas" to PwIcones.Route),
                             if (comPedidos) subOperacao else 0, { subOperacao = it },

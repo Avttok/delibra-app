@@ -234,3 +234,28 @@ private fun JanelaEmergencia(onFechar: () -> Unit) {
         Text("190 Polícia · 192 SAMU · 193 Bombeiros", color = c.texto3, fontSize = 12.sp)
     }
 }
+
+// ------------------------------------------------------------------ minha nota
+
+/** A nota que os clientes deram (média e quantas avaliações). Some enquanto não houver nenhuma. */
+@Composable
+fun MinhaNota(modifier: Modifier = Modifier) {
+    val c = Pw.cores
+    val perfil by com.pwexpress.core.perfil.Perfis.perfil.collectAsState()
+    val id = perfil?.id ?: return
+    var nota by remember(id) { mutableStateOf<JsonObject?>(null) }
+    LaunchedEffect(id) { Corridas.rpc("nota_motoboy", buildJsonObject { put("p_motoboy", id) }).onSuccess { nota = it as? JsonObject } }
+    val total = nota?.str("total")?.toIntOrNull() ?: 0
+    if (total == 0) return
+    val media = nota?.str("media")?.toDoubleOrNull() ?: return
+    PwCartao(modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(PwIcones.Star, null, tint = c.ouro, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Sua nota: ${String.format(java.util.Locale("pt", "BR"), "%.1f", media)}", color = c.texto, fontWeight = FontWeight.Bold, fontFamily = Archivo, fontSize = 16.sp)
+                Text("$total avaliação${if (total == 1) "" else "ões"} dos clientes", color = c.texto2, fontSize = 13.sp)
+            }
+            Row { repeat(5) { i -> Icon(PwIcones.Star, null, tint = if (i < Math.round(media)) c.ouro else c.borda, modifier = Modifier.size(14.dp)) } }
+        }
+    }
+}

@@ -299,6 +299,7 @@ class MainActivity : ComponentActivity() {
                                             extras = {
                                                 com.pwexpress.feature.corridas.ui.AvisoSuspensao()
                                                 CartaoGanhos(onCarteira = if (comCarteira) ({ aba = "carteira" }) else null)
+                                                com.pwexpress.feature.corridas.ui.MinhaNota()
                                             },
                                             chips = { com.pwexpress.feature.tracking.ui.ChipInicio(PwIcones.Radar, com.pwexpress.motoboy.ui.textoRaio(p?.raioKm, p?.raioModo ?: "posicao")) { raioAberto = true } },
                                             onConfiguracoes = { naConfig = true },

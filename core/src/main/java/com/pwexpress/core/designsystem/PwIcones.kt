@@ -79,6 +79,9 @@ object PwIcones {
     val Pin: ImageVector by lazy { icone("pin", "M12 17v5", "M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z") }
     val DoorOpen: ImageVector by lazy { icone("door-open", "M11 20H2", "M11 4.562v16.157a1 1 0 0 0 1.242.97L19 20V5.562a2 2 0 0 0-1.515-1.94l-4-1A2 2 0 0 0 11 4.561z", "M11 4H8a2 2 0 0 0-2 2v14", "M14 12h.01", "M22 20h-3") }
     val Wrench: ImageVector by lazy { icone("wrench", "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z") }
+    val Activity: ImageVector by lazy { icone("activity", "M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2") }
+    val Wifi: ImageVector by lazy { icone("wifi", "M12 20h.01", "M2 8.82a15 15 0 0 1 20 0", "M5 12.859a10 10 0 0 1 14 0", "M8.5 16.429a5 5 0 0 1 7 0") }
+    val Plug: ImageVector by lazy { icone("plug", "M12 22v-5", "M15 8V2", "M17 8a1 1 0 0 1 1 1v4a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1z", "M9 8V2") }
     val CheckCheck: ImageVector by lazy { icone("check-check", "M18 6 7 17l-5-5", "m22 10-7.5 7.5L13 16") }
     val Reply: ImageVector by lazy { icone("reply", "M20 18v-2a4 4 0 0 0-4-4H4", "m9 17-5-5 5-5") }
     val Mic: ImageVector by lazy { icone("mic", "M12 19v3", "M19 10v2a7 7 0 0 1-14 0v-2", "M12.0 2.0h0.0a3.0 3.0 0 0 1 3.0 3.0v7.0a3.0 3.0 0 0 1 -3.0 3.0h-0.0a3.0 3.0 0 0 1 -3.0 -3.0v-7.0a3.0 3.0 0 0 1 3.0 -3.0Z") }

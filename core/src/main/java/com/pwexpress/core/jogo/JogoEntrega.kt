@@ -472,27 +472,32 @@ private fun Loja(perfil: PerfilJogo?) {
                         else if (i.arco) Box(Modifier.size(42.dp).background(Brush.sweepGradient(listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red))))
                     }
                     Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(i.nome, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(i.nome, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        val falta = (i.preco - p.moedas).coerceAtLeast(0)
                         Text(when {
                             equipado -> "Em uso"
-                            i.poder && tem -> "Você tem ${p.quantos(i.chave)}"
-                            tem -> "Seu"
+                            i.poder && tem -> "Você tem ${p.quantos(i.chave)} · ${i.preco} moedas cada"
+                            tem -> "Já é seu"
                             bloqueado -> "Libera no level ${i.nivel}"
                             i.preco == 0 -> "Grátis"
+                            falta > 0 -> "${i.preco} moedas · faltam $falta"
                             else -> "${i.preco} moedas"
-                        }, color = if (bloqueado) Color(0xFF8B8B93) else Color(0xFFFACC15), fontSize = 12.5.sp)
+                        }, color = when { bloqueado -> Color(0xFF8B8B93); equipado || tem -> Color(0xFF86EFAC); else -> Color(0xFFFACC15) },
+                            fontSize = 12.5.sp, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
+                    Spacer(Modifier.width(10.dp))
+                    val larg = Modifier.width(104.dp)
                     when {
-                        equipado -> Icon(PwIcones.Check, null, tint = c.ouro)
+                        equipado -> Box(larg, contentAlignment = Alignment.CenterEnd) { Icon(PwIcones.Check, "Em uso", tint = c.ouro) }
                         tem && !i.poder -> PwBotaoVidro("Usar", onClick = {
                             ocupado = i.chave; escopo.launch { JogoServidor.equipar(i.chave).onFailure { aviso = it.message }; ocupado = null }
-                        }, habilitado = ocupado == null)
-                        bloqueado -> Icon(PwIcones.Lock, null, tint = Color(0xFF8B8B93))
-                        else -> PwBotaoOuro(if (ocupado == i.chave) "…" else "Comprar", onClick = {
+                        }, habilitado = ocupado == null, modifier = larg)
+                        bloqueado -> Box(larg, contentAlignment = Alignment.CenterEnd) { Icon(PwIcones.Lock, "Bloqueado", tint = Color(0xFF8B8B93)) }
+                        else -> PwBotaoOuro(if (ocupado == i.chave) "…" else if (i.poder && tem) "+1" else "Comprar", onClick = {
                             ocupado = i.chave; aviso = null
                             escopo.launch { JogoServidor.comprar(i.chave).onFailure { aviso = it.message }; ocupado = null }
-                        }, habilitado = ocupado == null && p.moedas >= i.preco)
+                        }, habilitado = ocupado == null && p.moedas >= i.preco, modifier = larg, altura = 40.dp, tamanhoTexto = 14)
                     }
                 }
             }

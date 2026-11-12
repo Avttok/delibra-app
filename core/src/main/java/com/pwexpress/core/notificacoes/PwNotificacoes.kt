@@ -149,18 +149,82 @@ object PwNotificacoes {
         // todo aviso ganha o cartão colorido com ícone do tipo (a cor e o ícone vêm do canal se não vierem)
         val cor = cores ?: when (canal) { CANAL_PLANEJADAS -> GRAD_AZUL; CANAL_SILENCIOSO -> GRAD_VIOLETA; else -> GRAD_OURO }
         val ic = icone ?: when (canal) { CANAL_PLANEJADAS -> "calendario"; CANAL_SILENCIOSO -> "info"; else -> "sino" }
-        val img = runCatching { banner(ctx, titulo, texto, cor, ic) }.getOrNull()
         val b = base(ctx, canal)
             .setContentTitle(titulo)
             .setContentText(texto)
             .setColor(cor[1])
-            .setStyle(if (img != null) NotificationCompat.BigPictureStyle().bigPicture(img).bigLargeIcon(null as Bitmap?).setSummaryText(longo ?: texto)
-                else NotificationCompat.BigTextStyle().bigText(longo ?: texto))
             .setAutoCancel(true)
+        vestir(ctx, b, titulo, texto, longo ?: texto, cor, ic)
+        b
             .setContentIntent(abrir)
             .setSilent(silencioso)
         acoes.forEach { b.addAction(it) }
         ctx.getSystemService(NotificationManager::class.java)?.notify(id, b.build())
+    }
+
+    /**
+     * A notificação inteira vira o cartão colorido (fechada, aberta e no aviso que desce na tela).
+     * Cada assunto tem a sua cor; se o aparelho não aceitar o layout, cai no cartão em imagem.
+     */
+    fun vestir(ctx: Context, b: NotificationCompat.Builder, titulo: String, texto: String, longo: String, cores: IntArray, icone: String?) {
+        val ok = runCatching {
+            val claro = android.graphics.Color.luminance(cores[1]) > 0.45f
+            val tinta = if (claro) 0xFF0A0A0A.toInt() else 0xFFFFFFFF.toInt()
+            val logo = logoRedonda(ctx)
+            val selo = icone?.let { selo(it, tinta) }
+            fun vista(layout: Int, w: Int, h: Int, corpo: String): android.widget.RemoteViews =
+                android.widget.RemoteViews(ctx.packageName, layout).apply {
+                    setImageViewBitmap(R.id.pwex_fundo, fundo(w, h, cores))
+                    if (logo != null) setImageViewBitmap(R.id.pwex_logo, logo) else setViewVisibility(R.id.pwex_logo, android.view.View.GONE)
+                    if (selo != null) setImageViewBitmap(R.id.pwex_selo, selo) else setViewVisibility(R.id.pwex_selo, android.view.View.GONE)
+                    setTextViewText(R.id.pwex_titulo, titulo); setTextColor(R.id.pwex_titulo, tinta)
+                    setTextViewText(R.id.pwex_texto, corpo); setTextColor(R.id.pwex_texto, tinta)
+                    if (corpo.isBlank()) setViewVisibility(R.id.pwex_texto, android.view.View.GONE)
+                }
+            val pequena = vista(R.layout.pwex_notif_pequena, 900, 170, texto)
+            val grande = vista(R.layout.pwex_notif_grande, 900, 380, longo)
+            b.setLargeIcon(null as Bitmap?)
+                .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+                .setCustomContentView(pequena)
+                .setCustomBigContentView(grande)
+                .setCustomHeadsUpContentView(vista(R.layout.pwex_notif_pequena, 900, 170, texto))
+        }.isSuccess
+        if (!ok) {
+            val img = runCatching { banner(ctx, titulo, texto, cores, icone) }.getOrNull()
+            b.setStyle(if (img != null) NotificationCompat.BigPictureStyle().bigPicture(img).bigLargeIcon(null as Bitmap?).setSummaryText(longo)
+                else NotificationCompat.BigTextStyle().bigText(longo))
+        }
+    }
+
+    /** Fundo do cartão: degradê, brilho e anéis (sem textos, que ficam por cima e podem ser lidos). */
+    fun fundo(w: Int, h: Int, cores: IntArray): Bitmap {
+        val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val tela = Canvas(b)
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        val raio = minOf(h * 0.28f, 64f)
+        p.shader = android.graphics.LinearGradient(0f, h.toFloat(), w.toFloat(), 0f, cores, null, Shader.TileMode.CLAMP)
+        tela.drawRoundRect(android.graphics.RectF(0f, 0f, w.toFloat(), h.toFloat()), raio, raio, p)
+        tela.save()
+        tela.clipPath(android.graphics.Path().apply { addRoundRect(android.graphics.RectF(0f, 0f, w.toFloat(), h.toFloat()), raio, raio, android.graphics.Path.Direction.CW) })
+        p.shader = android.graphics.RadialGradient(w * 0.85f, h * 0.1f, h * 0.9f, intArrayOf(0x55FFFFFF, 0x00FFFFFF), null, Shader.TileMode.CLAMP)
+        tela.drawCircle(w * 0.85f, h * 0.1f, h * 0.9f, p)
+        p.shader = null; p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = 0x33FFFFFF
+        tela.drawCircle(w * 0.9f, h * 1.0f, h * 0.45f, p); tela.drawCircle(w * 0.9f, h * 1.0f, h * 0.68f, p)
+        tela.restore()
+        return b
+    }
+
+    /** Selo redondo translúcido com o ícone do tipo (rota, calendário, alerta…). */
+    fun selo(icone: String, tinta: Int): Bitmap? {
+        val caminhos = ICONES[icone] ?: return null
+        val lado = 120
+        val b = Bitmap.createBitmap(lado, lado, Bitmap.Config.ARGB_8888)
+        val tela = Canvas(b)
+        tela.drawCircle(lado / 2f, lado / 2f, lado / 2f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x33FFFFFF })
+        val tr = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2.2f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND; color = tinta }
+        tela.translate((lado - 72) / 2f, (lado - 72) / 2f); tela.scale(3f, 3f)
+        caminhos.forEach { d -> runCatching { androidx.core.graphics.PathParser.createPathFromPathData(d) }.getOrNull()?.let { tela.drawPath(it, tr) } }
+        return b
     }
 
     /**
@@ -213,7 +277,6 @@ object PwNotificacoes {
         abrir: PendingIntent? = abrirApp(ctx, id), acoes: List<NotificationCompat.Action> = emptyList(), silencioso: Boolean = false,
         icone: String? = null,
     ) {
-        val img = runCatching { banner(ctx, titulo, texto, cores, icone) }.getOrNull()
         val b = base(ctx, canal)
             .setContentTitle(titulo)
             .setContentText(texto)
@@ -221,8 +284,7 @@ object PwNotificacoes {
             .setAutoCancel(true)
             .setContentIntent(abrir)
             .setSilent(silencioso)
-        if (img != null) b.setStyle(NotificationCompat.BigPictureStyle().bigPicture(img).bigLargeIcon(null as Bitmap?).setSummaryText(texto))
-        else b.setStyle(NotificationCompat.BigTextStyle().bigText(texto))
+        vestir(ctx, b, titulo, texto, texto, cores, icone)
         acoes.forEach { b.addAction(it) }
         ctx.getSystemService(NotificationManager::class.java)?.notify(id, b.build())
     }

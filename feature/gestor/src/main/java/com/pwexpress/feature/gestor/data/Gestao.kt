@@ -563,6 +563,11 @@ object Gestao {
         "limite_motoboys" to "Seu plano chegou ao limite de motoboys.",
         "limite_gestores" to "Seu plano chegou ao limite de gestores.",
         "limite_clientes" to "Seu plano chegou ao limite de clientes.",
+        "limite_gestores_do_plano" to "A empresa já tem o máximo de gestores. Fale com o Dev para liberar mais.",
+        "limite_supervisores_do_plano" to "A empresa já tem o máximo de supervisores. Fale com o Dev para liberar mais.",
+        "limite_motoboys_do_plano" to "A empresa já tem o máximo de motoboys do plano. Fale com o Dev para liberar mais.",
+        "apenas_dev_cria_gestor" to "Só o Dev do sistema cria contas de gestor.",
+        "holerite_fechado" to "O holerite deste motoboy já foi fechado: lance um ajuste no holerite.",
         "pag_token_invalido" to "Esse token não parece do Mercado Pago (começa com APP_USR- ou TEST-).",
         "rota_compartilhada_desligada" to "Abrir rota pelo chat está desligado.",
     )

@@ -475,6 +475,28 @@ private fun Selos(m: com.pwexpress.feature.gestor.data.MembroG, status: String?)
     }
 }
 
+/** Vagas de cada cargo na empresa (o Dev define): cargo → (usados, limite, pode). */
+private data class Vaga(val usados: Int, val limite: Int?, val pode: Boolean) {
+    fun texto(cargo: String): String? = when {
+        cargo == "gestor" && !pode && (limite == null || usados < limite) -> "Só o Dev cria gestores"
+        limite != null -> "$usados de $limite vaga(s) usada(s)" + if (!pode) " · sem vaga" else ""
+        else -> null
+    }
+}
+
+@Composable
+private fun lembrarVagas(org: String? = null): Map<String, Vaga> {
+    var v by remember { mutableStateOf<Map<String, Vaga>>(emptyMap()) }
+    androidx.compose.runtime.LaunchedEffect(org) {
+        Gestao.rpcJson("vagas_da_equipe", kotlinx.serialization.json.buildJsonObject { put("p_org", org?.let { kotlinx.serialization.json.JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull) })
+            .onSuccess { j -> v = (j as? kotlinx.serialization.json.JsonObject)?.mapValues { (_, e) -> val o = e as? kotlinx.serialization.json.JsonObject
+                Vaga(o?.get("usados")?.toString()?.toIntOrNull() ?: 0, o?.get("limite")?.toString()?.toIntOrNull(), o?.get("pode")?.toString() != "false") } ?: emptyMap() }
+    }
+    return v
+}
+
+private fun descVaga(base: String, v: Vaga?, cargo: String) = v?.texto(cargo)?.let { "$base · $it" } ?: base
+
 private fun gerarSenha(): String {
     val l = "abcdefghjkmnpqrstuvwxyz"; val n = "23456789"; val r = java.security.SecureRandom()
     fun p() = (1..4).map { l[r.nextInt(l.length)] }.joinToString("")
@@ -519,10 +541,15 @@ private fun NovaContaG(repassePadrao: Double, onFechar: () -> Unit, onCriada: (S
             PwCampo(senha, { senha = it }, "Senha inicial", modifier = Modifier.weight(1f))
             PwBotaoIcone(PwIcones.RefreshCw, "Gerar outra", { senha = gerarSenha() })
         }
-        if (cliente == null) PwInterruptor("Motoboy", motoboy, { motoboy = it }, descricao = "Usa o app e recebe corridas", icone = PwIcones.Bike)
-        if (cliente == null) PwInterruptor("Gestor", gestor, { gestor = it; if (it) supervisor = false }, descricao = "Acessa o painel", icone = PwIcones.ShieldCheck)
+        val vagas = lembrarVagas()
+        androidx.compose.runtime.LaunchedEffect(vagas["motoboy"]?.pode) { if (vagas["motoboy"]?.pode == false) motoboy = false }
+        if (cliente == null) PwInterruptor("Motoboy", motoboy, { motoboy = it }, descricao = descVaga("Usa o app e recebe corridas", vagas["motoboy"], "motoboy"), icone = PwIcones.Bike,
+            habilitado = motoboy || vagas["motoboy"]?.pode != false)
+        if (cliente == null) PwInterruptor("Gestor", gestor, { gestor = it; if (it) supervisor = false }, descricao = descVaga("Acessa o painel", vagas["gestor"], "gestor"), icone = PwIcones.ShieldCheck,
+            habilitado = gestor || vagas["gestor"]?.pode != false)
         // líder de equipe: faz só o que o gestor liberar (Equipe → pessoa → Permissões)
-        if (cliente == null) PwInterruptor("Supervisor", supervisor, { supervisor = it; if (it) gestor = false }, descricao = "Líder de equipe, com o que o gestor liberar", icone = PwIcones.UserCog, cor = Pw.cores.azul)
+        if (cliente == null) PwInterruptor("Supervisor", supervisor, { supervisor = it; if (it) gestor = false }, descricao = descVaga("Líder de equipe, com o que o gestor liberar", vagas["supervisor"], "supervisor"), icone = PwIcones.UserCog, cor = Pw.cores.azul,
+            habilitado = supervisor || vagas["supervisor"]?.pode != false)
         PwErro(erro)
         PwBotaoOuro(if (enviando) "Criando…" else "Criar conta", icone = PwIcones.UserPlus, habilitado = !enviando, onClick = {
             enviando = true
@@ -764,9 +791,13 @@ private fun EditarMembroG(m: com.pwexpress.feature.gestor.data.MembroG, eu: Bool
         Espaco(8)
         PwRotulo("Papéis")
         if (souDev) PwInterruptor("Dev", devPapel, { devPapel = it }, descricao = "Administra o sistema inteiro", icone = PwIcones.CodeXml, cor = c.dev)
-        PwInterruptor("Gestor", gestor, { gestor = it; if (it) supervisor = false }, descricao = "Acessa o painel (site e app)", icone = PwIcones.ShieldCheck)
-        PwInterruptor("Supervisor", supervisor, { supervisor = it; if (it) gestor = false }, descricao = "Líder de equipe, com o que o gestor liberar", icone = PwIcones.UserCog, cor = Pw.cores.azul)
-        PwInterruptor("Motoboy", motoboy, { motoboy = it }, descricao = "Usa o app e recebe corridas", icone = PwIcones.Bike)
+        val vagas = lembrarVagas()
+        PwInterruptor("Gestor", gestor, { gestor = it; if (it) supervisor = false }, descricao = descVaga("Acessa o painel (site e app)", vagas["gestor"], "gestor"), icone = PwIcones.ShieldCheck,
+            habilitado = gestor || m.gestor || vagas["gestor"]?.pode != false)
+        PwInterruptor("Supervisor", supervisor, { supervisor = it; if (it) gestor = false }, descricao = descVaga("Líder de equipe, com o que o gestor liberar", vagas["supervisor"], "supervisor"), icone = PwIcones.UserCog, cor = Pw.cores.azul,
+            habilitado = supervisor || m.supervisor || vagas["supervisor"]?.pode != false)
+        PwInterruptor("Motoboy", motoboy, { motoboy = it }, descricao = descVaga("Usa o app e recebe corridas", vagas["motoboy"], "motoboy"), icone = PwIcones.Bike,
+            habilitado = motoboy || m.motoboy || vagas["motoboy"]?.pode != false)
         if (gestor || devPapel) VincularClienteG(m.id, m.nome)
         PwErro(erro)
         msg?.let { Text(it, color = c.verde, fontWeight = FontWeight.SemiBold) }

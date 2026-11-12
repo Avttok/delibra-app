@@ -102,6 +102,10 @@ class MainActivity : ComponentActivity() {
                     val perfil by Perfis.perfil.collectAsState()
                     var noPerfil by remember { mutableStateOf(false) }
                     var naConfig by remember { mutableStateOf(false) }
+                    // com várias rotas permitidas: olha o quadro sem largar a rota em andamento
+                    var verQuadroEmRota by remember { mutableStateOf(false) }
+                    val ativasTodas by Corridas.ativas.collectAsState()
+                    androidx.activity.compose.BackHandler(enabled = verQuadroEmRota) { verQuadroEmRota = false }
                     // o raio tem janela própria (atalho "Sem raio definido" / "Raio N km" no Início)
                     var raioAberto by remember { mutableStateOf(false) }
                     if (raioAberto) com.pwexpress.motoboy.ui.JanelaRaio(onFechar = { raioAberto = false })
@@ -284,8 +288,10 @@ class MainActivity : ComponentActivity() {
                         }
                         o != null -> OfertaScreen(o, onFim = { }, modifier = conteudo)
                         !preparado -> PrimeiraConfiguracao(onPronto = { preparado = true }, modifier = conteudo)
-                        a != null -> CorridaScreen(a, admin = p?.admin == true, modifier = conteudo, chatLigado = chatLigado,
-                            onPainelGestor = if (podeTrocar) ({ trocar(Painel.GESTOR) }) else null)
+                        a != null && !verQuadroEmRota -> CorridaScreen(a, admin = p?.admin == true, modifier = conteudo, chatLigado = chatLigado,
+                            onPainelGestor = if (podeTrocar) ({ trocar(Painel.GESTOR) }) else null,
+                            onPegarMais = if ((p?.numero("motoboy_rotas_simultaneas", 1.0) ?: 1.0) > 1.0 && ativasTodas.size < (p?.numero("motoboy_rotas_simultaneas", 1.0) ?: 1.0).toInt())
+                                ({ verQuadroEmRota = true; aba = "corridas" }) else null)
                         naConfig && efetivo == Painel.MOTOBOY -> com.pwexpress.motoboy.ui.ConfigMotoApp(onVoltar = { naConfig = false }, modifier = conteudo)
                         else -> Box(conteudo.fillMaxSize()) {
                             val comPlanejadas = p?.modulo("corridas_planejadas") != false
@@ -293,9 +299,12 @@ class MainActivity : ComponentActivity() {
                             val abaMotoboy = when { aba == "corridas" -> "corridas"; aba == "carteira" && comCarteira -> "carteira"; else -> "inicio" }
                             androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
                                 PwTopo { AcoesTopo(efetivo, podeTrocar, ::trocar) { conta = true } }
+                                if (a != null) com.pwexpress.motoboy.ui.FaixaVoltarCorrida(
+                                    if (ativasTodas.size > 1) "Você está em ${ativasTodas.size} rotas · voltar" else "Voltar para a rota ${a.numeroExibicao}",
+                                    destaque = false, onClick = { verQuadroEmRota = false })
                                 Box(Modifier.weight(1f).padding(bottom = 86.dp)) {
                                     when (abaMotoboy) {
-                                        "corridas" -> PlanejadasScreen(onIniciada = { aba = "inicio" }, comPlanejadas = comPlanejadas)
+                                        "corridas" -> PlanejadasScreen(onIniciada = { aba = "inicio"; verQuadroEmRota = false }, comPlanejadas = comPlanejadas)
                                         "carteira" -> com.pwexpress.feature.corridas.ui.CarteiraScreen()
                                         else -> TrackingScreen(
                                             saudacao = NomePerfil(s.email).substringBefore(" "),

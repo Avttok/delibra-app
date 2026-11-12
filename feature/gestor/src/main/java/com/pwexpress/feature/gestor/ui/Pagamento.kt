@@ -135,6 +135,8 @@ internal fun PagamentoMotoboyG(corrida: CorridaG, ocupado: Boolean, acao: (suspe
             else -> "Pago no holerite (salário, diária ou hora)"
         })
 
+        val podeMudar = com.pwexpress.feature.gestor.data.Permissoes.estado.value.pode("editar_pagamento_motoboy")
+        if (!podeMudar) { TextoDica("A plataforma não liberou mudar o pagamento do motoboy."); return@PwCartao }
         Spacer(Modifier.height(10.dp))
         EditorCalculosG(regras, base, calc)
         if (mudou || (salvas.value?.size ?: 0) > 0) Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {

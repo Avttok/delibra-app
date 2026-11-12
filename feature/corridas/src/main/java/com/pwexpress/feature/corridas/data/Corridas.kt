@@ -38,7 +38,30 @@ object Corridas {
     val oferta: StateFlow<Oferta?> = _oferta.asStateFlow()
 
     private val _ativa = MutableStateFlow<Corrida?>(null)
+    /** A rota em foco (a que aparece na tela e recebe o GPS). */
     val ativa: StateFlow<Corrida?> = _ativa.asStateFlow()
+
+    private val _ativas = MutableStateFlow<List<Corrida>>(emptyList())
+    /** Todas as rotas em andamento (o gestor pode deixar pegar mais de uma). */
+    val ativas: StateFlow<List<Corrida>> = _ativas.asStateFlow()
+    private var focoEscolhido: String? = null
+
+    /** Troca a rota em foco (quando há mais de uma). */
+    fun focar(id: String) {
+        val c = _ativas.value.firstOrNull { it.id == id } ?: return
+        focoEscolhido = id
+        _ativa.value = c
+    }
+
+    /** Antes de pegar mais uma rota: se ela fica longe das que já tenho (km, limite do aviso). */
+    suspend fun distanciaDasMinhas(corridaId: String): Triple<Int, Double?, Double>? = tentar {
+        val r = PwCore.rpc.chamar("distancia_das_minhas_rotas", buildJsonObject { put("p_corrida", corridaId) })
+        if (!r.ok) return@tentar null
+        val o = r.json() as? kotlinx.serialization.json.JsonObject ?: return@tentar null
+        Triple((o["tenho"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull() ?: 0,
+            (o["km"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull(),
+            (o["aviso_km"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull() ?: 5.0)
+    }.getOrNull()
 
     /** true depois da primeira consulta bem-sucedida ao servidor. */
     private val _carregou = MutableStateFlow(false)
@@ -68,9 +91,12 @@ object Corridas {
         if (_fila.value > 0 && !enviarFila()) return@withLock
         tentar {
             val a = PwCore.rpc.chamar("minha_corrida_ativa", JsonObject(emptyMap()))
+            val lista = PwCore.rpc.chamar("minhas_corridas_ativas", JsonObject(emptyMap()))
+            if (lista.ok) _ativas.value = (lista.json() as? kotlinx.serialization.json.JsonArray)?.map { it.paraCorrida() }.orEmpty()
             if (a.ok) {
                 val antes = _ativa.value
-                val agora = a.json()?.paraCorrida()
+                // com mais de uma rota, fica na que o motoboy escolheu (se ainda estiver ativa)
+                val agora = _ativas.value.firstOrNull { it.id == focoEscolhido } ?: a.json()?.paraCorrida()
                 _ativa.value = agora
                 _carregou.value = true
                 // a corrida sumiu sem você concluir: cancelada ou tirada de você (avisa mesmo se o push não chegou)
@@ -93,6 +119,8 @@ object Corridas {
     fun limpar() {
         _oferta.value = null
         _ativa.value = null
+        _ativas.value = emptyList()
+        focoEscolhido = null
         _carregou.value = false
         _planejadas.value = emptyList()
     }
@@ -283,6 +311,8 @@ object Corridas {
             })
             if (!r.ok) throw Exception(traduzir(r))
             _ativa.value = r.json()?.paraCorrida() // null = corrida concluída
+            // tinha mais de uma rota: a próxima entra em foco
+            if (_ativa.value == null && _ativas.value.size > 1) { focoEscolhido = null; escopo.launch { sincronizarAgora() } }
             Unit
         }.recoverCatching { e ->
             val semRede = e is java.io.IOException || e is SemInternet

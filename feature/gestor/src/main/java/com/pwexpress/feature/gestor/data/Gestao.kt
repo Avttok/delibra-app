@@ -80,6 +80,7 @@ object Gestao {
 
     /** Recarrega tudo (o app chama a cada poucos segundos enquanto o painel está aberto). */
     suspend fun atualizar() = mutex.withLock {
+        if (!Permissoes.estado.value.carregou) Permissoes.carregar()
         tentar {
             val desde = Instant.now().minusSeconds(30L * 86400).toString()
             coroutineScope {
@@ -140,7 +141,7 @@ object Gestao {
         Unit
     }
 
-    fun limpar() { _dados.value = Dados() }
+    fun limpar() { _dados.value = Dados(); Permissoes.limpar() }
 
     // ------------------------------------------------------------------ corridas
 
@@ -566,6 +567,8 @@ object Gestao {
         "limite_gestores_do_plano" to "A empresa já tem o máximo de gestores. Fale com o suporte da plataforma para liberar mais.",
         "limite_supervisores_do_plano" to "A empresa já tem o máximo de supervisores. Fale com o suporte da plataforma para liberar mais.",
         "limite_motoboys_do_plano" to "A empresa já tem o máximo de motoboys do plano. Fale com o suporte da plataforma para liberar mais.",
+        "acao_bloqueada" to "A plataforma não liberou isso para gestores.",
+        "ajuste_bloqueado" to "Este ajuste está travado pela plataforma.",
         "apenas_dev_cria_gestor" to "Só o suporte da plataforma cria contas de gestor.",
         "holerite_fechado" to "O holerite deste motoboy já foi fechado: lance um ajuste no holerite.",
         "pag_token_invalido" to "Esse token não parece do Mercado Pago (começa com APP_USR- ou TEST-).",

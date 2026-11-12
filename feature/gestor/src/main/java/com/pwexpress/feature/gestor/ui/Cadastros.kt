@@ -1143,6 +1143,8 @@ fun ConfiguracoesG(onVoltar: (() -> Unit)?, onAbrir: (TelaG) -> Unit = {}) {
     val escopo = rememberCoroutineScope()
     fun sem(t: String) = java.text.Normalizer.normalize(t, java.text.Normalizer.Form.NFD).replace(Regex("\\p{M}"), "").lowercase()
     val grupoArea = GRUPOS_CONFIG.associate { it.chave to it.area }
+    // áreas sem nenhum ajuste à vista (o Dev escondeu) somem
+    val areasVisiveis = AREAS_CONFIG.filter { a -> PARAMETROS_VISIVEIS.any { grupoArea[it.grupo] == a.chave } }
     fun mudado(p: Param): Boolean {
         if (p.tipo == "multi") {
             val l = (dados.config[p.chave] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }?.sorted() ?: return false
@@ -1175,8 +1177,8 @@ fun ConfiguracoesG(onVoltar: (() -> Unit)?, onAbrir: (TelaG) -> Unit = {}) {
         PwInterruptor("Só o que mudei do padrão", soMudados, { soMudados = it }, descricao = if (nMudados == 0) "Tudo está no padrão." else "$nMudados ajuste${if (nMudados == 1) "" else "s"} diferente${if (nMudados == 1) "" else "s"} do padrão.")
         if (termo.isEmpty() && !soMudados) {
             // áreas (como no site): cada uma junta seções parecidas
-            PwFiltros(AREAS_CONFIG.map { a -> a.titulo to PARAMETROS_VISIVEIS.count { grupoArea[it.grupo] == a.chave && mudado(it) } }, area, { area = it; secao = null })
-            val a = AREAS_CONFIG.getOrNull(area)
+            PwFiltros(areasVisiveis.map { a -> a.titulo to PARAMETROS_VISIVEIS.count { grupoArea[it.grupo] == a.chave && mudado(it) } }, area, { area = it; secao = null })
+            val a = areasVisiveis.getOrNull(area)
             if (a != null) TextoDica(a.descricao)
             val secoes = GRUPOS_CONFIG.filter { it.area == a?.chave && PARAMETROS_VISIVEIS.any { p -> p.grupo == it.chave } }
             if (secoes.size > 1) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1199,7 +1201,7 @@ fun ConfiguracoesG(onVoltar: (() -> Unit)?, onAbrir: (TelaG) -> Unit = {}) {
                 extras.forEach { (t, i, tela) -> com.pwexpress.core.designsystem.PwPilula(t, i, { onAbrir(tela) }) }
             }
         }
-        val a = AREAS_CONFIG.getOrNull(area)
+        val a = areasVisiveis.getOrNull(area)
         val lista = when {
             termo.isNotEmpty() -> PARAMETROS_VISIVEIS.filter { com.pwexpress.core.busca.combina(termo, it.rotulo, it.descricao, it.descricaoDesligado, it.chave) }.filter { !soMudados || mudado(it) }
             soMudados -> PARAMETROS_VISIVEIS.filter(::mudado)
@@ -1217,7 +1219,7 @@ fun ConfiguracoesG(onVoltar: (() -> Unit)?, onAbrir: (TelaG) -> Unit = {}) {
                 val st = estado?.takeIf { it.first == p.chave }?.second
                 val dif = mudado(p)
                 PwCartao(padding = PaddingValues(14.dp), cor = if (dif) c.ouro.copy(alpha = 0.45f) else null) {
-                    CampoParametro(p, dados.config[p.chave], { salvar(p, it) }, bloqueado = p.soDev && !souDev) {
+                    CampoParametro(p, dados.config[p.chave], { salvar(p, it) }, bloqueado = (p.soDev && !souDev) || com.pwexpress.feature.gestor.data.Permissoes.estado.value.nivel(p.chave) == "ver") {
                         if (p.escopos.isNotEmpty()) TextoDica("Pode ter exceção por " + p.escopos.joinToString(", ") { mapOf("tipo" to "tipo de pedido", "cliente" to "cliente", "motoboy" to "motoboy")[it] ?: it } + ".")
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {

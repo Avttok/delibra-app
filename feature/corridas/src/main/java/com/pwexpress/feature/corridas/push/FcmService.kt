@@ -38,6 +38,12 @@ class FcmService : FirebaseMessagingService() {
             }
             "teste" -> com.pwexpress.core.notificacoes.PwNotificacoes.cartao(applicationContext, 4900, com.pwexpress.core.notificacoes.PwNotificacoes.CANAL_AVISOS,
                 message.data["titulo"] ?: "Teste de aviso", message.data["texto"] ?: "O push está funcionando.", com.pwexpress.core.notificacoes.PwNotificacoes.GRAD_VERDE, icone = "check")
+            "corrida_atribuida" -> {
+                // o gestor começou uma rota sua agora: o app entra em corrida (e fica online) sozinho
+                PwNotificacoes.cartao(applicationContext, 4400, PwNotificacoes.CANAL_AVISOS, "Sua rota começou",
+                    "O gestor iniciou a rota agora. Abra o app para ver o caminho.", PwNotificacoes.GRAD_OURO, icone = "rota")
+                runBlocking { withTimeoutOrNull(8_000) { Corridas.sincronizarAgora() } }
+            }
             "corrida_voltou" -> Alarme.avisarSilencioso(applicationContext, "Uma corrida que você recusou voltou ao lançamento")
             "cancelada" -> {
                 Alarme.pararOferta(applicationContext)

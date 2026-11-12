@@ -114,7 +114,7 @@ class TrackingService : Service() {
 
     @SuppressLint("MissingPermission") // verificado em onStartCommand
     private fun aplicar(modo: Modo, economia: Boolean) {
-        val nova = Triple(modo, economia, Intervalos.corridaMs(economia) * 1000 + Intervalos.corridaDistanciaM.toLong())
+        val nova = Triple(modo, economia, Intervalos.corridaMs(economia) * 1000 + Intervalos.corridaDistanciaM.toLong() + (Intervalos.disponivelFator * 7).toLong())
         if (nova == configAtual) return
         configAtual = nova
 
@@ -128,6 +128,13 @@ class TrackingService : Service() {
             val leitura = if (Intervalos.corridaDistanciaM > 0f) minOf(intervalo, if (economia) 5_000L else 2_000L) else intervalo
             LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, leitura)
                 .setMinUpdateIntervalMillis(minOf(leitura, 1_000L))
+                .setWaitForAccurateLocation(false)
+                .build()
+        } else if (Intervalos.disponivelDetalhado) {
+            // disponível com traçado: GPS de verdade, só que mais espaçado que em corrida
+            val leitura = minOf(Intervalos.disponivelMs(economia), if (economia) 10_000L else 5_000L)
+            LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, leitura)
+                .setMinUpdateIntervalMillis(minOf(leitura, 2_000L))
                 .setWaitForAccurateLocation(false)
                 .build()
         } else {
@@ -146,10 +153,25 @@ class TrackingService : Service() {
             Modo.OFFLINE -> return
             Modo.DISPONIVEL -> {
                 val ult = ultimoEnviado
-                val deveEnviar = ult == null ||
-                    loc.time - ultimoEnviadoEm >= Intervalos.disponivelEnvioMs ||
-                    loc.distanceTo(ult) >= Intervalos.disponivelDistanciaM
-                if (!deveEnviar) return
+                if (Intervalos.disponivelDetalhado) {
+                    val passou = if (ult == null) Long.MAX_VALUE else loc.time - ultimoEnviadoEm
+                    val intervalo = Intervalos.disponivelMs(Tracking.prefs.economia)
+                    val limite = if (passou >= intervalo * 3) Intervalos.PRECISAO_MAXIMA_M else Intervalos.precisaoMaximaM
+                    if (loc.hasAccuracy() && loc.accuracy > limite) return
+                    if (ult != null) {
+                        val andou = loc.distanceTo(ult)
+                        val porTempo = passou >= intervalo - 300
+                        val porDistancia = andou >= Intervalos.disponivelDistanciaDetalhadaM
+                        if (!porTempo && !porDistancia) return
+                        // parado: não enche de pontos no mesmo lugar
+                        if (!porDistancia && andou < 5f && passou < Intervalos.disponivelEnvioMs) return
+                    }
+                } else {
+                    val deveEnviar = ult == null ||
+                        loc.time - ultimoEnviadoEm >= Intervalos.disponivelEnvioMs ||
+                        loc.distanceTo(ult) >= Intervalos.disponivelDistanciaM
+                    if (!deveEnviar) return
+                }
             }
             Modo.EM_CORRIDA -> {
                 val ult = ultimoEnviado

@@ -299,8 +299,8 @@ object Gestao {
     suspend fun redefinirSenha(id: String, senha: String) = acao { PwCore.rpc.site("/api/equipe/senha", buildJsonObject { put("id", id); put("senha", senha) }).exigirOk(::traduzir); Unit }
     suspend fun bloquear(id: String, bloquear: Boolean) = acao { PwCore.rpc.site("/api/equipe/bloquear", buildJsonObject { put("id", id); put("bloquear", bloquear) }).exigirOk(::traduzir); Unit }
 
-    suspend fun excluirConta(id: String, senha: String, motivo: String?): Result<Unit> = acao {
-        val r = PwCore.rpc.site("/api/equipe/excluir", buildJsonObject { put("id", id); put("senha", senha); put("motivo", motivo ?: "") })
+    suspend fun excluirConta(id: String, senha: String, motivo: String?, completo: Boolean = false): Result<Unit> = acao {
+        val r = PwCore.rpc.site("/api/equipe/excluir", buildJsonObject { put("id", id); put("senha", senha); put("motivo", motivo ?: ""); put("completo", completo) })
         if (!r.ok) {
             val o = r.objeto()
             val e = o?.str("erro") ?: "falha"

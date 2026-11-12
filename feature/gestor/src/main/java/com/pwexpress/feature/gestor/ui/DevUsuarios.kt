@@ -122,10 +122,19 @@ internal fun DevUsuariosG() {
     val vis = l.filter { cargo == null || cargo in it.lista("papeis") }
     TextoDica("${vis.size} de ${l.size} contas")
     if (vis.isEmpty()) PwVazio("Ninguém com esse filtro.")
-    vis.forEach { u ->
-        val id = u.str("id") ?: return@forEach
-        UsuarioDevG(u, orgs, aberto == id, { aberto = if (aberto == id) null else id }, { versao++ })
-    }
+    // separados por empresa (sem empresa e o Dev no fim)
+    vis.groupBy { it.str("organizacao") ?: if ("dev" in it.lista("papeis")) "Plataforma (Dev)" else "Sem empresa" }
+        .toSortedMap(compareBy<String>({ it.startsWith("Plataforma") || it == "Sem empresa" }, { it })).forEach { (nomeOrg, us) ->
+            Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(PwIcones.Building2, null, tint = c.ouro, modifier = Modifier.size(15.dp)); Spacer(Modifier.width(6.dp))
+                Text(nomeOrg, color = c.ouro, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text("${us.size}", color = c.texto3, fontSize = 12.sp)
+            }
+            us.forEach { u ->
+                val id = u.str("id") ?: return@forEach
+                UsuarioDevG(u, orgs, aberto == id, { aberto = if (aberto == id) null else id }, { versao++ })
+            }
+        }
 }
 
 @Composable

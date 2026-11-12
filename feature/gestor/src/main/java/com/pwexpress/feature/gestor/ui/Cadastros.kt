@@ -846,18 +846,22 @@ private fun EditarMembroG(m: com.pwexpress.feature.gestor.data.MembroG, eu: Bool
         var senha by remember { mutableStateOf("") }
         var motivo by remember { mutableStateOf("") }
         var entendi by remember { mutableStateOf(false) }
+        var completo by remember { mutableStateOf(false) }
         var errExc by remember { mutableStateOf<String?>(null) }
         var enviando by remember { mutableStateOf(false) }
         PwJanela("Excluir ${m.nome}?", onFechar = { excluindo = false }, fecharFora = !enviando) {
-            PwErro("${m.email} deixa de existir: não entra mais no app nem no painel. Não dá para desfazer. As corridas continuam no histórico com o nome guardado.")
-            PwCampo(motivo, { motivo = it }, "Motivo (opcional)")
+            PwErro("${m.email} deixa de existir: não entra mais no app nem no painel. Não dá para desfazer.")
+            com.pwexpress.core.designsystem.PwSegmentado(listOf("Manter o histórico" to PwIcones.History, "Apagar tudo" to PwIcones.Trash2), if (completo) 1 else 0, { completo = it == 1 }, Modifier.fillMaxWidth())
+            TextoDica(if (completo) "Some também o e-mail, a cópia no registro, as mensagens, o jogo e o PIX. Nas rotas fica só “Conta apagada”."
+                else "As rotas continuam com o nome da pessoa e fica uma cópia no registro.")
+            if (!completo) PwCampo(motivo, { motivo = it }, "Motivo (opcional)")
             PwInterruptor("Entendo que é definitivo", entendi, { entendi = it }, cor = c.vermelho)
             PwCampo(senha, { senha = it }, "Sua senha", senha = true, teclado = KeyboardType.Password)
             PwErro(errExc)
             PwBotaoPerigo(if (enviando) "Excluindo…" else "Excluir de vez", cheio = true, habilitado = entendi && senha.isNotEmpty() && !enviando, modifier = Modifier.fillMaxWidth(), onClick = {
                 enviando = true
                 escopo.launch {
-                    Gestao.excluirConta(m.id, senha, motivo.trim().ifEmpty { null }).onSuccess { excluindo = false; Gestao.atualizar(); onExcluida() }.onFailure { errExc = it.message; senha = "" }
+                    Gestao.excluirConta(m.id, senha, motivo.trim().ifEmpty { null }, completo).onSuccess { excluindo = false; Gestao.atualizar(); onExcluida() }.onFailure { errExc = it.message; senha = "" }
                     enviando = false
                 }
             })

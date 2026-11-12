@@ -1156,6 +1156,7 @@ fun ConfiguracoesG(onVoltar: (() -> Unit)?, onAbrir: (TelaG) -> Unit = {}) {
                 "preco" -> listOf(Triple("Exceções", PwIcones.Layers, TelaG.Excecoes), Triple("Zonas de preço", PwIcones.MapPin, TelaG.CatalogoT(Catalogo.ZONAS)), Triple("Horários de pico", PwIcones.Clock, TelaG.CatalogoT(Catalogo.HORARIOS)))
                 "clientes" -> listOf(Triple("Exceções", PwIcones.Layers, TelaG.Excecoes), Triple("Categorias", PwIcones.Package2, TelaG.CatalogoT(Catalogo.CATEGORIAS)), Triple("Tipos de pedido", PwIcones.ClipboardList, TelaG.CatalogoT(Catalogo.TIPOS)))
                 "operacao" -> listOf(Triple("Exceções", PwIcones.Layers, TelaG.Excecoes), Triple("Tipos de pedido", PwIcones.ClipboardList, TelaG.CatalogoT(Catalogo.TIPOS)))
+                "sistema" -> listOf(Triple("Histórico de mudanças", PwIcones.History, TelaG.Historico), Triple("Exceções", PwIcones.Layers, TelaG.Excecoes))
                 else -> listOf(Triple("Exceções", PwIcones.Layers, TelaG.Excecoes))
             }
             Row(verticalAlignment = Alignment.CenterVertically) {

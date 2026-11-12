@@ -77,7 +77,7 @@ import java.util.Calendar
 internal fun iconeDoNome(nome: String?): ImageVector = com.pwexpress.core.designsystem.iconePorNome(nome)
 
 private var seqItem = 0
-private class ItemForm(val categoria: CategoriaG?) {
+private class ItemForm(val categoria: CategoriaG?, val entrega: String? = null) {
     val chave = "i${++seqItem}"
     var descricao by mutableStateOf("")
     var quantidade by mutableStateOf("1")
@@ -174,13 +174,15 @@ fun NovoPedidoG(onVoltar: () -> Unit, onCriado: () -> Unit) {
                 put("quantidade", (num(x.quantidade) ?: 1.0).toInt().coerceAtLeast(1))
                 num(x.peso)?.let { put("peso_kg", it) }; num(x.comp)?.let { put("comprimento_cm", it) }
                 num(x.larg)?.let { put("largura_cm", it) }; num(x.alt)?.let { put("altura_cm", it) }; num(x.valor)?.let { put("valor_declarado", it) }
+                // pacote de uma entrega só: vai com o índice do ponto (igual ao site do cliente)
+                paradas.indexOfFirst { it.chave == x.entrega }.takeIf { it >= 0 }?.let { put("entrega", it) }
             })
         }
     }
     val quandoIso = if (planejar) Instant.ofEpochMilli(quando).toString() else null
 
     // orçamento ao vivo
-    val chaveOrc = listOf(regras.toString(), empresaId, tipoPedido, urgente, quandoIso, rota?.distanciaM, chaveRota, distEntrega.toMap(), itens.joinToString { "${it.categoria?.id}${it.quantidade}${it.peso}${it.comp}${it.larg}${it.alt}" }).joinToString("§")
+    val chaveOrc = listOf(regras.toString(), empresaId, tipoPedido, urgente, quandoIso, rota?.distanciaM, chaveRota, distEntrega.toMap(), itens.joinToString { "${it.categoria?.id}${it.quantidade}${it.peso}${it.comp}${it.larg}${it.alt}${it.entrega}" }).joinToString("§")
     LaunchedEffect(chaveOrc) {
         if (paradas.any { it.lat == null }) { orc = null; return@LaunchedEffect }
         delay(450)
@@ -252,7 +254,16 @@ fun NovoPedidoG(onVoltar: () -> Unit, onCriado: () -> Unit) {
         paradas.forEachIndexed { i, p ->
             CartaoParadaForm(p, i, paradas.size,
                 onMover = { d -> val j = i + d; if (j in paradas.indices) { val x = paradas.removeAt(i); paradas.add(j, x) } },
-                onRemover = { paradas.remove(p) }, onMarcar = { marcando = p }, comOpcoes = true)
+                onRemover = { itens.removeAll { it.entrega == p.chave }; paradas.remove(p) }, onMarcar = { marcando = p }, comOpcoes = true)
+            // o que vai para esta entrega, direto no ponto (como no site do cliente)
+            if (!p.coleta) Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 4.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("O que vai para esta entrega", color = c.texto2, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    categorias.forEach { k -> Ficha(k.nome, if (k.perigoso) PwIcones.FlaskConical else iconeDoNome(k.icone), false, if (k.perigoso) c.vermelho else null) { itens.add(ItemForm(k, p.chave)) } }
+                    Ficha("Outro", PwIcones.Package, false) { itens.add(ItemForm(null, p.chave)) }
+                }
+                itens.filter { it.entrega == p.chave }.forEach { x -> CartaoItem(x, onRemover = { itens.remove(x) }) }
+            }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             com.pwexpress.core.designsystem.PwBotaoVidro("Entrega", onClick = { paradas.add(ParadaForm(false)) }, icone = PwIcones.Plus, modifier = Modifier.weight(1f))
@@ -264,12 +275,17 @@ fun NovoPedidoG(onVoltar: () -> Unit, onCriado: () -> Unit) {
         }
 
         PwCartao {
-            PwRotulo("O que vai")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                categorias.forEach { k -> Ficha(k.nome, if (k.perigoso) PwIcones.FlaskConical else iconeDoNome(k.icone), false, if (k.perigoso) c.vermelho else null) { itens.add(ItemForm(k)) } }
-                Ficha("Outro", PwIcones.Package, false) { itens.add(ItemForm(null)) }
+            var paraTodos by remember { mutableStateOf(false) }
+            if (!paraTodos && itens.none { it.entrega == null }) {
+                com.pwexpress.core.designsystem.PwBotaoVidro("Especificar pacote para todas as entregas", onClick = { paraTodos = true }, icone = PwIcones.Boxes, modifier = Modifier.fillMaxWidth())
+            } else {
+                PwRotulo("Para todas as entregas")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    categorias.forEach { k -> Ficha(k.nome, if (k.perigoso) PwIcones.FlaskConical else iconeDoNome(k.icone), false, if (k.perigoso) c.vermelho else null) { itens.add(ItemForm(k)) } }
+                    Ficha("Outro", PwIcones.Package, false) { itens.add(ItemForm(null)) }
+                }
+                itens.filter { it.entrega == null }.forEach { x -> CartaoItem(x, onRemover = { itens.remove(x) }) }
             }
-            itens.toList().forEach { x -> CartaoItem(x, onRemover = { itens.remove(x) }) }
             PwCampo(obs, { obs = it }, "Observações para o motoboy", linhas = 2)
         }
 

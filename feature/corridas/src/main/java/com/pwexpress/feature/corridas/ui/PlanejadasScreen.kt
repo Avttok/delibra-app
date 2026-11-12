@@ -132,7 +132,9 @@ fun PlanejadasScreen(modifier: Modifier = Modifier, onIniciada: () -> Unit = {},
             ocupado = null
         }
     }
-    fun pegar(r: Corrida) {
+    // já tenho rota e a nova fica longe: aviso, mas deixo pegar
+    var longe by remember { mutableStateOf<Pair<Corrida, Double>?>(null) }
+    fun pegarAgora(r: Corrida) {
         ocupado = r.id
         escopo.launch {
             Corridas.pegarRota(r.id)
@@ -146,6 +148,22 @@ fun PlanejadasScreen(modifier: Modifier = Modifier, onIniciada: () -> Unit = {},
         }
     }
 
+    fun pegar(r: Corrida) {
+        if (Corridas.ativas.value.isEmpty() || r.planejada) { pegarAgora(r); return }
+        ocupado = r.id
+        escopo.launch {
+            val d = Corridas.distanciaDasMinhas(r.id)
+            ocupado = null
+            val km = d?.second
+            if (d != null && km != null && km > d.third) longe = r to km else pegarAgora(r)
+        }
+    }
+    // já tenho rota e a nova fica longe: aviso, mas deixo pegar
+    longe?.let { (r, km) ->
+        com.pwexpress.core.designsystem.PwConfirmar("Essa rota fica longe",
+            "A coleta dela está a ${String.format(java.util.Locale("pt", "BR"), "%.1f", km)} km das paradas das rotas que você já tem. Recomendamos não pegar, mas a escolha é sua.",
+            "Pegar mesmo assim", onConfirmar = { longe = null; pegarAgora(r) }, onCancelar = { longe = null })
+    }
     PwPagina(modifier) {
         PwCabeca(PwIcones.Route, "Rotas", when (aba) { 0 -> "Pegue uma rota: quem pegar primeiro leva"; 1 -> "As que você reservou"; else -> "As rotas que você já fez" })
         PwSegmentado(

@@ -23,6 +23,14 @@ object Intervalos {
     const val DISPONIVEL_LEITURA_MS = 60_000L
     @Volatile var disponivelEnvioMs = 180_000L
     @Volatile var disponivelDistanciaM = 300f
+    /**
+     * Disponível com traçado (Ajustes → disponivel_fator): manda como em corrida, só que N vezes mais espaçado
+     * (ex.: 3 = em corrida a cada 20 m, disponível a cada 60 m). 0 = jeito leve antigo (a cada X min ou Y m).
+     */
+    @Volatile var disponivelFator = 3f
+    val disponivelDetalhado get() = disponivelFator > 0f
+    fun disponivelMs(economia: Boolean) = (corridaMs(economia) * disponivelFator).toLong().coerceAtLeast(10_000L)
+    val disponivelDistanciaDetalhadaM get() = (corridaDistanciaM.takeIf { it > 0f } ?: 20f) * disponivelFator
 
     /** Em corrida, descarta leituras com erro maior que isso (evita "saltos" no mapa). Ajustes → ping_precisao_max_m. */
     @Volatile var precisaoMaximaM = 60f

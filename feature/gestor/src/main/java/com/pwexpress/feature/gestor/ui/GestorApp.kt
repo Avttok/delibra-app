@@ -112,7 +112,8 @@ fun GestorApp(
             } else if (t >= limite) avisadas.remove(cor.id)
         }
     }
-    val comCarteira = modulo("carteira")
+    val permG by com.pwexpress.feature.gestor.data.Permissoes.estado.collectAsState()
+    val comCarteira = modulo("carteira") && permG.pode("ver_carteira")
     val planejadas = dados.corridas.count { it.teste == teste && it.status in Status.PLANEJADAS }
     val semMotoboy = dados.corridas.count { it.teste == teste && (it.status == Status.SEM_MOTOBOY || it.status == Status.MONTADA) }
     val paraRevisar = dados.pedidos.count { it.teste == teste && it.status == "recebido" }

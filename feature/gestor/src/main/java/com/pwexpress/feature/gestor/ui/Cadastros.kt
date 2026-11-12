@@ -846,18 +846,22 @@ private fun EditarMembroG(m: com.pwexpress.feature.gestor.data.MembroG, eu: Bool
         var senha by remember { mutableStateOf("") }
         var motivo by remember { mutableStateOf("") }
         var entendi by remember { mutableStateOf(false) }
+        var completo by remember { mutableStateOf(false) }
         var errExc by remember { mutableStateOf<String?>(null) }
         var enviando by remember { mutableStateOf(false) }
         PwJanela("Excluir ${m.nome}?", onFechar = { excluindo = false }, fecharFora = !enviando) {
-            PwErro("${m.email} deixa de existir: não entra mais no app nem no painel. Não dá para desfazer. As corridas continuam no histórico com o nome guardado.")
-            PwCampo(motivo, { motivo = it }, "Motivo (opcional)")
+            PwErro("${m.email} deixa de existir: não entra mais no app nem no painel. Não dá para desfazer.")
+            com.pwexpress.core.designsystem.PwSegmentado(listOf("Manter o histórico" to PwIcones.History, "Apagar tudo" to PwIcones.Trash2), if (completo) 1 else 0, { completo = it == 1 }, Modifier.fillMaxWidth())
+            TextoDica(if (completo) "Some também o e-mail, a cópia no registro, as mensagens, o jogo e o PIX. Nas rotas fica só “Conta apagada”."
+                else "As rotas continuam com o nome da pessoa e fica uma cópia no registro.")
+            if (!completo) PwCampo(motivo, { motivo = it }, "Motivo (opcional)")
             PwInterruptor("Entendo que é definitivo", entendi, { entendi = it }, cor = c.vermelho)
             PwCampo(senha, { senha = it }, "Sua senha", senha = true, teclado = KeyboardType.Password)
             PwErro(errExc)
             PwBotaoPerigo(if (enviando) "Excluindo…" else "Excluir de vez", cheio = true, habilitado = entendi && senha.isNotEmpty() && !enviando, modifier = Modifier.fillMaxWidth(), onClick = {
                 enviando = true
                 escopo.launch {
-                    Gestao.excluirConta(m.id, senha, motivo.trim().ifEmpty { null }).onSuccess { excluindo = false; Gestao.atualizar(); onExcluida() }.onFailure { errExc = it.message; senha = "" }
+                    Gestao.excluirConta(m.id, senha, motivo.trim().ifEmpty { null }, completo).onSuccess { excluindo = false; Gestao.atualizar(); onExcluida() }.onFailure { errExc = it.message; senha = "" }
                     enviando = false
                 }
             })
@@ -1143,6 +1147,8 @@ fun ConfiguracoesG(onVoltar: (() -> Unit)?, onAbrir: (TelaG) -> Unit = {}) {
     val escopo = rememberCoroutineScope()
     fun sem(t: String) = java.text.Normalizer.normalize(t, java.text.Normalizer.Form.NFD).replace(Regex("\\p{M}"), "").lowercase()
     val grupoArea = GRUPOS_CONFIG.associate { it.chave to it.area }
+    // áreas sem nenhum ajuste à vista (o Dev escondeu) somem
+    val areasVisiveis = AREAS_CONFIG.filter { a -> PARAMETROS_VISIVEIS.any { grupoArea[it.grupo] == a.chave } }
     fun mudado(p: Param): Boolean {
         if (p.tipo == "multi") {
             val l = (dados.config[p.chave] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }?.sorted() ?: return false
@@ -1175,8 +1181,8 @@ fun ConfiguracoesG(onVoltar: (() -> Unit)?, onAbrir: (TelaG) -> Unit = {}) {
         PwInterruptor("Só o que mudei do padrão", soMudados, { soMudados = it }, descricao = if (nMudados == 0) "Tudo está no padrão." else "$nMudados ajuste${if (nMudados == 1) "" else "s"} diferente${if (nMudados == 1) "" else "s"} do padrão.")
         if (termo.isEmpty() && !soMudados) {
             // áreas (como no site): cada uma junta seções parecidas
-            PwFiltros(AREAS_CONFIG.map { a -> a.titulo to PARAMETROS_VISIVEIS.count { grupoArea[it.grupo] == a.chave && mudado(it) } }, area, { area = it; secao = null })
-            val a = AREAS_CONFIG.getOrNull(area)
+            PwFiltros(areasVisiveis.map { a -> a.titulo to PARAMETROS_VISIVEIS.count { grupoArea[it.grupo] == a.chave && mudado(it) } }, area, { area = it; secao = null })
+            val a = areasVisiveis.getOrNull(area)
             if (a != null) TextoDica(a.descricao)
             val secoes = GRUPOS_CONFIG.filter { it.area == a?.chave && PARAMETROS_VISIVEIS.any { p -> p.grupo == it.chave } }
             if (secoes.size > 1) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1199,15 +1205,19 @@ fun ConfiguracoesG(onVoltar: (() -> Unit)?, onAbrir: (TelaG) -> Unit = {}) {
                 extras.forEach { (t, i, tela) -> com.pwexpress.core.designsystem.PwPilula(t, i, { onAbrir(tela) }) }
             }
         }
-        val a = AREAS_CONFIG.getOrNull(area)
+        val a = areasVisiveis.getOrNull(area)
         val lista = when {
             termo.isNotEmpty() -> PARAMETROS_VISIVEIS.filter { com.pwexpress.core.busca.combina(termo, it.rotulo, it.descricao, it.descricaoDesligado, it.chave) }.filter { !soMudados || mudado(it) }
             soMudados -> PARAMETROS_VISIVEIS.filter(::mudado)
             else -> PARAMETROS_VISIVEIS.filter { grupoArea[it.grupo] == a?.chave && (secao == null || it.grupo == secao) }
         }
         val souDev = com.pwexpress.core.perfil.Perfis.perfil.collectAsState().value?.dev == true
+        // pagamento do motoboy e preço do cliente no mesmo editor das rotas e pedidos
+        val visual = termo.isEmpty() && !soMudados && (a?.chave == "motoboys" || a?.chave == "preco")
+        if (visual) AjusteVisualG(if (a?.chave == "motoboys") "pagamento" else "preco", dados.config, ::padraoJson)
+        val cobertas = if (!visual) emptySet() else if (a?.chave == "motoboys") CHAVES_PAG_VISUAL else CHAVES_PRECO_VISUAL
         GRUPOS_CONFIG.forEach { g ->
-            val doGrupo = lista.filter { it.grupo == g.chave }
+            val doGrupo = lista.filter { it.grupo == g.chave && it.chave !in cobertas }
             if (doGrupo.isEmpty()) return@forEach
             Espaco(4)
             Text(g.titulo, color = c.texto, fontWeight = FontWeight.Bold, fontSize = 17.sp)
@@ -1217,7 +1227,7 @@ fun ConfiguracoesG(onVoltar: (() -> Unit)?, onAbrir: (TelaG) -> Unit = {}) {
                 val st = estado?.takeIf { it.first == p.chave }?.second
                 val dif = mudado(p)
                 PwCartao(padding = PaddingValues(14.dp), cor = if (dif) c.ouro.copy(alpha = 0.45f) else null) {
-                    CampoParametro(p, dados.config[p.chave], { salvar(p, it) }, bloqueado = p.soDev && !souDev) {
+                    CampoParametro(p, dados.config[p.chave], { salvar(p, it) }, bloqueado = (p.soDev && !souDev) || com.pwexpress.feature.gestor.data.Permissoes.estado.value.nivel(p.chave) == "ver") {
                         if (p.escopos.isNotEmpty()) TextoDica("Pode ter exceção por " + p.escopos.joinToString(", ") { mapOf("tipo" to "tipo de pedido", "cliente" to "cliente", "motoboy" to "motoboy")[it] ?: it } + ".")
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {

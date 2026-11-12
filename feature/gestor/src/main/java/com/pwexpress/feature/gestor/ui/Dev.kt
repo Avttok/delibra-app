@@ -104,7 +104,7 @@ fun DevG(onVoltar: () -> Unit) {
     PwPagina {
         Cabecalho("Console Dev", onVoltar, subtitulo = "O sistema inteiro, sem filtro")
         // mesmas áreas do console do site: Agora · Negócio · Sistema
-        PwFiltros(listOf("Visão geral" to 0, "Saúde" to 0, "Aparelhos" to 0, "Tarefas" to 0, "Empresas" to 0, "Usuários" to 0, "Faturamento" to 0,
+        PwFiltros(listOf("Visão geral" to 0, "Saúde" to 0, "Aparelhos" to 0, "Tarefas" to 0, "Empresas" to 0, "Usuários" to 0, "Permissões" to 0, "Faturamento" to 0,
             "Módulos" to 0, "Integrações" to 0, "Versão do app" to 0, "Conversas" to 0, "Registro" to 0, "Apagar" to 0), aba, { aba = it })
         PwErro(erro)
         when (aba) {
@@ -112,13 +112,14 @@ fun DevG(onVoltar: () -> Unit) {
             3 -> { TarefasDevG(painel?.arr("tarefas"), onMudou = { escopo.launch { carregar() } }); return@PwPagina }
             4 -> { DevEmpresasG(); return@PwPagina }
             5 -> { DevUsuariosG(); return@PwPagina }
-            6 -> { DevFaturamentoG(); DevPagamentosG(); return@PwPagina }
-            8 -> { DevIntegracoesG(); return@PwPagina }
-            9 -> { VersaoAppG(); return@PwPagina }
-            10 -> { DevConversasG(); return@PwPagina }
-            12 -> { ApagarTudoG(); return@PwPagina }
+            6 -> { DevPermissoesG(); return@PwPagina }
+            7 -> { DevFaturamentoG(); DevPagamentosG(); return@PwPagina }
+            9 -> { DevIntegracoesG(); return@PwPagina }
+            10 -> { VersaoAppG(); return@PwPagina }
+            11 -> { DevConversasG(); return@PwPagina }
+            13 -> { ApagarTudoG(); return@PwPagina }
         }
-        val sub = when (aba) { 7 -> 0; 0 -> 1; 2 -> 2; else -> 3 }
+        val sub = when (aba) { 8 -> 0; 0 -> 1; 2 -> 2; else -> 3 }
         if (sub == 1) DevOcultoG()
         when (sub) {
             0 -> {
@@ -321,6 +322,8 @@ private fun ApagarTudoG() {
         com.pwexpress.core.designsystem.PwBotaoPerigo("Apagar a operação (pedidos, rotas, pings, faturas, folha, chat)", { pedir = "tudo" to null })
         com.pwexpress.core.designsystem.PwBotaoPerigo("Apagar absolutamente tudo", { pedir = "tudo_mesmo" to null }, cheio = true)
         TextoDica("\"Tudo\" também apaga clientes, exceções, zonas, horários, PIX, conquistas e volta os ajustes ao padrão. Contas de acesso e módulos ficam.")
+        Espaco(10)
+        DevApagarContasG()
     } else {
         val k = cat!!
         Row(verticalAlignment = Alignment.CenterVertically) {

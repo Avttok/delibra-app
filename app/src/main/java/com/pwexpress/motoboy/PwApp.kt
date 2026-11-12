@@ -124,6 +124,7 @@ class PwApp : Application() {
                     inteligente = p.logico("ping_inteligente", true),
                     curvaGraus = p.numero("ping_curva_graus", 25.0),
                     retaMaxM = p.numero("ping_reta_max_m", 200.0),
+                    disponivelFator = p.numero("disponivel_fator", 3.0),
                 )
                 // conquistas e dados do aparelho já prontos (o menu da foto abre na hora)
                 if (p != null) escopo.launch { com.pwexpress.core.perfil.Conquistas.atualizarMinhas(10 * 60_000) }

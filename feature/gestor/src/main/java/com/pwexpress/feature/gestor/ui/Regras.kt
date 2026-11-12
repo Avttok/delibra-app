@@ -157,8 +157,10 @@ internal fun CampoParametro(p: Param, valor: JsonElement?, onSalvar: (JsonElemen
  * [valores] = exceções já salvas; [onDefinir] com null volta ao padrão.
  */
 @Composable
-internal fun EditorRegrasG(params: List<Param>, valores: Map<String, JsonElement>, onDefinir: (String, JsonElement?) -> Unit, busca: String = "") {
+internal fun EditorRegrasG(paramsTodos: List<Param>, valores: Map<String, JsonElement>, onDefinir: (String, JsonElement?) -> Unit, busca: String = "") {
     val c = Pw.cores
+    val perm by com.pwexpress.feature.gestor.data.Permissoes.estado.collectAsState()
+    val params = paramsTodos.filter { perm.nivel(it.chave) != "oculto" }
     val dados by Gestao.dados.collectAsState()
     val souDev = com.pwexpress.core.perfil.Perfis.perfil.collectAsState().value?.dev == true
     // organizado como os Ajustes: áreas, seções e "só as exceções"
@@ -193,7 +195,7 @@ internal fun EditorRegrasG(params: List<Param>, valores: Map<String, JsonElement
         doGrupo.forEach { p ->
             val tem = p.chave in valores
             PwCartao(padding = PaddingValues(14.dp), cor = if (tem) c.ouro.copy(alpha = 0.55f) else null) {
-                CampoParametro(p, if (tem) valores[p.chave] else dados.config[p.chave], { onDefinir(p.chave, it) }, bloqueado = p.soDev && !souDev) {
+                CampoParametro(p, if (tem) valores[p.chave] else dados.config[p.chave], { onDefinir(p.chave, it) }, bloqueado = (p.soDev && !souDev) || com.pwexpress.feature.gestor.data.Permissoes.estado.value.nivel(p.chave) == "ver") {
                     Espaco(6)
                     if (tem) Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Exceção · padrão: ${textoValor(p, dados.config[p.chave])}", color = c.ouro, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))

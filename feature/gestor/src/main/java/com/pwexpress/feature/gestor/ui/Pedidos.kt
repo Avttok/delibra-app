@@ -146,6 +146,7 @@ private fun CartaoPedido(p: PedidoG, empresa: String?, onClick: () -> Unit) {
         }
         Spacer(Modifier.size(4.dp))
         Text(nomeCliente(p, empresa), color = c.texto2, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        IdadeG(p.criadoEm, p.status in setOf("recebido", "aprovado"), Gestao.dados.collectAsState().value)
         val entregas = p.pontos.count { !it.coleta }
         Text(
             listOfNotNull(
@@ -227,14 +228,21 @@ private fun JanelaPedido(p: PedidoG, empresa: String?, onFechar: () -> Unit) {
 
         PwCartao(destaque = true) {
             var editando by remember(p.id) { mutableStateOf(false) }
+            var conta by remember(p.id) { mutableStateOf(false) }
+            val fechadoP = p.status in setOf("concluido", "cancelado", "recusado") || p.faturaId != null
+            ValorClienteG(p.id, p.orcamento, p.regras, fechadoP) { bloco -> rodar("Preço salvo.", fechar = false) { bloco() } }
             p.orcamento?.let { o ->
-                if (editando) EditarOrcamentoG(p.id, o, onFechar = { editando = false })
-                else {
-                    OrcamentoG(o, p.pontos)
-                    if (p.status !in setOf("concluido", "cancelado", "recusado") && p.faturaId == null)
-                        PwBotaoVidro("Mudar o cálculo", onClick = { editando = true }, icone = PwIcones.Pencil, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                Spacer(Modifier.size(8.dp))
+                Text(if (conta) "Esconder a conta" else "Ver a conta", color = c.ouro, fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                    modifier = Modifier.clickable { conta = !conta }.padding(vertical = 6.dp))
+                if (conta) {
+                    if (editando) EditarOrcamentoG(p.id, o, onFechar = { editando = false })
+                    else {
+                        OrcamentoG(o, p.pontos)
+                        if (!fechadoP) PwBotaoVidro("Mudar linha a linha", onClick = { editando = true }, icone = PwIcones.Pencil, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                    }
                 }
-            } ?: TextoDica("Sem orçamento.")
+            }
             Spacer(Modifier.size(8.dp))
             Text("Calculado: ${moedaBr(p.valorCalculado)}" + (if (p.valorAjuste != 0.0) " · ajuste ${if (p.valorAjuste > 0) "+" else "−"}${moedaBr(kotlin.math.abs(p.valorAjuste))}" else "") +
                 (p.ajusteMotivo?.takeIf { p.valorAjuste != 0.0 }?.let { " ($it)" } ?: "") + " · " +
@@ -526,50 +534,6 @@ internal fun BlocoRotaG(corrida: com.pwexpress.feature.gestor.data.CorridaG, ocu
 }
 
 /** Antes de soltar: mudar o modelo e os parâmetros do pagamento desta rota, com prévia antes de salvar. */
-@Composable
-private fun PagamentoEditavelG(corrida: com.pwexpress.feature.gestor.data.CorridaG, ocupado: Boolean, acao: (suspend () -> Result<Unit>) -> Unit) {
-    val c = Pw.cores
-    var aberto by remember(corrida.id) { mutableStateOf(false) }
-    val salvas = remember(corrida.id) { mutableStateOf<kotlinx.serialization.json.JsonObject?>(null) }
-    val regras = remember(corrida.id) { androidx.compose.runtime.mutableStateMapOf<String, kotlinx.serialization.json.JsonElement>() }
-    var previa by remember(corrida.id) { mutableStateOf<kotlinx.serialization.json.JsonObject?>(null) }
-    androidx.compose.runtime.LaunchedEffect(corrida.id, aberto) {
-        if (!aberto || salvas.value != null) return@LaunchedEffect
-        val r = Gestao.rpcJson("previa_pagamento_rota", kotlinx.serialization.json.buildJsonObject { put("p_corrida", corrida.id) }).getOrNull() as? kotlinx.serialization.json.JsonObject
-        val atuais = (r?.get("regras_rota") as? kotlinx.serialization.json.JsonObject) ?: kotlinx.serialization.json.JsonObject(emptyMap())
-        salvas.value = atuais; regras.clear(); regras.putAll(atuais)
-    }
-    val chave = kotlinx.serialization.json.JsonObject(regras.toMap()).toString()
-    val mudou = salvas.value != null && kotlinx.serialization.json.JsonObject(regras.toMap()) != salvas.value
-    androidx.compose.runtime.LaunchedEffect(chave) {
-        if (!mudou) { previa = null; return@LaunchedEffect }
-        kotlinx.coroutines.delay(400)
-        previa = Gestao.rpcJson("previa_pagamento_rota", kotlinx.serialization.json.buildJsonObject { put("p_corrida", corrida.id); put("p_regras", kotlinx.serialization.json.JsonObject(regras.toMap())) }).getOrNull() as? kotlinx.serialization.json.JsonObject
-    }
-    Espaco(8)
-    PwBotaoVidro(if (aberto) "Fechar" else "Mudar como paga antes de soltar", onClick = { aberto = !aberto }, icone = PwIcones.SlidersHorizontal, modifier = Modifier.fillMaxWidth())
-    if (!aberto) return
-    TextoDica("Vale só para esta rota, para quem pegar, por cima do cadastro do motoboy.")
-    val modos = listOf("zonas" to "Zonas", "rota" to "Por km", "percentual" to "Percentual", "por_entrega" to "Por entrega", "fixo" to "Fixo")
-    val atual = (regras["pag_modo"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: corrida.pagCalculo?.str("modo")
-    Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        modos.forEach { (k, r) -> PwPilula(r, ICONE_MODO[k] ?: PwIcones.Wallet, { regras["pag_modo"] = kotlinx.serialization.json.JsonPrimitive(k) }, ligada = atual == k) }
-    }
-    EditorRegrasG(paramsPag(regras, corrida.pagCalculo?.str("modo")), regras, { k, v -> if (v == null) regras.remove(k) else regras[k] = v })
-    previa?.let { pv ->
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.ouro.copy(alpha = 0.08f)).border(1.dp, c.ouro.copy(alpha = 0.4f), RoundedCornerShape(14.dp)).padding(10.dp)) {
-            com.pwexpress.core.designsystem.PwRotulo("Com as mudanças")
-            LinhasCalculo(pv)
-        }
-    }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        PwBotaoOuro("Salvar pagamento", onClick = { acao { Gestao.rpcJson("definir_regras_rota", kotlinx.serialization.json.buildJsonObject { put("p_corrida", corrida.id); put("p_regras", kotlinx.serialization.json.JsonObject(regras.toMap())) }).map { salvas.value = kotlinx.serialization.json.JsonObject(regras.toMap()); Unit } } },
-            icone = PwIcones.Check, habilitado = mudou && !ocupado, modifier = Modifier.weight(1f))
-        if ((salvas.value?.size ?: 0) > 0) PwBotaoIcone(PwIcones.Trash2, "Voltar às regras de sempre", {
-            acao { Gestao.rpcJson("definir_regras_rota", kotlinx.serialization.json.buildJsonObject { put("p_corrida", corrida.id); put("p_regras", kotlinx.serialization.json.JsonObject(emptyMap())) }).map { salvas.value = kotlinx.serialization.json.JsonObject(emptyMap()); regras.clear(); Unit } }
-        }, tamanho = 48.dp)
-    }
-}
 
 private val REGRA = mapOf(
     "mediana" to "entrega do meio", "percentil" to "percentil", "media" to "média das entregas",
@@ -1062,25 +1026,6 @@ private val GRUPOS_PAG = setOf("pagamento", "pag_combinar", "pag_zonas", "pag_km
  * zonas → zonas; por km → km; por entrega e fixo → os deles; percentual → a parte do motoboy;
  * mais de uma → como combinar. A volta só mostra os detalhes quando está ligada.
  */
-private fun paramsPag(regras: Map<String, kotlinx.serialization.json.JsonElement>, calcModo: String?): List<com.pwexpress.feature.gestor.data.Param> {
-    val lista = (regras["pag_modos"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
-    val modos = (lista?.takeIf { it.isNotEmpty() } ?: listOfNotNull((regras["pag_modo"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: calcModo?.takeIf { it != "combinado" } ?: "zonas")).toSet()
-    val volta = (regras["pag_volta"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "true"
-    return PARAMETROS.filter { p ->
-        p.grupo in GRUPOS_PAG && !p.soDev && !p.escondido && when (p.grupo) {
-            "pag_zonas" -> "zonas" in modos
-            "pag_km" -> "rota" in modos
-            "pag_entrega" -> "por_entrega" in modos
-            "pag_fixo" -> "fixo" in modos
-            "pag_combinar" -> modos.size > 1
-            else -> when (p.chave) {
-                "repasse_motoboy_pct" -> "percentual" in modos
-                "pag_volta_valor_km", "pag_volta_pct", "pag_volta_teto" -> volta
-                else -> true
-            }
-        }
-    }
-}
 private val EDITAVEIS = setOf("montada", "agendada", "aguardando_motoboy", "sem_motoboy")
 
 /**

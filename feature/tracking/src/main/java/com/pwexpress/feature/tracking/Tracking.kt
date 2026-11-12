@@ -77,8 +77,9 @@ object Tracking {
     /** Aplica os intervalos vindos do servidor (Configurações do gestor), em segundos/minutos/metros. */
     fun aplicarConfiguracoes(corridaS: Double?, economiaS: Double?, disponivelMin: Double?, disponivelM: Double?,
                              distanciaM: Double? = null, precisaoM: Double? = null, envioS: Double? = null,
-                             inteligente: Boolean? = null, curvaGraus: Double? = null, retaMaxM: Double? = null) {
+                             inteligente: Boolean? = null, curvaGraus: Double? = null, retaMaxM: Double? = null, disponivelFator: Double? = null) {
         var mudou = false
+        disponivelFator?.takeIf { it in 0.0..20.0 }?.let { val v = it.toFloat(); if (v != Intervalos.disponivelFator) { Intervalos.disponivelFator = v; mudou = true } }
         inteligente?.let { Intervalos.inteligente = it }
         curvaGraus?.takeIf { it in 5.0..90.0 }?.let { Intervalos.curvaGraus = it.toFloat() }
         retaMaxM?.takeIf { it >= 20 }?.let { Intervalos.retaMaxM = it.toFloat() }

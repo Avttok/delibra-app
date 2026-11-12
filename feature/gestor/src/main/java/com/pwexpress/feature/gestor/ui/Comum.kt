@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -170,6 +171,7 @@ internal fun CartaoCorridaG(corrida: CorridaG, dados: Gestao.Dados, onClick: () 
             Detalhe(PwIcones.Clock, hora(corrida.criadaEm))
             Detalhe(PwIcones.Ruler, km(corrida.distanciaPlanejadaM))
         }
+        IdadeG(corrida.criadaEm, corrida.status in setOf("montada", "aguardando_motoboy", "sem_motoboy"), dados)
         if (!corrida.planejada) {
             dados.nomeMotoboy(corrida)?.let { Detalhe(PwIcones.Bike, it) }
             oferta?.let { Detalhe(PwIcones.BellRing, "Enviada para ${dados.membro(it.motoboyId)?.nome ?: "motoboy"}") }
@@ -246,5 +248,24 @@ internal fun SelosPontoG(foto: Boolean, nome: Boolean, assinatura: Boolean, codi
         if (assinatura) com.pwexpress.core.designsystem.PwSelo("Assinatura", c.texto2, icone = com.pwexpress.core.designsystem.PwIcones.PenLine)
         if (codigo) com.pwexpress.core.designsystem.PwSelo("Código" + (cod?.let { " $it" } ?: ""), c.texto2, icone = com.pwexpress.core.designsystem.PwIcones.KeyRound)
         if (de != null || ate != null) com.pwexpress.core.designsystem.PwSelo("${de ?: "…"}–${ate ?: "…"}", c.texto2, icone = com.pwexpress.core.designsystem.PwIcones.Clock)
+    }
+}
+
+/** "criado há 25 min", em destaque quando passou do tempo (Ajustes → Pedidos → Avisar se ficar parado). */
+@Composable
+internal fun IdadeG(desde: Long?, aberto: Boolean, dados: Gestao.Dados) {
+    val c = Pw.cores
+    if (desde == null) return
+    var agora by androidx.compose.runtime.remember { androidx.compose.runtime.mutableLongStateOf(System.currentTimeMillis()) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(30_000); agora = System.currentTimeMillis() } }
+    val min = ((agora - desde) / 60_000).coerceAtLeast(0)
+    val txt = when { min < 1 -> "agora"; min < 60 -> "há $min min"; min < 1440 -> "há ${min / 60} h" + if (min % 60 > 0) " ${min % 60} min" else ""; else -> "há ${min / 1440} d" }
+    val limite = (dados.config["alerta_parado_min"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull() ?: 30.0
+    val alerta = aberto && limite > 0 && min >= limite
+    Row(Modifier.clip(RoundedCornerShape(99.dp)).background(if (alerta) androidx.compose.ui.graphics.Color(0xFFF59E0B).copy(alpha = 0.15f) else androidx.compose.ui.graphics.Color.Transparent)
+        .padding(horizontal = if (alerta) 8.dp else 0.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(PwIcones.Hourglass, null, tint = if (alerta) androidx.compose.ui.graphics.Color(0xFFFBBF24) else c.texto3, modifier = Modifier.size(12.dp))
+        Spacer(Modifier.width(4.dp))
+        Text("Criado $txt", color = if (alerta) androidx.compose.ui.graphics.Color(0xFFFBBF24) else c.texto3, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
     }
 }

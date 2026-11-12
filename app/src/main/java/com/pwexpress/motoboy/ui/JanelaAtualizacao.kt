@@ -96,6 +96,7 @@ fun JanelaAtualizacao() {
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false, dismissOnClickOutside = false, dismissOnBackPress = podeFechar),
     ) {
         var verNotas by remember { androidx.compose.runtime.mutableStateOf(false) }
+        val notasAtual by Atualizador.notasInstalada.collectAsState()
         if (obrigatoria && !verNotas) BackHandler { /* não sai: versão obrigatória */ }
         if (verNotas) BackHandler { verNotas = false }
         val fracao = (estado as? EstadoAtualizacao.Baixando)?.fracao ?: if (estado is EstadoAtualizacao.Instalando) 1f else 0f
@@ -187,6 +188,8 @@ fun JanelaAtualizacao() {
                         Text("${mb(e.baixado)} de ${mb(e.total)} MB", color = c.texto2, fontFamily = Archivo, textAlign = TextAlign.Center)
                         Barra(anim)
                         Texto("Pode deixar o app aberto. O Android vai pedir para confirmar a instalação.")
+                        if (e.versao.notas.isNotBlank()) PwBotaoVidro("Ver o que há de novo", onClick = { verNotas = true }, icone = PwIcones.Sparkles,
+                            modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth())
                         PwBotaoVidro("Cancelar", onClick = { Atualizador.cancelarDownload() }, modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth())
                     }
                     is EstadoAtualizacao.Instalando -> {
@@ -208,6 +211,8 @@ fun JanelaAtualizacao() {
                     EstadoAtualizacao.EmDia -> if (!obrigatoria) {
                         Titulo("O app está em dia")
                         Texto("Você já tem tudo o que há de novo.")
+                        if (notasAtual.isNotBlank()) PwBotaoVidro("Ver as novidades desta versão", onClick = { verNotas = true }, icone = PwIcones.Sparkles,
+                            modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth())
                         PwBotaoOuro("Ótimo", onClick = { Atualizador.fecharJanela() }, icone = PwIcones.Check, modifier = Modifier.widthIn(max = 420.dp))
                     }
                     else -> {
@@ -238,11 +243,13 @@ fun JanelaAtualizacao() {
                     }
                 }
             }
-            val notasV = ((estado as? EstadoAtualizacao.Disponivel)?.versao ?: bloqueio?.versao)?.notas.orEmpty()
+            val notasV = ((estado as? EstadoAtualizacao.Disponivel)?.versao ?: (estado as? EstadoAtualizacao.Baixando)?.versao ?: bloqueio?.versao)?.notas?.takeIf { it.isNotBlank() }
+                ?: notasAtual
             androidx.compose.animation.AnimatedVisibility(verNotas && notasV.isNotBlank(), Modifier.align(Alignment.BottomCenter),
                 enter = androidx.compose.animation.slideInVertically { it } + androidx.compose.animation.fadeIn(),
                 exit = androidx.compose.animation.slideOutVertically { it } + androidx.compose.animation.fadeOut()) {
-                PainelNotas(notasV, onFechar = { verNotas = false }, onAtualizar = { verNotas = false; Atualizador.baixar() })
+                PainelNotas(notasV, onFechar = { verNotas = false },
+                    onAtualizar = if (estado is EstadoAtualizacao.Disponivel || bloqueio != null) ({ verNotas = false; Atualizador.baixar() }) else null)
             }
         }
     }
@@ -260,7 +267,7 @@ private fun Texto(t: String) {
 
 /** Painel das notas da versão: sobe de baixo, ocupa quase a tela, com o texto formatado. */
 @Composable
-private fun PainelNotas(notas: String, onFechar: () -> Unit, onAtualizar: () -> Unit) {
+private fun PainelNotas(notas: String, onFechar: () -> Unit, onAtualizar: (() -> Unit)?) {
     val c = Pw.cores
     val forma = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     Column(
@@ -284,7 +291,7 @@ private fun PainelNotas(notas: String, onFechar: () -> Unit, onAtualizar: () -> 
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.borda))
         com.pwexpress.core.designsystem.PwMarkdown(notas, Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 14.dp))
-        Box(Modifier.padding(16.dp)) { PwBotaoOuro("Atualizar agora", onClick = onAtualizar, icone = PwIcones.Download, altura = 54.dp) }
+        if (onAtualizar != null) Box(Modifier.padding(16.dp)) { PwBotaoOuro("Atualizar agora", onClick = onAtualizar, icone = PwIcones.Download, altura = 54.dp) }
     }
 }
 

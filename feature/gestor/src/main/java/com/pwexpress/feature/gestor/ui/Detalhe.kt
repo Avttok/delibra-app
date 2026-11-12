@@ -410,6 +410,11 @@ private fun BlocoPlanejadaG(corrida: CorridaG, ocupado: Boolean, acao: (suspend 
             PwBotaoVidro("Mudar horário", onClick = { reagendar = true }, icone = PwIcones.Repeat, modifier = Modifier.weight(1f))
             if (corrida.motoboyId != null) PwBotaoVidro("Liberar", onClick = { acao { Gestao.gerenciarPlanejada(corrida.id, "liberar") } }, icone = PwIcones.CalendarX, habilitado = !ocupado, modifier = Modifier.weight(1f))
         }
+        if (corrida.motoboyId != null && com.pwexpress.feature.gestor.data.Permissoes.estado.value.pode("forcar_inicio")) {
+            Espaco(8)
+            com.pwexpress.core.designsystem.PwBotaoOuro("Começar agora", onClick = { acao { Gestao.gerenciarPlanejada(corrida.id, "iniciar_agora") } }, icone = PwIcones.Play, habilitado = !ocupado)
+            TextoDica("Vira a corrida do motoboy reservado na hora, sem esperar o horário.")
+        }
         Espaco(8)
         PwBotaoVidro("Despachar agora", onClick = { acao { Gestao.gerenciarPlanejada(corrida.id, "despachar_agora") } }, icone = PwIcones.Send, habilitado = !ocupado, modifier = Modifier.fillMaxWidth())
     }

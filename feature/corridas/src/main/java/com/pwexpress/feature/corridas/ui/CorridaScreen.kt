@@ -1,5 +1,6 @@
 package com.pwexpress.feature.corridas.ui
 
+import androidx.compose.foundation.horizontalScroll
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -92,6 +93,8 @@ fun CorridaScreen(
     chatLigado: Boolean = false,
     /** Conta gestor + motoboy: vai ao painel sem largar a corrida. */
     onPainelGestor: (() -> Unit)? = null,
+    /** O gestor deixa pegar mais de uma rota: abre o quadro sem largar esta. */
+    onPegarMais: (() -> Unit)? = null,
 ) {
     val ctx = LocalContext.current
     val c = Pw.cores
@@ -145,7 +148,21 @@ fun CorridaScreen(
 
     var focoT by remember(corrida.id) { mutableStateOf<com.pwexpress.core.mapa.FocoMapa?>(null) }
     var abrirCheio by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    val todas by Corridas.ativas.collectAsState()
     Column(modifier.fillMaxSize()) {
+        // ---------------------------------------------------------- mais de uma rota: troca qual está na tela
+        if (todas.size > 1 || onPegarMais != null) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()).padding(start = 12.dp, end = 12.dp, top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (todas.size > 1) todas.forEach { r ->
+                    val sel = r.id == corrida.id
+                    Text("Rota ${r.numeroExibicao}", color = if (sel) c.sobreOuro else c.texto, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                        modifier = Modifier.clip(RoundedCornerShape(99.dp)).background(if (sel) c.ouro else c.campo).clickable { Corridas.focar(r.id) }.padding(horizontal = 12.dp, vertical = 7.dp))
+                }
+                if (onPegarMais != null) Text("+ Pegar mais", color = c.ouro, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                    modifier = Modifier.clip(RoundedCornerShape(99.dp)).border(1.dp, c.ouro, RoundedCornerShape(99.dp)).clickable(onClick = onPegarMais).padding(horizontal = 12.dp, vertical = 6.dp))
+            }
+        }
         // ---------------------------------------------------------- navegação curva a curva (dentro do app)
         if (parada != null && !comprovanteAberto) {
             NavegacaoBanner(parada.id, parada.lat to parada.lng, Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp))

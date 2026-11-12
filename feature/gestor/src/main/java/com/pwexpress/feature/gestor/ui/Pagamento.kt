@@ -62,7 +62,11 @@ import kotlinx.serialization.json.put
 private val CALCULOS = listOf(
     Triple("zonas", "Zonas", "pag_zonas"), Triple("rota", "Por km", "pag_km"), Triple("percentual", "Percentual", "percentual"),
     Triple("por_entrega", "Por entrega", "pag_entrega"), Triple("fixo", "Fixo", "pag_fixo"),
+    Triple("salario", "Salário fixo", "salario"), Triple("diaria", "Diária", "diaria"), Triple("por_hora", "Por hora", "por_hora"),
 )
+/** Valores de cada cálculo (os do holerite têm as chaves deles). */
+private val CHAVES_CALC = mapOf("percentual" to setOf("repasse_motoboy_pct"), "salario" to setOf("pag_salario_mensal", "pag_salario_proporcional", "pag_minimo_periodo"),
+    "diaria" to setOf("pag_diaria_valor"), "por_hora" to setOf("pag_hora_valor"))
 private val COMBINAR = listOf("soma" to "Soma", "media" to "Média", "maior" to "Maior", "menor" to "Menor")
 
 /** Valor de cada cálculo num resultado (combinado tem as partes; um só, é o próprio). */
@@ -210,7 +214,7 @@ internal fun EditorCalculosG(regras: androidx.compose.runtime.snapshots.Snapshot
                 }
                 AnimatedVisibility(aberto == modo) {
                     Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 10.dp)) {
-                        val ps = PARAMETROS.filter { p -> !p.soDev && !p.escondido && if (grupo == "percentual") p.chave == "repasse_motoboy_pct" else p.grupo == grupo }
+                        val ps = PARAMETROS.filter { p -> !p.soDev && !p.escondido && (CHAVES_CALC[grupo]?.contains(p.chave) ?: (p.grupo == grupo)) }
                         EditorRegrasG(ps, regras, { k, v -> if (v == null) regras.remove(k) else regras[k] = v })
                     }
                 }

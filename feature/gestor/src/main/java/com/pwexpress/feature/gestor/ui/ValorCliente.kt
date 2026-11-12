@@ -166,8 +166,8 @@ internal fun PecasPrecoG(regras: androidx.compose.runtime.snapshots.SnapshotStat
 internal val CHAVES_PRECO_VISUAL = PECAS.flatMap { it.chaves }.toSet()
 
 /** Chaves do pagamento do motoboy que o editor visual cobre nos Ajustes. */
-internal val CHAVES_PAG_VISUAL: Set<String> get() = PARAMETROS.filter { it.grupo in setOf("pag_combinar", "pag_km", "pag_zonas", "pag_entrega", "pag_fixo") ||
-    it.chave in setOf("repasse_motoboy_pct", "pag_volta", "pag_volta_valor_km", "pag_volta_pct") }.map { it.chave }.toSet()
+internal val CHAVES_PAG_VISUAL: Set<String> get() = PARAMETROS.filter { it.grupo in setOf("pag_combinar", "pag_km", "pag_zonas", "pag_entrega", "pag_fixo", "pag_periodo") ||
+    it.chave in setOf("pag_modo", "repasse_motoboy_pct", "pag_volta", "pag_volta_valor_km", "pag_volta_pct") }.map { it.chave }.toSet()
 
 /**
  * Padrão da empresa no mesmo editor das rotas e pedidos (igual ao site): o pagamento do motoboy e o preço do cliente.

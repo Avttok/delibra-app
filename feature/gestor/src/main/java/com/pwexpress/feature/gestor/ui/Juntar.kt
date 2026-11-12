@@ -114,9 +114,10 @@ internal fun PainelJuntarG(p: PedidoG, onAbrir: (TelaG) -> Unit = {}) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(PwIcones.Combine, null, tint = c.ouro, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
-                Text("Juntar com outros pedidos", color = c.texto, fontWeight = FontWeight.Bold, fontFamily = Archivo, fontSize = 16.sp)
+                Text("Montagem da rota", color = c.texto, fontWeight = FontWeight.Bold, fontFamily = Archivo, fontSize = 16.sp)
                 Text("O que vale para este pedido. Toque para mudar só aqui.", color = c.texto3, fontSize = 12.5.sp)
             }
+            SeloOrigem("roteirizar_agrupar")
         }
         Espaco(8)
         val junta = bool("roteirizar_agrupar")
@@ -126,7 +127,6 @@ internal fun PainelJuntarG(p: PedidoG, onAbrir: (TelaG) -> Unit = {}) {
                     descricao = if (junta) "Entra numa rota com pedidos perto e no mesmo horário." else "Cada entrega dele vira uma rota própria.", icone = PwIcones.Combine)
             }
         }
-        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) { SeloOrigem("roteirizar_agrupar") }
         AnimatedVisibility(junta) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                 BLOCOS.forEach { b ->

@@ -353,6 +353,11 @@ private fun JanelaPedido(p: PedidoG, empresa: String?, onFechar: () -> Unit) {
                 "Voltar para revisão", onConfirmar = { confirmarVolta = false; voltarRevisao() }, onCancelar = { confirmarVolta = false })
             TextoDica("Só enquanto nenhuma coleta ou entrega dele foi feita. Serve para refazer as rotas com regras novas.")
         }
+        if (p.status in setOf("cancelado", "recusado")) {
+            PwBotaoVidro("Voltar para revisão", onClick = { rodar("Pedido voltou para revisão: aprove de novo para virar rota.", fechar = false) { Gestao.revisarPedido(p.id, "voltar_revisao", null, null) } },
+                icone = PwIcones.RotateCcw, modifier = Modifier.fillMaxWidth())
+            TextoDica("O pedido ${if (p.status == "cancelado") "cancelado" else "recusado"} volta a esperar a sua revisão.")
+        }
         Spacer(Modifier.size(12.dp))
     }
 }
@@ -517,30 +522,7 @@ internal fun BlocoRotaG(corrida: com.pwexpress.feature.gestor.data.CorridaG, ocu
         }
     }
 
-    val calc = corrida.pagCalculo ?: return
-    var ajuste by remember(corrida.id) { mutableStateOf(numeroBr(corrida.pagAjuste)) }
-    var motivo by remember(corrida.id) { mutableStateOf(corrida.pagAjusteMotivo.orEmpty()) }
-    PwCartao {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(PwIcones.HandCoins, null, tint = c.ouro, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
-            Text("Pagamento do motoboy" + if (corrida.motoboyId == null) " (prévia)" else "", color = c.texto, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.weight(1f))
-        }
-        Espaco(4)
-        LinhasCalculo(calc)
-        if (aberta) PagamentoEditavelG(corrida, ocupado, acao)
-        if (corrida.motoboyId != null) {
-            Espaco(8)
-            PwCampo(ajuste, { ajuste = it }, "Ajuste (+/−)", teclado = KeyboardType.Text, prefixo = "R$ ")
-            PwCampo(motivo, { motivo = it }, "Motivo", dica = "Ex.: chuva, espera longa, rota mais curta")
-            Espaco(6)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PwBotaoVidro("Salvar ajuste", onClick = { acao { Gestao.ajustarPagamento(corrida.id, ajuste.replace(",", ".").toDoubleOrNull() ?: 0.0, motivo.ifBlank { null }) } }, icone = PwIcones.Check, modifier = Modifier.weight(1f))
-                PwBotaoVidro("Recalcular", onClick = { acao { Gestao.recalcularPagamento(corrida.id) } }, icone = PwIcones.RefreshCw, modifier = Modifier.weight(1f))
-            }
-            Espaco(6)
-            Text("A pagar: ${moedaBr(corrida.valorMotoboy)}", color = c.texto, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        }
-    }
+    PagamentoMotoboyG(corrida, ocupado, acao)
 }
 
 /** Antes de soltar: mudar o modelo e os parâmetros do pagamento desta rota, com prévia antes de salvar. */
@@ -1185,7 +1167,8 @@ private fun CartaoRotaG(
     val id = r.str("id") ?: return
     val editavel = !previa && r.str("status") in EDITAVEIS
     // na prévia, "Revisar rota" deixa mudar o pagamento (guardado no pedido, passa para a rota quando nascer)
-    val mudaPagamento = editavel || (previa && revisando)
+    // o gestor sempre decide como calcular: antes e depois de o motoboy pegar (até fechar o holerite)
+    val mudaPagamento = (!previa && r.str("status") != "cancelada") || (previa && revisando)
     val original = (r["paradas"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it as? kotlinx.serialization.json.JsonObject }.orEmpty()
     val paradas = remember(id) { androidx.compose.runtime.mutableStateListOf<kotlinx.serialization.json.JsonObject>().apply { addAll(original) } }
     val regrasSalvas = (r["pag_regras"] as? kotlinx.serialization.json.JsonObject) ?: kotlinx.serialization.json.JsonObject(emptyMap())
@@ -1314,35 +1297,16 @@ private fun CartaoRotaG(
         }, icone = PwIcones.Check, habilitado = !ocupado, modifier = Modifier.padding(top = 6.dp))
     }
     if (mudaPagamento) {
-        // modalidade desta rota: uma só (mesmo com várias ligadas nos Ajustes); os valores dela aparecem logo abaixo
         Espaco(8)
-        PwRotulo("Como o motoboy desta rota é pago")
-        Espaco(4)
-        val modos = listOf("zonas" to "Zonas", "rota" to "Por km", "percentual" to "Percentual", "por_entrega" to "Por entrega", "fixo" to "Fixo")
-        val listaModos = (regras["pag_modos"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }.orEmpty()
-        val atualModo = listaModos.singleOrNull() ?: (regras["pag_modo"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.takeIf { listaModos.isEmpty() }
-            ?: r.obj("pagamento")?.str("modo")?.takeIf { it != "combinado" }
-        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            modos.forEach { (k, rot) ->
-                PwPilula(rot, ICONE_MODO[k] ?: PwIcones.Wallet, {
-                    regras["pag_modos"] = kotlinx.serialization.json.JsonArray(listOf(kotlinx.serialization.json.JsonPrimitive(k)))
-                    regras["pag_modo"] = kotlinx.serialization.json.JsonPrimitive(k)
-                    verRegras = true
-                }, ligada = atualModo == k)
-            }
-        }
-        TextoDica(if (atualModo == null) "Agora: cálculos combinados (como nos Ajustes). Toque numa modalidade para usar só ela nesta rota." else "Toque para trocar. Os valores da modalidade aparecem abaixo, com a prévia.")
-        Espaco(8)
-        PwBotaoVidro((if (verRegras) "Esconder" else "Mudar") + " os valores do pagamento" + if (regrasSalvas.isNotEmpty()) " (${regrasSalvas.size})" else "",
+        PwBotaoVidro((if (verRegras) "Fechar" else "Mudar") + " como o motoboy desta rota é pago" + if (regrasSalvas.isNotEmpty()) " (${regrasSalvas.size})" else "",
             onClick = { verRegras = !verRegras }, icone = PwIcones.SlidersHorizontal, modifier = Modifier.fillMaxWidth())
         if (verRegras) {
-            TextoDica(if (previa) "Vale para a rota deste pedido, para quem pegar, por cima do cadastro do motoboy. Salve e a prévia mostra o valor novo."
-                else "Valem só para esta rota, para quem pegar, por cima do cadastro do motoboy. Mude e veja a prévia acima antes de salvar.")
+            TextoDica(if (previa) "Vale para a rota deste pedido, para quem pegar. Salve e a prévia mostra o valor novo."
+                else "Vale só para esta rota, antes ou depois de o motoboy pegar (até fechar o holerite dele).")
             (sug?.get("regras_comuns") as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it as? kotlinx.serialization.json.JsonObject }?.forEach { rc ->
                 PwPilula("Usar as de costume (${rc.long("vezes")}×)", PwIcones.Sparkles, { regras.clear(); rc.obj("regras")?.let { regras.putAll(it) } })
             }
-            EditorRegrasG(paramsPag(regras, r.obj("pagamento")?.str("modo")), regras, { k, v -> if (v == null) regras.remove(k) else regras[k] = v })
+            EditorCalculosG(regras, previaPag ?: r.obj("pagamento"), r.obj("pagamento"))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PwBotaoOuro("Salvar pagamento", onClick = {
                     if (previa) rodar("Pagamento da rota salvo. A prévia já mostra o valor novo.", rpc("definir_regras_rota_pedido") { put("p_pedido", pedidoId); put("p_regras", kotlinx.serialization.json.JsonObject(regras.toMap())) })

@@ -77,6 +77,8 @@ data class CorridaG(
     val pagCalculo: JsonObject? = null, val pagAjuste: Double = 0.0, val pagAjusteMotivo: String? = null, val perigoso: Boolean = false,
     /** Fechou sozinha (motoboy sem sinal): espera o app mandar as etapas. */
     val aguardandoConfirmacao: Boolean = false,
+    /** O motoboy vê o motivo do ajuste no holerite. */
+    val pagAjusteMostrar: Boolean = true,
 ) {
     val automatica get() = origem == "roteirizador"
     val entregas get() = paradas.count { !it.coleta }
@@ -172,7 +174,7 @@ fun JsonObject.paraCorridaG() = CorridaG(
     paradas = arr("paradas").map { it.paraParadaG() }.sortedBy { it.ordem },
     origem = str("origem") ?: "manual", sugeridoMotoboyId = str("sugerido_motoboy_id"), modoDespacho = str("modo_despacho"), quadroDesde = iso(str("quadro_desde")),
     pagCalculo = obj("pag_calculo"), pagAjuste = dbl("pag_ajuste") ?: 0.0, pagAjusteMotivo = str("pag_ajuste_motivo"), perigoso = bool("tem_perigoso"),
-    aguardandoConfirmacao = bool("aguardando_confirmacao"),
+    aguardandoConfirmacao = bool("aguardando_confirmacao"), pagAjusteMostrar = boolOuNulo("pag_ajuste_mostrar") ?: true,
 )
 
 // ------------------------------------------------------------------ pedidos (do site do cliente e do gestor)

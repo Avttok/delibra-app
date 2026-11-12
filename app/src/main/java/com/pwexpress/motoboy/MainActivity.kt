@@ -297,9 +297,11 @@ class MainActivity : ComponentActivity() {
                                         else -> TrackingScreen(
                                             saudacao = NomePerfil(s.email).substringBefore(" "),
                                             extras = {
-                                                com.pwexpress.feature.corridas.ui.AvisoSuspensao()
-                                                CartaoGanhos(onCarteira = if (comCarteira) ({ aba = "carteira" }) else null)
-                                                com.pwexpress.feature.corridas.ui.MinhaNota()
+                                                androidx.compose.foundation.layout.Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(14.dp)) {
+                                                    com.pwexpress.feature.corridas.ui.AvisoSuspensao()
+                                                    CartaoGanhos(onCarteira = if (comCarteira) ({ aba = "carteira" }) else null)
+                                                    com.pwexpress.feature.corridas.ui.MinhaNota()
+                                                }
                                             },
                                             chips = { com.pwexpress.feature.tracking.ui.ChipInicio(PwIcones.Radar, com.pwexpress.motoboy.ui.textoRaio(p?.raioKm, p?.raioModo ?: "posicao")) { raioAberto = true } },
                                             onConfiguracoes = { naConfig = true },

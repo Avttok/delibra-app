@@ -102,7 +102,7 @@ internal fun CampoParametro(p: Param, valor: JsonElement?, onSalvar: (JsonElemen
             }
         }
         TextoDica(if (atuais.isEmpty()) "Nenhum marcado" else "${atuais.size} marcado${if (atuais.size > 1) "s" else ""}")
-        if (bloqueado) TextoDica("Só o Dev altera.")
+        if (bloqueado) TextoDica("Só a plataforma altera.")
         extra?.invoke()
         return
     }
@@ -113,7 +113,7 @@ internal fun CampoParametro(p: Param, valor: JsonElement?, onSalvar: (JsonElemen
             (valor as? JsonPrimitive)?.content?.toDoubleOrNull() ?: p.padraoNum, p.unidade, p.min ?: 0.0, p.max ?: (if (p.unidade == "km") 50.0 else 5000.0), p.passo,
             { if (!bloqueado) onSalvar(JsonPrimitive(it)) }, habilitado = !bloqueado, dupla = "entrega" in p.chave,
         )
-        if (bloqueado) TextoDica("Só o Dev altera.")
+        if (bloqueado) TextoDica("Só a plataforma altera.")
         extra?.invoke()
         return
     }
@@ -148,7 +148,7 @@ internal fun CampoParametro(p: Param, valor: JsonElement?, onSalvar: (JsonElemen
             }
         }
     }
-    if (bloqueado) TextoDica("Só o Dev altera.")
+    if (bloqueado) TextoDica("Só a plataforma altera.")
     extra?.invoke()
 }
 

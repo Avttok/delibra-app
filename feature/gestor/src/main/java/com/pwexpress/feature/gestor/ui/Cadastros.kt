@@ -478,7 +478,7 @@ private fun Selos(m: com.pwexpress.feature.gestor.data.MembroG, status: String?)
 /** Vagas de cada cargo na empresa (o Dev define): cargo → (usados, limite, pode). */
 private data class Vaga(val usados: Int, val limite: Int?, val pode: Boolean) {
     fun texto(cargo: String): String? = when {
-        cargo == "gestor" && !pode && (limite == null || usados < limite) -> "Só o Dev cria gestores"
+        cargo == "gestor" && !pode && (limite == null || usados < limite) -> "Só o suporte da plataforma cria gestores"
         limite != null -> "$usados de $limite vaga(s) usada(s)" + if (!pode) " · sem vaga" else ""
         else -> null
     }
@@ -622,7 +622,7 @@ fun MembroG(id: String, meuId: String?, onVoltar: () -> Unit) {
                 CompartilharMotoboyG(m.id, m.nome)
             }
             "penalidades" -> PenalidadesG("motoboy", m.id)
-            "editar" -> if (m.dev && !souDev) TextoDica("Conta Dev: só o Dev altera esta conta.") else EditarMembroG(m, eu = m.id == meuId, onExcluida = onVoltar, souDev = souDev)
+            "editar" -> if (m.dev && !souDev) TextoDica("Conta protegida: não dá para alterar.") else EditarMembroG(m, eu = m.id == meuId, onExcluida = onVoltar, souDev = souDev)
         }
     }
 }

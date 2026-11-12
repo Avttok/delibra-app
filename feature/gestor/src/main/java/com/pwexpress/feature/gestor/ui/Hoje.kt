@@ -105,7 +105,7 @@ internal fun HojeG(onAba: (String) -> Unit) {
         }
         Linha2(
             { Numero("Rotas feitas", "${n("concluidas_hoje")}", compara, PwIcones.Route, it) },
-            { Numero("Entregas", "${n("entregas_hoje")}", "${n("canceladas_hoje")} rota(s) cancelada(s)", PwIcones.PackageCheck, it) },
+            { Numero("Entregas", "${n("entregas_hoje")}", "concluídas hoje", PwIcones.PackageCheck, it) },
         )
         Linha2(
             { Numero("Na rua", "${n("rotas_ativas")}", "${n("rotas_esperando")} esperando motoboy", PwIcones.Bike, it) },
@@ -113,6 +113,10 @@ internal fun HojeG(onAba: (String) -> Unit) {
         )
         Linha2(
             { Numero("Pedidos", "${n("pedidos_hoje")}", "${n("para_revisar")} para revisar", PwIcones.ClipboardList, it) },
+            { Numero("Canceladas", "${n("canceladas_hoje")}", "rotas canceladas hoje", PwIcones.CircleX, it) },
+        )
+        Linha2(
+            { Numero("Nota (30 dias)", d.dbl("nota_media_30d")?.let { String.format(java.util.Locale("pt", "BR"), "%.1f", it) } ?: "—", "média das avaliações", PwIcones.Star, it) },
             { Numero("Tempo médio", d.int("tempo_medio_min")?.let { "$it min" } ?: "—", "do aceite à conclusão", PwIcones.Clock, it) },
         )
         PwCartao {

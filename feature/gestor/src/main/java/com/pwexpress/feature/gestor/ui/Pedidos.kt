@@ -146,6 +146,7 @@ private fun CartaoPedido(p: PedidoG, empresa: String?, onClick: () -> Unit) {
         }
         Spacer(Modifier.size(4.dp))
         Text(nomeCliente(p, empresa), color = c.texto2, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        IdadeG(p.criadoEm, p.status in setOf("recebido", "aprovado"), Gestao.dados.collectAsState().value)
         val entregas = p.pontos.count { !it.coleta }
         Text(
             listOfNotNull(

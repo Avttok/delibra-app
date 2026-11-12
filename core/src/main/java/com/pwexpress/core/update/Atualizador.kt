@@ -116,6 +116,8 @@ object Atualizador {
                 return@launch
             }
             if (v == null || v.build <= buildAtual) {
+                // em dia: guarda as notas desta versão para a pessoa ver o que tem de novo
+                if (v != null && v.build == buildAtual) _notasInstalada.value = v.notas
                 _estado.value = if (automatico) EstadoAtualizacao.Ocioso else EstadoAtualizacao.EmDia
                 return@launch
             }
@@ -226,6 +228,10 @@ object Atualizador {
                 .maxByOrNull { it.build }
         }
     }
+
+    private val _notasInstalada = kotlinx.coroutines.flow.MutableStateFlow("")
+    /** Notas da versão que está instalada (quando o app está em dia). */
+    val notasInstalada: kotlinx.coroutines.flow.StateFlow<String> = _notasInstalada
 
     fun baixar() {
         val v = when (val e = _estado.value) {

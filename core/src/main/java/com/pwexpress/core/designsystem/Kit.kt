@@ -685,6 +685,8 @@ fun PwSelosCargo(dev: Boolean, gestor: Boolean, motoboy: Boolean, teste: Boolean
 @Composable
 fun PwCabecalho(titulo: String, onVoltar: () -> Unit, modifier: Modifier = Modifier, subtitulo: String? = null, acoes: @Composable RowScope.() -> Unit = {}) {
     val c = Pw.cores
+    // o "voltar" do celular faz o mesmo que a seta: sai só desta tela (volta um passo, não ao começo)
+    androidx.activity.compose.BackHandler(onBack = onVoltar)
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         PwBotaoIcone(PwIcones.ArrowLeft, "Voltar", onVoltar)
         Spacer(Modifier.width(12.dp))

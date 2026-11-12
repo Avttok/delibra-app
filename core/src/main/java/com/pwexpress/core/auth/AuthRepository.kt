@@ -137,6 +137,72 @@ class AuthRepository(
         Result.failure(AuthErro("Erro inesperado: ${e.message}"))
     }
 
+    // ------------------------------------------------------------------ verificação em dois passos (TOTP)
+
+    data class Fator(val id: String, val nome: String, val verificado: Boolean)
+    data class NovoFator(val id: String, val segredo: String, val uri: String)
+
+    private fun aal(token: String): String = runCatching {
+        val p = token.split(".")[1]
+        val json = String(android.util.Base64.decode(p, android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP))
+        Json.parseToJsonElement(json).jsonObject["aal"]?.jsonPrimitive?.content ?: "aal1"
+    }.getOrDefault("aal1")
+
+    /** Fatores (aplicativos autenticadores) da conta. */
+    suspend fun fatores(): Result<List<Fator>> = try {
+        val t = tokenValido() ?: throw AuthErro("Entre de novo.")
+        val r = http.requisitar("GET", "/auth/v1/user", null, bearer = t)
+        if (!r.ok) throw AuthErro(mensagemPorCodigo(r))
+        val l = (Json.parseToJsonElement(r.corpo).jsonObject["factors"] as? kotlinx.serialization.json.JsonArray).orEmpty().mapNotNull { e ->
+            val o = e as? kotlinx.serialization.json.JsonObject ?: return@mapNotNull null
+            if (o["factor_type"]?.jsonPrimitive?.content != "totp") return@mapNotNull null
+            Fator(o.getValue("id").jsonPrimitive.content, o["friendly_name"]?.jsonPrimitive?.content ?: "Autenticador", o["status"]?.jsonPrimitive?.content == "verified")
+        }
+        Result.success(l)
+    } catch (e: AuthErro) { Result.failure(e) } catch (e: IOException) { Result.failure(AuthErro("Sem conexão com o servidor.")) }
+
+    /** Conta com autenticador e sessão ainda sem o código: o app pede o código antes de seguir. */
+    suspend fun precisaCodigo(): String? {
+        val t = runCatching { tokenValido() }.getOrNull() ?: return null
+        if (aal(t) == "aal2") return null
+        return fatores().getOrNull()?.firstOrNull { it.verificado }?.id
+    }
+
+    /** Começa a cadastrar um autenticador: devolve o segredo e o link otpauth:// para o app autenticador. */
+    suspend fun cadastrarFator(): Result<NovoFator> = try {
+        val t = tokenValido() ?: throw AuthErro("Entre de novo.")
+        // tira tentativas antigas não confirmadas
+        fatores().getOrNull()?.filter { !it.verificado }?.forEach { http.requisitar("DELETE", "/auth/v1/factors/${it.id}", null, bearer = t) }
+        val nome = "Delibra app ${java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale("pt", "BR")).format(java.util.Date())}"
+        val r = http.post("/auth/v1/factors", buildJsonObject { put("factor_type", "totp"); put("friendly_name", nome) }.toString(), bearer = t)
+        if (!r.ok) throw AuthErro(if (r.codigo == 422) "Esse recurso não está ligado no servidor." else mensagemPorCodigo(r))
+        val o = Json.parseToJsonElement(r.corpo).jsonObject
+        val totp = o["totp"]?.jsonObject
+        Result.success(NovoFator(o.getValue("id").jsonPrimitive.content, totp?.get("secret")?.jsonPrimitive?.content.orEmpty(), totp?.get("uri")?.jsonPrimitive?.content.orEmpty()))
+    } catch (e: AuthErro) { Result.failure(e) } catch (e: IOException) { Result.failure(AuthErro("Sem conexão com o servidor.")) }
+
+    /** Confere o código de 6 dígitos (cadastro ou entrada) e troca a sessão pela verificada. */
+    suspend fun verificarCodigo(fator: String, codigo: String): Result<Unit> = try {
+        val t = tokenValido() ?: throw AuthErro("Entre de novo.")
+        val ch = http.post("/auth/v1/factors/$fator/challenge", "{}", bearer = t)
+        if (!ch.ok) throw AuthErro(mensagemPorCodigo(ch))
+        val chId = Json.parseToJsonElement(ch.corpo).jsonObject.getValue("id").jsonPrimitive.content
+        val v = http.post("/auth/v1/factors/$fator/verify", buildJsonObject { put("challenge_id", chId); put("code", codigo.filter { it.isDigit() }) }.toString(), bearer = t)
+        if (!v.ok) throw AuthErro(if (v.codigo in 400..422) "Código errado ou vencido. Confira a hora do celular e tente o código novo." else mensagemPorCodigo(v))
+        val nova = parseSessao(v.corpo)
+        guardar(nova)
+        contas.atualizarToken(nova.email.ifBlank { _sessao.value?.email.orEmpty() }, nova.refreshToken)
+        Result.success(Unit)
+    } catch (e: AuthErro) { Result.failure(e) } catch (e: IOException) { Result.failure(AuthErro("Sem conexão com o servidor.")) }
+
+    /** Tira um autenticador da conta. */
+    suspend fun removerFator(fator: String): Result<Unit> = try {
+        val t = tokenValido() ?: throw AuthErro("Entre de novo.")
+        val r = http.requisitar("DELETE", "/auth/v1/factors/$fator", null, bearer = t)
+        if (!r.ok) throw AuthErro(if (r.codigo == 403) "Para remover, entre com o código do autenticador primeiro." else mensagemPorCodigo(r))
+        Result.success(Unit)
+    } catch (e: AuthErro) { Result.failure(e) } catch (e: IOException) { Result.failure(AuthErro("Sem conexão com o servidor.")) }
+
     fun sair() {
         store.limpar()
         _sessao.value = null

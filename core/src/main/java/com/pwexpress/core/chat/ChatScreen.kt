@@ -330,6 +330,22 @@ private fun ConversaAberta(id: String, conv: Conversa?, meuId: String?, gestor: 
                 if (conv?.tipo == "direta" && conv.outro != null) PwBotaoIcone(PwIcones.UserRound, "Ver perfil", { com.pwexpress.core.perfil.PerfilAberto.abrir(conv.outro) })
                 if (conv != null && conv.souMembro) PwBotaoIcone(if (conv.silenciada) PwIcones.BellRing else PwIcones.BellOff, if (conv.silenciada) "Voltar a avisar" else "Silenciar",
                     { escopo.launch { Chat.silenciar(id, !conv.silenciada) } })
+                if (gestor || dev) PwBotaoIcone(PwIcones.Download, "Exportar conversa", {
+                    escopo.launch {
+                        Chat.exportar(id).onSuccess { (nome, txt) ->
+                            runCatching {
+                                val pasta = java.io.File(ctx.cacheDir, "fotos").apply { mkdirs() }
+                                val arq = java.io.File(pasta, "conversa-${nome.replace(Regex("[^\\w-]+"), "-")}.txt").apply { writeText(txt) }
+                                val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.comprovantes", arq)
+                                ctx.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+                                    .putExtra(android.content.Intent.EXTRA_STREAM, uri).putExtra(android.content.Intent.EXTRA_SUBJECT, "Conversa: $nome")
+                                    .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION), "Exportar conversa"))
+                            }.onFailure {
+                                runCatching { ctx.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, txt), "Exportar conversa")) }
+                            }
+                        }.onFailure { PwToast.mostrar("Só gestores exportam conversas.", TipoAviso.ERRO) }
+                    }
+                })
                 if (dev) {
                     var confirmar by remember { mutableStateOf(false) }
                     PwBotaoIcone(PwIcones.Trash2, "Apagar conversa", { confirmar = true }, cor = Color(0xFFEF4444))

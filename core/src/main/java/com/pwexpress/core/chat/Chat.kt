@@ -176,6 +176,20 @@ object Chat {
         }
     }
 
+    /** Gestor: a conversa inteira em texto (quem, quando, o quê), para guardar ou mandar. */
+    suspend fun exportar(conversa: String): Result<Pair<String, String>> = tentar {
+        val o = rpc("chat_exportar", buildJsonObject { put("p_conversa", conversa) }) as? JsonObject ?: error("Não deu para exportar.")
+        val nome = o.t("conversa") ?: "Conversa"
+        val fmt = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale("pt", "BR"))
+        val linhas = (o["mensagens"] as? JsonArray).orEmpty().mapNotNull { e ->
+            val m = e as? JsonObject ?: return@mapNotNull null
+            val quando = instante(m.t("quando"))?.let { fmt.format(java.util.Date(it)) } ?: ""
+            val apagada = (m["apagada"] as? JsonPrimitive)?.booleanOrNull == true
+            "[$quando] ${m.t("autor") ?: ""}: " + if (apagada) "(apagada)" else m.t("texto") ?: "(${m.t("anexo") ?: "anexo"})"
+        }
+        nome to "Conversa: $nome\n\n${linhas.joinToString("\n")}\n"
+    }
+
     suspend fun apagarConversaDev(conversa: String) = tentar { rpc("dev_apagar_conversa", buildJsonObject { put("p_conversa", conversa) }); carregar() }
 
     suspend fun mensagens(conversa: String, limite: Int = 120): Result<List<Mensagem>> = tentar {

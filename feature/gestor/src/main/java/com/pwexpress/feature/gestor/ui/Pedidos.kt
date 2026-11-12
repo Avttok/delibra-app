@@ -227,14 +227,21 @@ private fun JanelaPedido(p: PedidoG, empresa: String?, onFechar: () -> Unit) {
 
         PwCartao(destaque = true) {
             var editando by remember(p.id) { mutableStateOf(false) }
+            var conta by remember(p.id) { mutableStateOf(false) }
+            val fechadoP = p.status in setOf("concluido", "cancelado", "recusado") || p.faturaId != null
+            ValorClienteG(p.id, p.orcamento, p.regras, fechadoP) { bloco -> rodar("Preço salvo.", fechar = false) { bloco() } }
             p.orcamento?.let { o ->
-                if (editando) EditarOrcamentoG(p.id, o, onFechar = { editando = false })
-                else {
-                    OrcamentoG(o, p.pontos)
-                    if (p.status !in setOf("concluido", "cancelado", "recusado") && p.faturaId == null)
-                        PwBotaoVidro("Mudar o cálculo", onClick = { editando = true }, icone = PwIcones.Pencil, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                Spacer(Modifier.size(8.dp))
+                Text(if (conta) "Esconder a conta" else "Ver a conta", color = c.ouro, fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                    modifier = Modifier.clickable { conta = !conta }.padding(vertical = 6.dp))
+                if (conta) {
+                    if (editando) EditarOrcamentoG(p.id, o, onFechar = { editando = false })
+                    else {
+                        OrcamentoG(o, p.pontos)
+                        if (!fechadoP) PwBotaoVidro("Mudar linha a linha", onClick = { editando = true }, icone = PwIcones.Pencil, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                    }
                 }
-            } ?: TextoDica("Sem orçamento.")
+            }
             Spacer(Modifier.size(8.dp))
             Text("Calculado: ${moedaBr(p.valorCalculado)}" + (if (p.valorAjuste != 0.0) " · ajuste ${if (p.valorAjuste > 0) "+" else "−"}${moedaBr(kotlin.math.abs(p.valorAjuste))}" else "") +
                 (p.ajusteMotivo?.takeIf { p.valorAjuste != 0.0 }?.let { " ($it)" } ?: "") + " · " +

@@ -53,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.clip
@@ -298,10 +299,10 @@ fun PwCampo(
 
 /** Linha com interruptor (o toque na linha inteira liga/desliga). */
 @Composable
-fun PwInterruptor(titulo: String, ligado: Boolean, onMudar: (Boolean) -> Unit, modifier: Modifier = Modifier, descricao: String? = null, icone: ImageVector? = null, cor: Color? = null) {
+fun PwInterruptor(titulo: String, ligado: Boolean, onMudar: (Boolean) -> Unit, modifier: Modifier = Modifier, descricao: String? = null, icone: ImageVector? = null, cor: Color? = null, habilitado: Boolean = true) {
     val c = Pw.cores
     Row(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { onMudar(!ligado) }.padding(vertical = 8.dp, horizontal = 2.dp),
+        modifier.fillMaxWidth().alpha(if (habilitado) 1f else 0.5f).clip(RoundedCornerShape(14.dp)).clickable(enabled = habilitado) { onMudar(!ligado) }.padding(vertical = 8.dp, horizontal = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icone != null) {
@@ -314,7 +315,7 @@ fun PwInterruptor(titulo: String, ligado: Boolean, onMudar: (Boolean) -> Unit, m
         }
         Spacer(Modifier.width(10.dp))
         Switch(
-            checked = ligado, onCheckedChange = onMudar,
+            checked = ligado, onCheckedChange = onMudar, enabled = habilitado,
             colors = SwitchDefaults.colors(checkedThumbColor = c.sobreOuro, checkedTrackColor = cor ?: c.ouro, uncheckedTrackColor = c.bordaForte, uncheckedBorderColor = Color.Transparent),
         )
     }

@@ -164,6 +164,7 @@ fun PerfilScreen(
         // ---------------------------------------------------------- veículo (motoboy)
         if (perfil?.motoboy == true) CartaoMeuVeiculo()
         if (perfil?.logico("usuario_troca_senha", true) != false) CartaoSenha()
+        CartaoDoisPassos()
 
         // ---------------------------------------------------------- diagnóstico (administrador)
         if (perfil?.admin == true) {
@@ -348,6 +349,25 @@ private fun EditarMeuVeiculo(atual: kotlinx.serialization.json.JsonObject?, onFe
 
 
 /** Trocar a própria senha (sem depender do gestor). Ajustes → usuario_troca_senha. */
+/** Verificação em dois passos (igual ao site): código do autenticador além da senha. */
+@Composable
+private fun CartaoDoisPassos() {
+    val c = Pw.cores
+    var aberto by remember { mutableStateOf(false) }
+    PwCartao {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(PwIcones.ShieldCheck, null, tint = c.ouro, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f)) {
+                PwRotulo("Verificação em dois passos")
+                Text("Pede um código do autenticador ao entrar.", color = c.texto3, fontSize = 12.5.sp)
+            }
+            com.pwexpress.core.designsystem.PwBotaoVidro("Abrir", onClick = { aberto = true }, icone = PwIcones.ShieldCheck)
+        }
+    }
+    if (aberto) com.pwexpress.core.auth.DoisPassosJanela(onFechar = { aberto = false })
+}
+
 @Composable
 private fun CartaoSenha() {
     val c = Pw.cores

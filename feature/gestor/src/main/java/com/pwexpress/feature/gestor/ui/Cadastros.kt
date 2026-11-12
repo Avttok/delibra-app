@@ -475,6 +475,28 @@ private fun Selos(m: com.pwexpress.feature.gestor.data.MembroG, status: String?)
     }
 }
 
+/** Vagas de cada cargo na empresa (o Dev define): cargo → (usados, limite, pode). */
+private data class Vaga(val usados: Int, val limite: Int?, val pode: Boolean) {
+    fun texto(cargo: String): String? = when {
+        cargo == "gestor" && !pode && (limite == null || usados < limite) -> "Só o suporte da plataforma cria gestores"
+        limite != null -> "$usados de $limite vaga(s) usada(s)" + if (!pode) " · sem vaga" else ""
+        else -> null
+    }
+}
+
+@Composable
+private fun lembrarVagas(org: String? = null): Map<String, Vaga> {
+    var v by remember { mutableStateOf<Map<String, Vaga>>(emptyMap()) }
+    androidx.compose.runtime.LaunchedEffect(org) {
+        Gestao.rpcJson("vagas_da_equipe", kotlinx.serialization.json.buildJsonObject { put("p_org", org?.let { kotlinx.serialization.json.JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull) })
+            .onSuccess { j -> v = (j as? kotlinx.serialization.json.JsonObject)?.mapValues { (_, e) -> val o = e as? kotlinx.serialization.json.JsonObject
+                Vaga(o?.get("usados")?.toString()?.toIntOrNull() ?: 0, o?.get("limite")?.toString()?.toIntOrNull(), o?.get("pode")?.toString() != "false") } ?: emptyMap() }
+    }
+    return v
+}
+
+private fun descVaga(base: String, v: Vaga?, cargo: String) = v?.texto(cargo)?.let { "$base · $it" } ?: base
+
 private fun gerarSenha(): String {
     val l = "abcdefghjkmnpqrstuvwxyz"; val n = "23456789"; val r = java.security.SecureRandom()
     fun p() = (1..4).map { l[r.nextInt(l.length)] }.joinToString("")
@@ -519,10 +541,15 @@ private fun NovaContaG(repassePadrao: Double, onFechar: () -> Unit, onCriada: (S
             PwCampo(senha, { senha = it }, "Senha inicial", modifier = Modifier.weight(1f))
             PwBotaoIcone(PwIcones.RefreshCw, "Gerar outra", { senha = gerarSenha() })
         }
-        if (cliente == null) PwInterruptor("Motoboy", motoboy, { motoboy = it }, descricao = "Usa o app e recebe corridas", icone = PwIcones.Bike)
-        if (cliente == null) PwInterruptor("Gestor", gestor, { gestor = it; if (it) supervisor = false }, descricao = "Acessa o painel", icone = PwIcones.ShieldCheck)
+        val vagas = lembrarVagas()
+        androidx.compose.runtime.LaunchedEffect(vagas["motoboy"]?.pode) { if (vagas["motoboy"]?.pode == false) motoboy = false }
+        if (cliente == null) PwInterruptor("Motoboy", motoboy, { motoboy = it }, descricao = descVaga("Usa o app e recebe corridas", vagas["motoboy"], "motoboy"), icone = PwIcones.Bike,
+            habilitado = motoboy || vagas["motoboy"]?.pode != false)
+        if (cliente == null) PwInterruptor("Gestor", gestor, { gestor = it; if (it) supervisor = false }, descricao = descVaga("Acessa o painel", vagas["gestor"], "gestor"), icone = PwIcones.ShieldCheck,
+            habilitado = gestor || vagas["gestor"]?.pode != false)
         // líder de equipe: faz só o que o gestor liberar (Equipe → pessoa → Permissões)
-        if (cliente == null) PwInterruptor("Supervisor", supervisor, { supervisor = it; if (it) gestor = false }, descricao = "Líder de equipe, com o que o gestor liberar", icone = PwIcones.UserCog, cor = Pw.cores.azul)
+        if (cliente == null) PwInterruptor("Supervisor", supervisor, { supervisor = it; if (it) gestor = false }, descricao = descVaga("Líder de equipe, com o que o gestor liberar", vagas["supervisor"], "supervisor"), icone = PwIcones.UserCog, cor = Pw.cores.azul,
+            habilitado = supervisor || vagas["supervisor"]?.pode != false)
         PwErro(erro)
         PwBotaoOuro(if (enviando) "Criando…" else "Criar conta", icone = PwIcones.UserPlus, habilitado = !enviando, onClick = {
             enviando = true
@@ -595,7 +622,7 @@ fun MembroG(id: String, meuId: String?, onVoltar: () -> Unit) {
                 CompartilharMotoboyG(m.id, m.nome)
             }
             "penalidades" -> PenalidadesG("motoboy", m.id)
-            "editar" -> if (m.dev && !souDev) TextoDica("Conta Dev: só o Dev altera esta conta.") else EditarMembroG(m, eu = m.id == meuId, onExcluida = onVoltar, souDev = souDev)
+            "editar" -> if (m.dev && !souDev) TextoDica("Conta protegida: não dá para alterar.") else EditarMembroG(m, eu = m.id == meuId, onExcluida = onVoltar, souDev = souDev)
         }
     }
 }
@@ -764,9 +791,13 @@ private fun EditarMembroG(m: com.pwexpress.feature.gestor.data.MembroG, eu: Bool
         Espaco(8)
         PwRotulo("Papéis")
         if (souDev) PwInterruptor("Dev", devPapel, { devPapel = it }, descricao = "Administra o sistema inteiro", icone = PwIcones.CodeXml, cor = c.dev)
-        PwInterruptor("Gestor", gestor, { gestor = it; if (it) supervisor = false }, descricao = "Acessa o painel (site e app)", icone = PwIcones.ShieldCheck)
-        PwInterruptor("Supervisor", supervisor, { supervisor = it; if (it) gestor = false }, descricao = "Líder de equipe, com o que o gestor liberar", icone = PwIcones.UserCog, cor = Pw.cores.azul)
-        PwInterruptor("Motoboy", motoboy, { motoboy = it }, descricao = "Usa o app e recebe corridas", icone = PwIcones.Bike)
+        val vagas = lembrarVagas()
+        PwInterruptor("Gestor", gestor, { gestor = it; if (it) supervisor = false }, descricao = descVaga("Acessa o painel (site e app)", vagas["gestor"], "gestor"), icone = PwIcones.ShieldCheck,
+            habilitado = gestor || m.gestor || vagas["gestor"]?.pode != false)
+        PwInterruptor("Supervisor", supervisor, { supervisor = it; if (it) gestor = false }, descricao = descVaga("Líder de equipe, com o que o gestor liberar", vagas["supervisor"], "supervisor"), icone = PwIcones.UserCog, cor = Pw.cores.azul,
+            habilitado = supervisor || m.supervisor || vagas["supervisor"]?.pode != false)
+        PwInterruptor("Motoboy", motoboy, { motoboy = it }, descricao = descVaga("Usa o app e recebe corridas", vagas["motoboy"], "motoboy"), icone = PwIcones.Bike,
+            habilitado = motoboy || m.motoboy || vagas["motoboy"]?.pode != false)
         if (gestor || devPapel) VincularClienteG(m.id, m.nome)
         PwErro(erro)
         msg?.let { Text(it, color = c.verde, fontWeight = FontWeight.SemiBold) }
@@ -842,7 +873,7 @@ private fun EditarMembroG(m: com.pwexpress.feature.gestor.data.MembroG, eu: Bool
 fun FinanceiroG(onVoltar: (() -> Unit)?) {
     var aba by remember { mutableIntStateOf(0) }
     val abas: @Composable () -> Unit = {
-        PwFiltros(listOf("Resumo" to 0, "Faturas" to 0, "Folha" to 0, "Clientes" to 0, "Extrato" to 0, "PIX" to 0), aba, { aba = it })
+        PwFiltros(listOf("Resumo" to 0, "Faturas" to 0, "Folha" to 0, "Clientes" to 0, "Extrato" to 0, "Relatórios" to 0, "PIX" to 0), aba, { aba = it })
     }
     when (aba) {
         0 -> ResumoCarteiraG(onVoltar, abas)
@@ -850,6 +881,7 @@ fun FinanceiroG(onVoltar: (() -> Unit)?) {
         2 -> FolhaG(onVoltar, abas)
         3 -> ClientesCarteiraG(onVoltar, abas)
         4 -> ExtratoCarteiraG(onVoltar, abas)
+        5 -> RelatoriosG(onVoltar, abas)
         else -> PixCarteiraG(onVoltar, abas)
     }
 }

@@ -1,6 +1,9 @@
 package com.pwexpress.feature.gestor.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -320,6 +323,7 @@ private fun HoleriteG(linha: JsonObject, ini: String, fim: String, teste: Boolea
     var versao by remember { mutableIntStateOf(0) }
     var desc by remember { mutableStateOf("") }
     var valor by remember { mutableStateOf("") }
+    var vis by remember { mutableStateOf("tudo") }
     var erro by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(mid, ini, fim, versao) {
         h = Gestao.rpcJson("holerite", buildJsonObject { put("p_motoboy", mid); put("p_inicio", ini); put("p_fim", fim); put("p_teste", teste) }).getOrNull() as? JsonObject
@@ -365,11 +369,21 @@ private fun HoleriteG(linha: JsonObject, ini: String, fim: String, teste: Boolea
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             PwRotulo("Ajustes do período"); Spacer(Modifier.width(8.dp))
-            com.pwexpress.core.designsystem.PwDica("Ajustes", "Bônus (valor positivo) ou desconto (com −). O motoboy não vê o motivo: o total do ajuste aparece repartido entre as rotas do holerite dele.")
+            com.pwexpress.core.designsystem.PwDica("Ajustes", "Bônus (valor positivo) ou desconto (com −). Em cada ajuste você escolhe o que o motoboy vê: tudo, só o valor (aparece como \"Ajuste\") ou nada (não aparece para ele nem no total dele).")
         }
         x.arr("ajustes").forEach { a ->
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(a.str("descricao").orEmpty(), color = c.texto, modifier = Modifier.weight(1f))
+                Column(Modifier.weight(1f)) {
+                    Text(a.str("descricao").orEmpty(), color = c.texto)
+                    val vAt = a.str("visibilidade") ?: "tudo"
+                    val (rot, ic) = VIS_AJUSTE[vAt] ?: VIS_AJUSTE.getValue("tudo")
+                    Row(Modifier.padding(top = 2.dp).clip(RoundedCornerShape(99.dp)).background(c.vidro)
+                        .clickable(enabled = st == "aberto") { rodar("O motoboy agora vê: ${VIS_AJUSTE[proximaVis(vAt)]?.first?.lowercase()}.", "ajuste_holerite_visibilidade") { put("p_id", a.str("id")!!); put("p_visibilidade", proximaVis(vAt)) } }
+                        .padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(ic, null, tint = c.texto3, modifier = Modifier.size(12.dp)); Spacer(Modifier.width(4.dp))
+                        Text("Motoboy vê: ${rot.lowercase()}", color = c.texto3, fontSize = 11.5.sp)
+                    }
+                }
                 Text(moedaBr(a.dbl("valor")), color = if ((a.dbl("valor") ?: 0.0) >= 0) c.verde else c.vermelho, fontWeight = FontWeight.SemiBold)
                 if (st == "aberto") PwBotaoIcone(PwIcones.Trash2, "Remover", { rodar("Ajuste removido.", "remover_ajuste_holerite") { put("p_ajuste", a.str("id")!!) } }, tamanho = 32.dp, cor = c.vermelho)
             }
@@ -379,10 +393,14 @@ private fun HoleriteG(linha: JsonObject, ini: String, fim: String, teste: Boolea
                 PwCampo(desc, { desc = it }, "Descrição", dica = "Ex.: bônus, vale", modifier = Modifier.weight(2f))
                 PwCampo(valor, { valor = it }, "R$ (+/−)", modifier = Modifier.weight(1f))
             }
+            Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                VIS_AJUSTE.forEach { (k, v) -> com.pwexpress.core.designsystem.PwPilula(v.first, v.second, { vis = k }, ligada = vis == k) }
+            }
+            TextoDica(when (vis) { "valor" -> "O motoboy vê só o valor, como \"Ajuste\"."; "oculto" -> "O motoboy não vê este ajuste (nem no total dele)."; else -> "O motoboy vê a descrição e o valor." })
             PwBotaoVidro("Adicionar ajuste", onClick = {
                 val v = valor.replace('−', '-').replace('–', '-').replace("R$", "").replace(" ", "").replace(',', '.').toDoubleOrNull()?.takeIf { it != 0.0 }
                 if (desc.isBlank() || v == null) { erro = "Descreva e informe um valor diferente de zero (use − para desconto)."; return@PwBotaoVidro }
-                rodar("Ajuste adicionado.", "ajuste_holerite") { put("p_motoboy", mid); put("p_inicio", ini); put("p_fim", fim); put("p_descricao", desc.trim()); put("p_valor", v); put("p_teste", teste) }
+                rodar("Ajuste adicionado.", "ajuste_holerite") { put("p_motoboy", mid); put("p_inicio", ini); put("p_fim", fim); put("p_descricao", desc.trim()); put("p_valor", v); put("p_teste", teste); put("p_visibilidade", vis) }
                 desc = ""; valor = ""
             }, icone = PwIcones.Plus, modifier = Modifier.fillMaxWidth())
         }
@@ -400,3 +418,6 @@ private fun HoleriteG(linha: JsonObject, ini: String, fim: String, teste: Boolea
 }
 
 @Suppress("unused") private val semUso: JsonElement = JsonNull
+
+private val VIS_AJUSTE = linkedMapOf("tudo" to ("Tudo" to PwIcones.Eye), "valor" to ("Só o valor" to PwIcones.EyeOff), "oculto" to ("Nada" to PwIcones.Lock))
+private fun proximaVis(v: String) = when (v) { "tudo" -> "valor"; "valor" -> "oculto"; else -> "tudo" }

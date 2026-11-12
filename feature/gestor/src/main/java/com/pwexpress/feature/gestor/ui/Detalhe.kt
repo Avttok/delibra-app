@@ -330,6 +330,13 @@ fun DetalheCorridaG(id: String, onVoltar: () -> Unit) {
             }
         }
 
+        if (corrida.status == Status.CANCELADA) {
+            PwBotaoVidro("Voltar para revisão", onClick = {
+                acao { Gestao.rpcJson("reabrir_corrida", kotlinx.serialization.json.buildJsonObject { put("p_corrida", kotlinx.serialization.json.JsonPrimitive(corrida.id)) })
+                    .map { j -> com.pwexpress.core.designsystem.PwToast.mostrar(if ((j as? kotlinx.serialization.json.JsonObject)?.get("rota")?.toString()?.contains("montada") == true)
+                        "A rota voltou a \"montada\": solte de novo quando quiser." else "Os pedidos desta rota voltaram para a revisão.") } }
+            }, icone = PwIcones.RotateCcw, habilitado = !ocupado, modifier = Modifier.fillMaxWidth())
+        }
         if (corrida.status != Status.CONCLUIDA && corrida.status != Status.CANCELADA) {
             PwBotaoPerigo("Cancelar corrida", onClick = { cancelarPergunta = true }, icone = PwIcones.CircleX, habilitado = !ocupado, modifier = Modifier.fillMaxWidth())
         }

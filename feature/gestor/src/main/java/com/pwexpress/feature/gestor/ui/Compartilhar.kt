@@ -60,7 +60,7 @@ private fun EscolhaCompartilhar(opcoes: List<Triple<String, String, androidx.com
     }
 }
 
-/** Ajustes → Despacho: com quem a empresa compartilha os motoboys (se o Dev deixar). */
+/** Ajustes → Despacho: com quem a empresa compartilha os motoboys (se a plataforma deixar). */
 @Composable
 internal fun CompartilharEmpresaG() {
     val c = Pw.cores
@@ -75,19 +75,19 @@ internal fun CompartilharEmpresaG() {
             PwRotulo("Seus motoboys em outras empresas")
         }
         Espaco(4)
-        if (!x.bool("permitido")) { TextoDica("O Dev não liberou o compartilhamento de motoboys entre empresas."); return@PwCartao }
+        if (!x.bool("permitido")) { TextoDica("A plataforma não liberou o compartilhamento de motoboys entre empresas."); return@PwCartao }
         TextoDica("Rotas de outras empresas podem chegar aos seus motoboys (sempre depois dos motoboys delas). Cada motoboy pode ter a escolha dele em Equipe → motoboy → Regras.")
         Espaco(8)
         val empresas = x.arr("empresas").map { it.str("id").orEmpty() to (it.str("nome") ?: "Empresa") }
         EscolhaCompartilhar(listOf(
-            Triple("padrao", "Como o Dev definiu", PwIcones.CodeXml), Triple("nenhuma", "Nenhuma", PwIcones.Lock),
+            Triple("padrao", "Padrão da plataforma", PwIcones.CodeXml), Triple("nenhuma", "Nenhuma", PwIcones.Lock),
             Triple("todas", "Todas", PwIcones.Globe), Triple("escolhidas", "Escolher", PwIcones.ListChecks),
         ), x.str("modo") ?: "padrao", x.strs("orgs").toSet(), empresas) { modo, orgs ->
             escopo.launch {
                 salvarCompartilhamento(modo, orgs, null).onSuccess { PwToast.mostrar("Compartilhamento salvo."); carregarCompartilhamento().onSuccess { d = it } }.onFailure { erro = it.message }
             }
         }
-        if ((x.str("modo") ?: "padrao") == "padrao") TextoDica(if (x.bool("padrao_dev")) "Hoje: o Dev deixa seus motoboys receberem de outras empresas." else "Hoje: o Dev não manda rotas de outras empresas para os seus motoboys.")
+        if ((x.str("modo") ?: "padrao") == "padrao") TextoDica(if (x.bool("padrao_dev")) "Hoje: a plataforma deixa seus motoboys receberem de outras empresas." else "Hoje: o Dev não manda rotas de outras empresas para os seus motoboys.")
         PwErro(erro)
     }
 }

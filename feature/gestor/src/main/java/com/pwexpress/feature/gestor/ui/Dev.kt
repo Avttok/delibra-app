@@ -103,14 +103,23 @@ fun DevG(onVoltar: () -> Unit) {
 
     PwPagina {
         Cabecalho("Console Dev", onVoltar, subtitulo = "O sistema inteiro, sem filtro")
-        PwFiltros(listOf("Empresas" to 0, "Faturamento" to 0, "Módulos" to 0, "Sistema" to 0, "Aparelhos" to 0, "Registro" to 0, "Versão do app" to 0, "Tarefas" to 0, "Apagar" to 0), aba, { aba = it })
+        // mesmas áreas do console do site: Agora · Negócio · Sistema
+        PwFiltros(listOf("Visão geral" to 0, "Saúde" to 0, "Aparelhos" to 0, "Tarefas" to 0, "Empresas" to 0, "Usuários" to 0, "Faturamento" to 0,
+            "Módulos" to 0, "Integrações" to 0, "Versão do app" to 0, "Conversas" to 0, "Registro" to 0, "Apagar" to 0), aba, { aba = it })
         PwErro(erro)
-        if (aba == 0) { DevEmpresasG(); return@PwPagina }
-        if (aba == 1) { DevFaturamentoG(); DevPagamentosG(); return@PwPagina }
-        val sub = aba - 2
-        if (sub == 4) { VersaoAppG(); return@PwPagina }
-        if (sub == 6) { ApagarTudoG(); return@PwPagina }
-        if (sub == 5) { TarefasDevG(painel?.arr("tarefas"), onMudou = { escopo.launch { carregar() } }); return@PwPagina }
+        when (aba) {
+            1 -> { DevSaudeG(); return@PwPagina }
+            3 -> { TarefasDevG(painel?.arr("tarefas"), onMudou = { escopo.launch { carregar() } }); return@PwPagina }
+            4 -> { DevEmpresasG(); return@PwPagina }
+            5 -> { DevUsuariosG(); return@PwPagina }
+            6 -> { DevFaturamentoG(); DevPagamentosG(); return@PwPagina }
+            8 -> { DevIntegracoesG(); return@PwPagina }
+            9 -> { VersaoAppG(); return@PwPagina }
+            10 -> { DevConversasG(); return@PwPagina }
+            12 -> { ApagarTudoG(); return@PwPagina }
+        }
+        val sub = when (aba) { 7 -> 0; 0 -> 1; 2 -> 2; else -> 3 }
+        if (sub == 1) DevOcultoG()
         when (sub) {
             0 -> {
                 val l = modulos ?: run { PwCarregando(); return@PwPagina }

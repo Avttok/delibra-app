@@ -199,8 +199,11 @@ class MainActivity : ComponentActivity() {
                     val o = oferta
                     val a = ativa
 
+                    val doisPassos by com.pwexpress.core.auth.DoisPassos.pendente.collectAsState()
+                    LaunchedEffect(sessao?.userId) { com.pwexpress.core.auth.DoisPassos.pendente.value = null; if (sessao != null) runCatching { com.pwexpress.core.auth.DoisPassos.conferir() }.onFailure { com.pwexpress.core.auth.DoisPassos.pendente.value = "" } }
                     when {
                         s == null -> LoginScreen(conteudo)
+                        !doisPassos.isNullOrEmpty() -> com.pwexpress.core.auth.PedirCodigoTela(doisPassos!!, onSair = ::sair, modifier = conteudo)
                         (p == null || !dadosProntos) && !esperouPerfil -> com.pwexpress.motoboy.ui.SplashMarca(if (p == null) "Carregando sua conta…" else "Preparando tudo…")
                         p == null && !esperouPerfil -> Box(conteudo.fillMaxSize(), contentAlignment = Alignment.Center) {
                             androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {

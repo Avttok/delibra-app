@@ -83,6 +83,13 @@ object Gestao {
 
     /** Recarrega tudo (o app chama a cada poucos segundos enquanto o painel está aberto). */
     suspend fun atualizar() = mutex.withLock {
+        // Nunca segura o app: se o servidor travar, desiste em 25 s e a próxima volta tenta de novo
+        // (antes uma busca presa deixava tudo, até as ações, esperando na fila por minutos).
+        if (kotlinx.coroutines.withTimeoutOrNull(25_000) { atualizarDentro() } == null)
+            _erro.value = "O servidor demorou para responder. Tentando de novo…"
+    }
+
+    private suspend fun atualizarDentro() {
         if (!Permissoes.estado.value.carregou) Permissoes.carregar()
         tentar {
             val desde = Instant.now().minusSeconds(30L * 86400).toString()

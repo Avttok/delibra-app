@@ -13,6 +13,7 @@ import com.pwexpress.core.json.objeto
 import com.pwexpress.core.json.str
 import com.pwexpress.core.json.strs
 import com.pwexpress.core.network.ErroServidor
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,6 +77,8 @@ object Gestao {
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
     private var voltas = 0
+    private val fundo = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+    private var trilhaJob: kotlinx.coroutines.Job? = null
     private var ultimoTeste: Boolean? = null
 
     /** Recarrega tudo (o app chama a cada poucos segundos enquanto o painel está aberto). */
@@ -94,17 +97,22 @@ object Gestao {
                 val teste = com.pwexpress.core.designsystem.TemaApp.modoTeste.value
                 val trocouModo = teste != ultimoTeste
                 ultimoTeste = teste
-                val trilha = if (voltas++ % 5 == 0 || !_dados.value.carregado || trocouModo) async {
+                if (trocouModo) trilhaJob?.cancel()
+                // percursos à parte: o resto (pedidos, rotas, equipe) aparece na hora, sem esperar o traçado pelas ruas
+                if ((voltas++ % 5 == 0 || !_dados.value.carregado || trocouModo) && trilhaJob?.isActive != true) trilhaJob = fundo.launch {
                     val desde12h = Instant.now().minusSeconds(12L * 3600).toString()
                     // pelo site: todos os pings (sem o corte de 1000) e o caminho já casado com as ruas
-                    com.pwexpress.core.mapa.PercursosServidor.buscar(Instant.parse(desde12h), Instant.now().plusSeconds(600), teste = teste)?.let { r ->
+                    val r = com.pwexpress.core.mapa.PercursosServidor.buscar(Instant.parse(desde12h), Instant.now().plusSeconds(600), teste = teste)?.let { r ->
                         r.pings.groupBy({ it.motoboy }, { PontoTrilha(null, it.ping.status, it.ping.lat, it.ping.lng, it.ping.quando, it.ping.corridaId) }) to r.ajustes
                     } ?: tentar {
                         rpc.rest("GET", "/rest/v1/localizacoes?select=motoboy_id,sessao_id,status,lat,lng,registrado_em,corrida_id&teste=eq.$teste&registrado_em=gte.${enc(desde12h)}&order=registrado_em.asc&limit=8000").exigirOk().lista()
                             .mapNotNull { o -> val la = o.dbl("lat"); val lo = o.dbl("lng"); if (la == null || lo == null) null else o.str("motoboy_id")!! to PontoTrilha(o.str("sessao_id"), o.str("status") ?: "", la, lo, iso(o.str("registrado_em")) ?: 0, o.str("corrida_id")) }
                             .groupBy({ it.first }, { it.second }) to emptyMap<String, com.pwexpress.core.mapa.PercursosServidor.Ajuste>()
                     }.getOrNull()
-                } else null
+                    // só vale se o modo (teste/real) não mudou enquanto buscava
+                    if (r != null && com.pwexpress.core.designsystem.TemaApp.modoTeste.value == teste)
+                        _dados.value = _dados.value.copy(trilhas = r.first, ajustesTrilha = r.second)
+                }
                 val empresas = async { rpc.rest("GET", "/rest/v1/empresas?select=*&order=nome").exigirOk().lista() }
                 val fav = async { rpc.rest("GET", "/rest/v1/empresa_favoritos?select=empresa_id,motoboy_id,ordem&order=ordem").exigirOk().lista() }
                 // ajustes da empresa (padrão da plataforma + o que a empresa mudou)
@@ -117,7 +125,6 @@ object Gestao {
                     }.getOrDefault(_dados.value.pedidos)
                 }
                 val icones = async { tentar { rpc.rest("GET", "/rest/v1/perfis?select=id,icone&icone=not.is.null").exigirOk().lista().associate { it.str("id")!! to it.str("icone")!! } }.getOrDefault(emptyMap()) }
-                val trilhaR = trilha?.await()
                 val todos = equipe.await().map { it.paraMembroG() }
                 val vinc = vinculos.await()
                 _dados.value = Dados(
@@ -129,8 +136,8 @@ object Gestao {
                     empresas = empresas.await().map { it.paraEmpresaG() },
                     favoritos = fav.await().groupBy({ it.str("empresa_id")!! }, { it.str("motoboy_id")!! }),
                     config = cfg.await().toMap(),
-                    trilhas = trilhaR?.first ?: _dados.value.trilhas,
-                    ajustesTrilha = trilhaR?.second ?: _dados.value.ajustesTrilha,
+                    trilhas = if (trocouModo) emptyMap() else _dados.value.trilhas,
+                    ajustesTrilha = if (trocouModo) emptyMap() else _dados.value.ajustesTrilha,
                     pedidos = pedidos.await(),
                     icones = icones.await(),
                     carregado = true,
@@ -141,7 +148,7 @@ object Gestao {
         Unit
     }
 
-    fun limpar() { _dados.value = Dados(); Permissoes.limpar() }
+    fun limpar() { trilhaJob?.cancel(); _dados.value = Dados(); Permissoes.limpar() }
 
     // ------------------------------------------------------------------ corridas
 

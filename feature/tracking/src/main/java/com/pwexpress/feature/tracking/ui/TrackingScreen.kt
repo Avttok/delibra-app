@@ -490,9 +490,11 @@ fun PainelAparelho() {
             ItemPermissao("Notificações", perms.notificacoes) { pedirBasicas.launch(Permissoes.basicas()) }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            ItemPermissao("Localização \"o tempo todo\"", perms.segundoPlano, habilitado = perms.localizacao) {
-                pedirSegundoPlano.launch(Permissoes.SEGUNDO_PLANO)
-            }
+            var avisoFundo by remember { mutableStateOf(false) }
+            ItemPermissao("Localização \"o tempo todo\"", perms.segundoPlano, habilitado = perms.localizacao) { avisoFundo = true }
+            // a Play Store exige explicar antes de pedir a localização em segundo plano
+            if (avisoFundo) com.pwexpress.core.designsystem.PwConfirmar("Uso da localização", "Este app coleta a sua localização para oferecer rotas perto de você, mostrar a entrega no mapa para a empresa e para quem recebe, e registrar o trajeto feito, inclusive quando o app está fechado ou a tela está apagada.\n\nIsso só acontece enquanto você está online ou em corrida. Ao ficar offline, o envio para. Detalhes na política de privacidade.", "Continuar",
+                onConfirmar = { avisoFundo = false; pedirSegundoPlano.launch(Permissoes.SEGUNDO_PLANO) }, onCancelar = { avisoFundo = false }, perigo = false)
         }
         ItemPermissao("Sem restrição de bateria", perms.semRestricaoBateria) { Permissoes.pedirSemRestricaoBateria(ctx) }
         if (!perms.tudoOk) {

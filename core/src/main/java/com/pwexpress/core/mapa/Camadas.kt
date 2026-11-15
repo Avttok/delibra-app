@@ -46,6 +46,9 @@ data class RegistroPercurso(
 }
 
 private const val LACUNA_MS = 20 * 60_000L
+/** Sem sinal: mais de 5 min sem ping e mais de 500 m adiante = outro registro (não liga em reta). Igual no servidor e no site. */
+private const val SEM_SINAL_MS = 5 * 60_000L
+private const val SEM_SINAL_M = 500.0
 
 fun separarRegistros(pings: List<PingMapa>): List<RegistroPercurso> {
     val out = mutableListOf<RegistroPercurso>()
@@ -55,7 +58,9 @@ fun separarRegistros(pings: List<PingMapa>): List<RegistroPercurso> {
         if (p.status == "offline" || !coordenadaValida(p.lat, p.lng)) { if (p.status == "offline") atual = null; continue }
         val corrida = p.status == "em_corrida"
         val cid = if (corrida) p.corridaId else null
-        if (atual == null || tipoAtual != corrida || corridaAtual != cid || p.quando - anterior > LACUNA_MS) {
+        val u = atual?.lastOrNull()
+        val semSinal = u != null && p.quando - anterior > SEM_SINAL_MS && distanciaM(u.lat, u.lng, p.lat, p.lng) > SEM_SINAL_M
+        if (atual == null || tipoAtual != corrida || corridaAtual != cid || p.quando - anterior > LACUNA_MS || semSinal) {
             atual?.let { out += RegistroPercurso(tipoAtual, corridaAtual, it.toList()) }
             atual = mutableListOf(); tipoAtual = corrida; corridaAtual = cid
         }

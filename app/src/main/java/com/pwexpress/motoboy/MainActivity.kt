@@ -205,9 +205,16 @@ class MainActivity : ComponentActivity() {
 
                     val doisPassos by com.pwexpress.core.auth.DoisPassos.pendente.collectAsState()
                     LaunchedEffect(sessao?.userId) { com.pwexpress.core.auth.DoisPassos.pendente.value = null; if (sessao != null) runCatching { com.pwexpress.core.auth.DoisPassos.conferir() }.onFailure { com.pwexpress.core.auth.DoisPassos.pendente.value = "" } }
+                    val termos by com.pwexpress.core.auth.Termos.pendente.collectAsState()
+                    // termos: confere depois do login e dos dois passos (o mesmo aceite vale no site)
+                    LaunchedEffect(sessao?.userId, doisPassos) {
+                        if (sessao != null && doisPassos == "") runCatching { com.pwexpress.core.auth.Termos.conferir() }.onFailure { com.pwexpress.core.auth.Termos.pendente.value = "" }
+                        else if (sessao == null) com.pwexpress.core.auth.Termos.pendente.value = null
+                    }
                     when {
                         s == null -> LoginScreen(conteudo)
                         !doisPassos.isNullOrEmpty() -> com.pwexpress.core.auth.PedirCodigoTela(doisPassos!!, onSair = ::sair, modifier = conteudo)
+                        !termos.isNullOrEmpty() -> com.pwexpress.core.auth.AceiteTermosTela(termos!!, onSair = ::sair, modifier = conteudo)
                         (p == null || !dadosProntos) && !esperouPerfil -> com.pwexpress.motoboy.ui.SplashMarca(if (p == null) "Carregando sua conta…" else "Preparando tudo…")
                         p == null && !esperouPerfil -> Box(conteudo.fillMaxSize(), contentAlignment = Alignment.Center) {
                             androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {

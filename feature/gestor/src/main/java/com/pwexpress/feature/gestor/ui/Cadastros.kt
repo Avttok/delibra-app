@@ -842,15 +842,23 @@ private fun EditarMembroG(m: com.pwexpress.feature.gestor.data.MembroG, eu: Bool
             }
         }
     }
-    if (excluindo) {
+    if (excluindo) JanelaExcluirContaG(m.id, m.nome, m.email, onFechar = { excluindo = false }, onExcluida = onExcluida)
+}
+
+/** Excluir uma conta de vez (manter o histórico ou apagar tudo), com a senha de quem exclui. Usado em Pessoas e no Dev. */
+@Composable
+internal fun JanelaExcluirContaG(id: String, nome: String, email: String?, onFechar: () -> Unit, onExcluida: () -> Unit) {
+    val c = Pw.cores
+    val escopo = rememberCoroutineScope()
+    run {
         var senha by remember { mutableStateOf("") }
         var motivo by remember { mutableStateOf("") }
         var entendi by remember { mutableStateOf(false) }
         var completo by remember { mutableStateOf(false) }
         var errExc by remember { mutableStateOf<String?>(null) }
         var enviando by remember { mutableStateOf(false) }
-        PwJanela("Excluir ${m.nome}?", onFechar = { excluindo = false }, fecharFora = !enviando) {
-            PwErro("${m.email} deixa de existir: não entra mais no app nem no painel. Não dá para desfazer.")
+        PwJanela("Excluir $nome?", onFechar = onFechar, fecharFora = !enviando) {
+            PwErro("${email ?: nome} deixa de existir: não entra mais no app nem no painel. Não dá para desfazer.")
             com.pwexpress.core.designsystem.PwSegmentado(listOf("Manter o histórico" to PwIcones.History, "Apagar tudo" to PwIcones.Trash2), if (completo) 1 else 0, { completo = it == 1 }, Modifier.fillMaxWidth())
             TextoDica(if (completo) "Some também o e-mail, a cópia no registro, as mensagens, o jogo e o PIX. Nas rotas fica só “Conta apagada”."
                 else "As rotas continuam com o nome da pessoa e fica uma cópia no registro.")
@@ -861,13 +869,14 @@ private fun EditarMembroG(m: com.pwexpress.feature.gestor.data.MembroG, eu: Bool
             PwBotaoPerigo(if (enviando) "Excluindo…" else "Excluir de vez", cheio = true, habilitado = entendi && senha.isNotEmpty() && !enviando, modifier = Modifier.fillMaxWidth(), onClick = {
                 enviando = true
                 escopo.launch {
-                    Gestao.excluirConta(m.id, senha, motivo.trim().ifEmpty { null }, completo).onSuccess { excluindo = false; Gestao.atualizar(); onExcluida() }.onFailure { errExc = it.message; senha = "" }
+                    Gestao.excluirConta(id, senha, motivo.trim().ifEmpty { null }, completo).onSuccess { onFechar(); Gestao.atualizar(); onExcluida() }.onFailure { errExc = it.message; senha = "" }
                     enviando = false
                 }
             })
         }
     }
 }
+
 
 // =====================================================================
 // Carteira

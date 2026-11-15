@@ -74,6 +74,7 @@ fun PrimeiraConfiguracao(onPronto: () -> Unit, modifier: Modifier = Modifier) {
     val c = Pw.cores
     var estado by remember { mutableStateOf(lerPreparo(ctx)) }
     var tentativasSegundoPlano by remember { mutableIntStateOf(0) }
+    var avisoFundo by remember { mutableStateOf(false) }
 
     LifecycleResumeEffect(Unit) {
         estado = lerPreparo(ctx)
@@ -124,8 +125,12 @@ fun PrimeiraConfiguracao(onPronto: () -> Unit, modifier: Modifier = Modifier) {
             else "Para o GPS continuar com a tela apagada.",
             estado.segundoPlano, habilitado = estado.base,
         ) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) pedirSegundoPlano.launch(Permissoes.SEGUNDO_PLANO)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) avisoFundo = true
         }
+        // a Play Store exige explicar antes de pedir a localização em segundo plano
+        if (avisoFundo) com.pwexpress.core.designsystem.PwConfirmar("Uso da localização", "Este app coleta a sua localização para oferecer rotas perto de você, mostrar a entrega no mapa para a empresa e para quem recebe, e registrar o trajeto feito, inclusive quando o app está fechado ou a tela está apagada.\n\nIsso só acontece enquanto você está online ou em corrida. Ao ficar offline, o envio para. Detalhes na política de privacidade.", "Continuar",
+            onConfirmar = { avisoFundo = false; if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) pedirSegundoPlano.launch(Permissoes.SEGUNDO_PLANO) },
+            onCancelar = { avisoFundo = false }, perigo = false)
         Passo(4, PwIcones.BatteryLow, "Sem restrição de bateria", "Para o Android não pausar o app.", estado.bateria) {
             Permissoes.pedirSemRestricaoBateria(ctx)
         }

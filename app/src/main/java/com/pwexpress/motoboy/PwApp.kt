@@ -30,6 +30,7 @@ class PwApp : Application() {
         TemaApp.init(this)
         com.pwexpress.core.designsystem.PwTour.init(this)
         PwCore.init(this)
+        com.pwexpress.core.erros.RelatorioErros.init(this, "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
         Tracking.init(this, BuildConfig.VERSION_NAME)
         Corridas.init(this)
         Atualizador.init(this, BuildConfig.VERSION_CODE)

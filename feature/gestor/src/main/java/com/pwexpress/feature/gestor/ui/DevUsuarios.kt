@@ -154,6 +154,7 @@ private fun UsuarioDevG(u: JsonObject, orgs: List<Pair<String, String>>, aberto:
     var ocupado by remember { mutableStateOf(false) }
     var senha by remember { mutableStateOf<String?>(null) }
     var escolherOrg by remember { mutableStateOf(false) }
+    var excluir by remember { mutableStateOf(false) }
     val mb = u.obj("motoboy")
     val online = mb != null && mb.str("status") != "offline"
     val bloqueado = u.bool("bloqueado")
@@ -207,8 +208,39 @@ private fun UsuarioDevG(u: JsonObject, orgs: List<Pair<String, String>>, aberto:
                 if (online) PwBotaoVidro("Deixar offline", icone = PwIcones.Power, habilitado = !ocupado, modifier = Modifier.fillMaxWidth(), onClick = {
                     rodar("Motoboy ficou offline.") { Gestao.rpcJson("dev_forcar_offline", buildJsonObject { put("p_motoboy", id) }) }
                 })
+                // a conta Dev nunca é excluída daqui
+                if ("dev" !in papeisOrig) PwBotaoPerigo("Excluir conta", { excluir = true }, modifier = Modifier.fillMaxWidth())
                 senha?.let { Text("E-mail: ${u.str("email")}\nSenha: $it", fontFamily = FontFamily.Monospace, color = c.texto,
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.campo).padding(12.dp)) }
+            }
+        }
+    }
+    if (excluir) JanelaExcluirContaG(id, u.str("nome").orEmpty(), u.str("email"), onFechar = { excluir = false }, onExcluida = { PwToast.mostrar("Conta excluída."); onMudou() })
+}
+
+/** Travamentos e erros do app nos últimos 7 dias, do mais frequente ao menos (o app manda sozinho). */
+@Composable
+private fun DevTravamentosG() {
+    val c = Pw.cores
+    var e by remember { mutableStateOf<JsonObject?>(null) }
+    var aberto by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) { Gestao.rpcJson("dev_erros_app", buildJsonObject { put("p_dias", 7) }).onSuccess { e = it as? JsonObject } }
+    val d = e ?: return
+    val lista = d.arr("lista")
+    PwCartao {
+        PwRotulo("Travamentos do app · 7 dias")
+        if (lista.isEmpty()) { TextoDica("Nenhum travamento. Tudo certo."); return@PwCartao }
+        TextoDica("${d.int("total") ?: 0} ocorrências em ${d.int("aparelhos") ?: 0} aparelho(s).")
+        lista.forEach { x ->
+            val ass = x.str("assinatura").orEmpty()
+            Column(Modifier.fillMaxWidth().padding(top = 8.dp).clip(RoundedCornerShape(10.dp)).clickable { aberto = if (aberto == ass) null else ass }.padding(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(x.str("mensagem").orEmpty().ifBlank { "Erro sem mensagem" }, color = c.texto, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    PwSelo("${x.int("quantas") ?: 0}×", if (x.str("tipo") == "travou") c.vermelho else c.ouro)
+                }
+                Text("${x.int("pessoas") ?: 0} pessoa(s) · ${x.str("aparelho").orEmpty()} · ${x.str("tela").orEmpty()} · ${haQuanto(x.str("ultimo_em"))}", color = c.texto3, fontSize = 11.sp)
+                if (aberto == ass) Text(x.str("pilha").orEmpty().lines().take(14).joinToString("\n"), fontFamily = FontFamily.Monospace, color = c.texto2, fontSize = 10.sp,
+                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp).clip(RoundedCornerShape(8.dp)).background(c.campo).padding(8.dp))
             }
         }
     }
@@ -244,6 +276,7 @@ internal fun DevSaudeG() {
         }
     })
     TextoDica("Tira pontos repetidos de rotas antigas e deixa um a cada intervalo fora de rota (Ajustes → Rastreamento).")
+    DevTravamentosG()
     PwCartao {
         PwRotulo("Maiores tabelas")
         val tab = d.arr("tabelas"); val max = (tab.maxOfOrNull { it.dbl("mb") ?: 0.0 } ?: 1.0).coerceAtLeast(0.1)

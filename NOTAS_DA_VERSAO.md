@@ -1,18 +1,19 @@
 ## Delibra · novidades
 
-**Para todos**
-- **Termos de uso e privacidade**: na primeira vez que entrar, o app pede para ler e aceitar. Os dois ficam no site, em /termos e /privacidade.
-- **Travou? A gente fica sabendo**: se o app fechar sozinho, o erro chega para o suporte na próxima vez que você abrir, sem precisar fazer nada.
+**O sistema do jeito da sua empresa** (Ajustes → Pedidos, rotas e despacho, e Ajustes → Preço)
+- **Campos próprios**: crie campos no pedido (número da nota, centro de custo), na parada (dinheiro recebido, temperatura, foto da nota), no cadastro do cliente e no do motoboy. Escolha o tipo, se é obrigatório e quem preenche.
+- **Nomes próprios**: troque os nomes dos status e das paradas ("Coleta" vira "Retirada na farmácia", "Para revisar" vira "Aguardando conferência").
+- **Taxas e bônus**: monte linhas a mais no preço e no pagamento: espera por minuto, pedágio, seguro sobre o valor declarado, adicional noturno ou de fim de semana, bônus por veículo, com mínimo, máximo e horário.
+- **Cargos**: crie cargos como Atendente ou Financeiro, com as permissões prontas, e dê a quem é supervisor.
+- **Veículo**: escolha quais veículos podem levar as rotas de cada cliente ou tipo de pedido. A oferta só vai para quem tem o veículo certo, e o cliente pode escolher quando você deixar.
 
 **Para o motoboy**
-- **Uso da localização explicado**: antes de pedir "Permitir o tempo todo", o app mostra para que serve a localização e quando ela é enviada.
-- **Percurso sem retas falsas**: quando o celular fica sem sinal, o mapa deixa o trecho em branco em vez de ligar os pontos com uma reta.
-
-**Para o gestor**
-- **API para lojas virtuais**: em Clientes → empresa → API, gere uma chave para a loja criar e acompanhar pedidos sozinha, e cadastre o endereço que recebe os avisos de andamento.
-- **Ajustes explicados**: todos os ajustes agora têm uma linha dizendo o que fazem.
-- **Voltar fecha a janela**: no site, o botão voltar fecha a janela aberta em vez de sair da página.
+- **Informações da parada**: quando a empresa pede, a tela de concluir mostra os campos dela (inclusive foto). Funciona sem internet.
 
 **Para o suporte**
-- **Excluir conta pelo app**: em Dev → Usuários, cada conta tem o botão de excluir, mantendo o histórico ou apagando tudo.
-- **Travamentos na Saúde do sistema**: os erros do app dos últimos 7 dias, do mais frequente ao menos, com aparelho, versão e tela.
+- **Módulos por empresa**: ligue ou desligue um módulo só para uma empresa.
+- **Servidores de mapa**: aponte rotas, percursos e endereços para servidores próprios quando precisar.
+- **E-mails com texto próprio**: cada empresa escreve o seu e-mail de cadastro, fatura, entrega e devolução.
+
+**API para lojas**
+- Aceita os campos próprios e o veículo, e tem limite de chamadas por minuto.

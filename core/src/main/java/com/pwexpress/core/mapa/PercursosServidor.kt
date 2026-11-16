@@ -23,7 +23,9 @@ import java.time.Instant
 object PercursosServidor {
     data class Ajuste(val ate: Long, val caminho: List<Pair<Double, Double>>)
     data class Ping(val motoboy: String, val ping: PingMapa)
-    data class Resultado(val pings: List<Ping>, val ajustes: Map<String, Ajuste>, val linha: List<Pair<Double, Double>>, val parcial: Boolean) {
+    data class Resultado(val pings: List<Ping>, val ajustes: Map<String, Ajuste>, val linha: List<Pair<Double, Double>>, val parcial: Boolean,
+                         /** A linha em pedaços: entre um e outro o GPS ficou sem sinal (não se liga com reta). */
+                         val linhas: List<List<Pair<Double, Double>>> = listOf(linha)) {
         fun pingsDe(motoboy: String) = pings.filter { it.motoboy == motoboy }.map { it.ping }
         /** Registros de um motoboy com o caminho pelas ruas. */
         fun registros(motoboy: String) = aplicarAjustes(separarRegistros(pingsDe(motoboy)), motoboy, ajustes)
@@ -56,7 +58,9 @@ object PercursosServidor {
             val ate = (o["ate"] as? JsonPrimitive)?.longOrNull ?: return@mapNotNull null
             k to Ajuste(ate, (o["caminho"] as? JsonArray).orEmpty().mapNotNull(::par))
         }.toMap()
-        Resultado(pings, ajustes, (j["linha"] as? JsonArray).orEmpty().mapNotNull(::par), (j["parcial"] as? JsonPrimitive)?.booleanOrNull == true)
+        val linha = (j["linha"] as? JsonArray).orEmpty().mapNotNull(::par)
+        val linhas = (j["linhas"] as? JsonArray)?.mapNotNull { (it as? JsonArray)?.mapNotNull(::par)?.takeIf { l -> l.isNotEmpty() } } ?: listOf(linha)
+        Resultado(pings, ajustes, linha, (j["parcial"] as? JsonPrimitive)?.booleanOrNull == true, linhas.filter { it.isNotEmpty() })
     }.getOrNull()
 }
 
@@ -68,18 +72,22 @@ fun aplicarAjustes(regs: List<RegistroPercurso>, motoboy: String, ajustes: Map<S
     }
 
 /**
- * O feito de uma corrida (lat, lng), pelas ruas. Em andamento, busca de novo a cada minuto.
- * Vazio enquanto não há pings (ou o site não respondeu).
+ * O feito de uma corrida (lat, lng), pelas ruas, em pedaços (onde o GPS ficou sem sinal, não liga com reta).
+ * Em andamento, busca de novo a cada minuto. Vazio enquanto não há pings (ou o site não respondeu).
  */
 @androidx.compose.runtime.Composable
-fun rememberTrilhaCorrida(corridaId: String?, ativa: Boolean): List<Pair<Double, Double>> {
-    val estado = androidx.compose.runtime.produceState(emptyList<Pair<Double, Double>>(), corridaId, ativa) {
+fun rememberTrilhaCorrida(corridaId: String?, ativa: Boolean): List<List<Pair<Double, Double>>> {
+    val estado = androidx.compose.runtime.produceState(emptyList<List<Pair<Double, Double>>>(), corridaId, ativa) {
         if (corridaId == null) { value = emptyList(); return@produceState }
         while (true) {
-            PercursosServidor.buscar(corrida = corridaId)?.let { value = it.linha }
+            PercursosServidor.buscar(corrida = corridaId)?.let { value = it.linhas }
             if (!ativa) break
             kotlinx.coroutines.delay(60_000)
         }
     }
     return estado.value
 }
+
+/** Os pedaços do feito viram trilhas do mapa; a posição de agora entra no fim do último pedaço. */
+fun trilhasDoFeito(pedacos: List<List<Pair<Double, Double>>>, agora: Pair<Double, Double>?): List<TrilhaMapa> =
+    pedacos.mapIndexed { i, p -> if (i == pedacos.lastIndex && agora != null) p + agora else p }.filter { it.size >= 2 }.map { TrilhaMapa(it) }

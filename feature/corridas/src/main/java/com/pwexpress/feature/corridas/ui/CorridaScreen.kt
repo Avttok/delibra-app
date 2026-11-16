@@ -68,6 +68,7 @@ import com.pwexpress.core.mapa.PinoMapa
 import com.pwexpress.core.mapa.PwMapa
 import com.pwexpress.feature.corridas.data.Corrida
 import com.pwexpress.feature.corridas.data.Corridas
+import com.pwexpress.feature.corridas.data.Exigencias
 import com.pwexpress.feature.corridas.data.Parada
 import com.pwexpress.feature.corridas.data.Posicao
 import com.pwexpress.feature.corridas.data.PosicaoAtual
@@ -103,6 +104,8 @@ fun CorridaScreen(
     var enviando by remember { mutableStateOf(false) }
     var erro by remember { mutableStateOf<String?>(null) }
     var comprovanteAberto by remember { mutableStateOf(false) }
+    // campos que a empresa pergunta ao chegar no endereço (Ajustes → Modalidades → Campos próprios)
+    var chegadaAberta by remember { mutableStateOf(false) }
     var posicao by remember { mutableStateOf<Posicao?>(null) }
     var minimizado by com.pwexpress.core.designsystem.lembrarLigado("corrida_minimizada", false)
 
@@ -137,8 +140,9 @@ fun CorridaScreen(
         }
     }
 
-    if (comprovanteAberto && parada != null) {
-        ComprovanteEntrega(corrida, parada, posicao, ignorarLocal = (admin && corrida.teste) || (!noLocalReal && podePular), onFechar = { comprovanteAberto = false }, modifier = modifier)
+    if ((comprovanteAberto || chegadaAberta) && parada != null) {
+        ComprovanteEntrega(corrida, parada, posicao, ignorarLocal = (admin && corrida.teste) || (!noLocalReal && podePular),
+            onFechar = { comprovanteAberto = false; chegadaAberta = false }, modifier = modifier, naChegada = chegadaAberta && !comprovanteAberto)
         return
     }
 
@@ -164,7 +168,7 @@ fun CorridaScreen(
             }
         }
         // ---------------------------------------------------------- navegação curva a curva (dentro do app)
-        if (parada != null && !comprovanteAberto) {
+        if (parada != null && !comprovanteAberto && !chegadaAberta) {
             NavegacaoBanner(parada.id, parada.lat to parada.lng, Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp))
         }
         // ---------------------------------------------------------- mapa
@@ -182,7 +186,7 @@ fun CorridaScreen(
                 minhaPosicao = eu,
                 modifier = Modifier.fillMaxSize(),
                 focar = focoT,
-                trilhas = if (feito.size >= 2) listOf(com.pwexpress.core.mapa.TrilhaMapa(feito + listOfNotNull(eu))) else emptyList(),
+                trilhas = com.pwexpress.core.mapa.trilhasDoFeito(feito, eu),
                 restanteDe = eu,
             )
             // barra de vidro sobre o mapa: corrida + selo de teste à esquerda, valor à direita
@@ -248,7 +252,7 @@ fun CorridaScreen(
                     BotaoMapa("", PwIcones.ChevronUp, descricao = "Mostrar detalhes") { minimizado = false }
                 }
                 erro?.let { Text(it, color = c.vermelho) }
-                BotaoAcao(corrida, parada, enviando, noLocal, podeIgnorar, onAvancar = { a, i -> avancar(a, i) }, onComprovante = { comprovanteAberto = true })
+                BotaoAcao(corrida, parada, enviando, noLocal, podeIgnorar, onAvancar = { a, i -> avancar(a, i) }, onComprovante = { comprovanteAberto = true }, onChegada = { chegadaAberta = true })
                 if (!noLocal && podePedirPular && !podeIgnorar) PedirPularParada(corrida.id, parada)
             }
             return@Column
@@ -292,7 +296,7 @@ fun CorridaScreen(
                         Text("Parada liberada pelo gestor: confirme de onde está.", color = c.texto, fontSize = 14.sp, fontFamily = Archivo)
                     }
                 }
-                BotaoAcao(corrida, parada, enviando, noLocal, podeIgnorar, onAvancar = { a, i -> avancar(a, i) }, onComprovante = { comprovanteAberto = true })
+                BotaoAcao(corrida, parada, enviando, noLocal, podeIgnorar, onAvancar = { a, i -> avancar(a, i) }, onComprovante = { comprovanteAberto = true }, onChegada = { chegadaAberta = true })
                 if (!noLocal && podePedirPular && !podeIgnorar) PedirPularParada(corrida.id, parada)
             }
             PwCartao {
@@ -343,11 +347,14 @@ private fun BotaoAcao(
     podeIgnorar: Boolean,
     onAvancar: (acao: String, ignorar: Boolean) -> Unit,
     onComprovante: () -> Unit,
+    onChegada: () -> Unit,
 ) {
     val c = Pw.cores
     val coleta = parada.tipo == TipoParada.COLETA
     val precisa = corrida.exigencias(parada).alguma || com.pwexpress.core.perfil.Modalidades.camposDaParada(coleta, corrida.tipoPedido).isNotEmpty()
+    val perguntaNaChegada = com.pwexpress.core.perfil.Modalidades.camposDaParada(coleta, corrida.tipoPedido, "chegou").isNotEmpty()
     val (rotulo, icone, acao) = when {
+        parada.status != StatusParada.CHEGOU && perguntaNaChegada -> Triple("Cheguei no local", PwIcones.MapPin, onChegada)
         parada.status != StatusParada.CHEGOU -> Triple("Cheguei no local", PwIcones.MapPin, { onAvancar("chegou", false) })
         coleta && precisa -> Triple("Confirmar coleta", PwIcones.PackageCheck, onComprovante)
         coleta -> Triple("Coletado", PwIcones.PackageCheck, { onAvancar("concluir", false) })
@@ -371,7 +378,7 @@ private fun BotaoAcao(
             PwBotaoVidro(
                 if (corrida.teste) "Ignorar localização (teste)" else "Confirmar daqui (fora do raio)",
                 onClick = {
-                    if (parada.status != StatusParada.CHEGOU) onAvancar("chegou", true)
+                    if (parada.status != StatusParada.CHEGOU) { if (perguntaNaChegada) onChegada() else onAvancar("chegou", true) }
                     else if (precisa) onComprovante()
                     else onAvancar("concluir", true)
                 },
@@ -422,7 +429,7 @@ private fun IndicadorDistancia(distancia: Float?, noLocal: Boolean, exige: Boole
 // ------------------------------------------------------------------ comprovante
 
 @Composable
-private fun ComprovanteEntrega(corrida: Corrida, parada: Parada, posicaoInicial: Posicao?, ignorarLocal: Boolean, onFechar: () -> Unit, modifier: Modifier) {
+private fun ComprovanteEntrega(corrida: Corrida, parada: Parada, posicaoInicial: Posicao?, ignorarLocal: Boolean, onFechar: () -> Unit, modifier: Modifier, naChegada: Boolean = false) {
     val ctx = LocalContext.current
     val c = Pw.cores
     val scope = rememberCoroutineScope()
@@ -434,10 +441,11 @@ private fun ComprovanteEntrega(corrida: Corrida, parada: Parada, posicaoInicial:
     var enviando by remember { mutableStateOf(false) }
     var etapa by remember { mutableStateOf("") }
     var erro by remember { mutableStateOf<String?>(null) }
-    val ex = corrida.exigencias(parada)
+    // na chegada só entram os campos próprios marcados para a chegada; o comprovante fica para o fim
+    val ex = if (naChegada) Exigencias(foto = false, nome = false, assinatura = false, codigo = false) else corrida.exigencias(parada)
     val coleta = parada.tipo == TipoParada.COLETA
     // campos próprios da empresa para esta parada (Ajustes → Modalidades → Campos próprios)
-    val campos = remember(parada.id) { com.pwexpress.core.perfil.Modalidades.camposDaParada(coleta, corrida.tipoPedido) }
+    val campos = remember(parada.id, naChegada) { com.pwexpress.core.perfil.Modalidades.camposDaParada(coleta, corrida.tipoPedido, if (naChegada) "chegou" else "concluir") }
     val respostas = remember(parada.id) { androidx.compose.runtime.mutableStateMapOf<String, String>() }
     val fotosCampo = remember(parada.id) { androidx.compose.runtime.mutableStateMapOf<String, ByteArray>() }
     var campoFoto by remember { mutableStateOf<String?>(null) }
@@ -476,12 +484,11 @@ private fun ComprovanteEntrega(corrida: Corrida, parada: Parada, posicaoInicial:
             }
             etapa = "Conferindo localização…"
             val posicao = PosicaoAtual.obter(ctx, 8_000) ?: posicaoInicial
-            etapa = if (fotos.isEmpty()) "Finalizando…" else "Enviando comprovante…"
+            etapa = if (fotos.isEmpty()) (if (naChegada) "Enviando…" else "Finalizando…") else "Enviando comprovante…"
             Corridas.avancar(
-                parada.id, "concluir",
+                parada.id, if (naChegada) "chegou" else "concluir",
                 buildJsonObject {
-                    put("recebedor_nome", nome.trim())
-                    put("codigo", codigo)
+                    if (!naChegada) { put("recebedor_nome", nome.trim()); put("codigo", codigo) }
                     // respostas dos campos próprios: vão junto da etapa (também sem internet)
                     respostas.forEach { (k, v) -> if (v.isNotBlank()) put("resp_$k", v.trim()) }
                 },
@@ -495,7 +502,7 @@ private fun ComprovanteEntrega(corrida: Corrida, parada: Parada, posicaoInicial:
 
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(if (coleta) "Comprovante de coleta" else "Comprovante de entrega", style = MaterialTheme.typography.headlineSmall, color = c.texto, modifier = Modifier.weight(1f))
+            Text(if (naChegada) "Ao chegar" else if (coleta) "Comprovante de coleta" else "Comprovante de entrega", style = MaterialTheme.typography.headlineSmall, color = c.texto, modifier = Modifier.weight(1f))
             TextButton(onClick = onFechar, enabled = !enviando) { Text("Voltar", color = c.texto2) }
         }
         Text(parada.endereco, color = c.texto2)
@@ -568,7 +575,7 @@ private fun ComprovanteEntrega(corrida: Corrida, parada: Parada, posicaoInicial:
         }
 
         erro?.let { Text(it, color = c.vermelho) }
-        PwBotaoOuro(if (enviando) etapa else if (coleta) "Confirmar coleta" else "Confirmar entrega", onClick = { finalizar() }, habilitado = !enviando, icone = PwIcones.CircleCheck, altura = 64.dp)
+        PwBotaoOuro(if (enviando) etapa else if (naChegada) "Confirmar chegada" else if (coleta) "Confirmar coleta" else "Confirmar entrega", onClick = { finalizar() }, habilitado = !enviando, icone = PwIcones.CircleCheck, altura = 64.dp)
         Spacer(Modifier.size(12.dp))
     }
 }

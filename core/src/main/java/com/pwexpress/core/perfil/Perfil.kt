@@ -268,6 +268,7 @@ object Perfis {
         val o = jsonObject
         fun txt(k: String) = (o[k] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
         fun bool(k: String) = (o[k] as? JsonPrimitive)?.booleanOrNull ?: false
+        runCatching { Modalidades.atualizar(o) }
         return Perfil(
             id = txt("id").orEmpty(),
             nome = txt("nome").orEmpty(),

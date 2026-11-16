@@ -741,7 +741,7 @@ private fun DetalhesPedidoG(p: PedidoG, onFocar: (Double, Double) -> Unit = { _,
                 }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text((if (pt.coleta) "Coleta" else "Entrega") + if (pt.status == "concluido") " · feita" else "", color = if (pt.coleta) c.ouro else c.texto2,
+                    Text(com.pwexpress.core.perfil.Modalidades.nomeParada(pt.coleta) + if (pt.status == "concluido") " · feita" else "", color = if (pt.coleta) c.ouro else c.texto2,
                         fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     Text(pt.endereco, color = c.texto, fontSize = 14.sp)
                     listOfNotNull(pt.contatoNome, pt.contatoTelefone, pt.instrucoes).takeIf { it.isNotEmpty() }?.let { TextoDica(it.joinToString(" · ")) }
@@ -1162,7 +1162,7 @@ private fun CartaoRotaG(
             }
             Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
-                Text((if (x.str("tipo") == "coleta") "Coleta" else "Entrega") + if (!deste) " · outro pedido" else "", color = c.texto2, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                Text(com.pwexpress.core.perfil.Modalidades.nomeParada(x.str("tipo") == "coleta") + if (!deste) " · outro pedido" else "", color = c.texto2, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
                 Text(x.str("endereco").orEmpty().split(",").take(2).joinToString(","), color = c.texto, fontSize = 13.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
             if (editavel) {

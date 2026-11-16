@@ -42,6 +42,8 @@ sealed interface TelaG {
     data object Excecoes : TelaG
     data object Historico : TelaG
     data class CatalogoT(val cat: Catalogo) : TelaG
+    /** Ajustes → Modalidades: "campos", "nomes", "taxas" ou "cargos". */
+    data class Modalidade(val qual: String) : TelaG
 }
 
 /** Pedidos de navegação vindos de fora do painel (ex.: "Configurações" no menu da foto). */
@@ -152,6 +154,7 @@ fun GestorApp(
                     TelaG.Excecoes -> ExcecoesG(onVoltar = ::voltar)
                     TelaG.Historico -> HistoricoG(onVoltar = ::voltar)
                     is TelaG.CatalogoT -> CatalogoG(atual.cat, onVoltar = ::voltar)
+                    is TelaG.Modalidade -> ModalidadeG(atual.qual, onVoltar = ::voltar)
                     TelaG.Dev -> DevG(onVoltar = ::voltar)
                     null -> when (aba) {
                         "mapa" -> ComSubAbas(listOf("Mapa" to PwIcones.Mapa, "Hoje" to PwIcones.LayoutDashboard), subMapa, { subMapa = it }) { i ->

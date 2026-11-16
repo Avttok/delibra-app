@@ -406,6 +406,7 @@ private fun ModulosDevG(l: List<Gestao.ModuloDev>, salvar: (Gestao.ModuloDev, Bo
         Text("O que é um módulo?", color = c.texto, fontWeight = FontWeight.Bold)
         TextoDica("Uma parte do sistema (chat, carteira, pedidos, conquistas…). Desligado, some do site e do app para todo mundo — menos para você. Ligado, dá para deixar só para alguns cargos (ex.: carteira só para gestores).")
     }
+    ModulosPorEmpresaG(l)
     com.pwexpress.core.designsystem.PwCampo(busca, { busca = it }, "Buscar módulo")
     val n = listOf(l.size, l.count { it.ligado }, l.count { !it.ligado }, l.count { it.ligado && it.papeis.isNotEmpty() })
     PwFiltros(listOf("Todos" to n[0], "Ligados" to n[1], "Desligados" to n[2], "Só alguns" to n[3]), filtro, { filtro = it })
@@ -592,6 +593,42 @@ private fun AparelhosDevG(ap: List<JsonObject>?) {
                     }
                 }
             }
+        }
+    }
+}
+
+
+/** Exceção por empresa: o módulo segue a regra geral, ou fica ligado/desligado só nesta empresa. */
+@Composable
+private fun ModulosPorEmpresaG(l: List<Gestao.ModuloDev>) {
+    val escopo = rememberCoroutineScope()
+    var orgs by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var org by remember { mutableStateOf<String?>(null) }
+    var abrir by remember { mutableStateOf(false) }
+    val mapa = remember { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
+    LaunchedEffect(Unit) {
+        Gestao.rpcJson("dev_organizacoes").onSuccess { j -> orgs = (j as? kotlinx.serialization.json.JsonArray).orEmpty().mapNotNull { (it as? kotlinx.serialization.json.JsonObject)?.let { o -> (o.str("id") ?: return@let null) to (o.str("nome") ?: "Empresa") } } }
+    }
+    LaunchedEffect(org) {
+        mapa.clear()
+        org?.let { id -> Gestao.rpcJson("modulos_da_empresa", kotlinx.serialization.json.buildJsonObject { put("p_org", id) }).onSuccess { j ->
+            (j as? kotlinx.serialization.json.JsonObject)?.forEach { (k, v) -> (v as? kotlinx.serialization.json.JsonPrimitive)?.content?.toBooleanStrictOrNull()?.let { mapa[k] = it } } } }
+    }
+    PwCartao {
+        PwRotulo("Por empresa")
+        PwBotaoVidro("Empresa: ${orgs.firstOrNull { it.first == org }?.second ?: "escolha"}", onClick = { abrir = !abrir }, icone = PwIcones.Building2, modifier = Modifier.fillMaxWidth())
+        if (abrir) orgs.forEach { (id, nome) -> Text(nome, color = Pw.cores.texto, modifier = Modifier.fillMaxWidth().clickable { org = id; abrir = false }.padding(10.dp)) }
+        val o = org ?: return@PwCartao
+        l.forEach { m ->
+            val v = mapa[m.chave]
+            Text(m.nome, color = Pw.cores.texto, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
+            com.pwexpress.core.designsystem.PwSegmentado(listOf("Regra geral" to null, "Ligado" to null, "Desligado" to null), when (v) { null -> 0; true -> 1; false -> 2 }, { i ->
+                val novo = when (i) { 1 -> true; 2 -> false; else -> null }
+                escopo.launch {
+                    Gestao.rpcJson("definir_modulo_empresa", kotlinx.serialization.json.buildJsonObject { put("p_org", o); put("p_chave", m.chave); if (novo == null) put("p_ligado", kotlinx.serialization.json.JsonNull) else put("p_ligado", novo) })
+                        .onSuccess { if (novo == null) mapa.remove(m.chave) else mapa[m.chave] = novo }
+                }
+            }, Modifier.fillMaxWidth())
         }
     }
 }

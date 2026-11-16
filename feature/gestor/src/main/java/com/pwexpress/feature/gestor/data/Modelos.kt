@@ -32,10 +32,13 @@ object Status {
     const val CANCELADA = "cancelada"
     val ATIVAS = setOf(AGUARDANDO_PAGAMENTO, AGUARDANDO, SEM_MOTOBOY, ACEITA, EM_ANDAMENTO)
     val PLANEJADAS = setOf(AGENDADA, RESERVADA)
-    val rotulo = mapOf(
+    private val padrao = mapOf(
         MONTADA to "Rota montada · esperando você", AGENDADA to "Planejada · livre", RESERVADA to "Planejada · reservada", AGUARDANDO to "Procurando motoboy", AGUARDANDO_PAGAMENTO to "Aguardando pagamento",
         SEM_MOTOBOY to "Sem motoboy", ACEITA to "Aceita", EM_ANDAMENTO to "Em andamento", CONCLUIDA to "Concluída", CANCELADA to "Cancelada",
     )
+    /** Com os nomes próprios da empresa (Ajustes → Modalidades → Nomes). */
+    val rotulo: Map<String, String> get() = padrao.mapValues { (k, v) -> com.pwexpress.core.perfil.Modalidades.nomeStatus("rota", k, v) }
+    val padroes: Map<String, String> get() = padrao
 }
 
 data class RefG(val nome: String, val distanciaM: Int?, val tipo: String?, val lat: Double? = null, val lng: Double? = null, val relacao: String? = null)
@@ -208,10 +211,11 @@ data class PedidoG(
 }
 
 object StatusPedido {
-    val rotulo = mapOf(
+    val padroes = mapOf(
         "recebido" to "Para revisar", "aprovado" to "Aprovado", "roteirizado" to "Na rota", "em_rota" to "Em rota",
         "concluido" to "Concluído", "cancelado" to "Cancelado", "recusado" to "Recusado",
     )
+    val rotulo: Map<String, String> get() = padroes.mapValues { (k, v) -> com.pwexpress.core.perfil.Modalidades.nomeStatus("pedido", k, v) }
 }
 
 fun JsonObject.paraPedidoG() = PedidoG(

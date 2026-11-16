@@ -110,6 +110,7 @@ fun DetalheCorridaG(id: String, onVoltar: () -> Unit) {
                 com.pwexpress.core.chat.Chat.compartilhar(com.pwexpress.core.chat.Anexo("rota", corrida.id, "Rota ${corrida.numeroExibicao}",
                     "${dados.cliente(corrida)} · ${corrida.paradas.count { !it.coleta }} entrega(s)"))
             })
+            BotaoAjustesG("Ajustes das rotas", listOf("rotas", "despacho", "local", "pular", "offline", "comprovantes", "pagamento", "chamados"))
         }
         if (corrida == null) { if (!dados.carregado) PwCarregando() else PwErro("Essa corrida não existe mais (pode ter sido apagada)."); return@PwPagina }
 
@@ -131,6 +132,10 @@ fun DetalheCorridaG(id: String, onVoltar: () -> Unit) {
             )
         }
 
+        // tudo da rota sem sair daqui: pedidos com itens, valores, avaliações, pedidos do motoboy e ofertas
+        var ficha by remember(id) { mutableStateOf(false) }
+        PwBotaoVidro("Pedidos, valores e tudo o que aconteceu", onClick = { ficha = true }, icone = PwIcones.ClipboardList, modifier = Modifier.fillMaxWidth())
+        if (ficha) FichaRotaG(id, onFechar = { ficha = false }, onAbrir = { ficha = false }, onTrocar = { ficha = false; GestorNav.abrir(TelaG.Corrida(it)) })
         PwCartao {
             Text(corrida.nomeStatus, style = TextStyle(fontFamily = ArchivoLargo, fontWeight = FontWeight.Black, fontSize = 22.sp), color = corStatus(corrida.status, c))
             dados.ofertas.firstOrNull { it.corridaId == corrida.id }?.let { o ->

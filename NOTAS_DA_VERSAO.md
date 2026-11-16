@@ -5,6 +5,7 @@
 
 **No mapa**
 - **Trajeto sem linha reta**: quando o GPS fica sem sinal ou o pedido passou por mais de uma rota, o trajeto aparece em partes, sem uma reta ligando um ponto ao outro.
+- **Trajeto completo no app**: o pedaço feito antes de o motoboy ficar offline voltou a aparecer no percurso.
 
 **Ajustes**
 - **Fuso horário da empresa**: escolha o fuso (Manaus, Cuiabá, Rio Branco e outros). O "hoje" do painel, os relatórios, o holerite, os horários de pedido e as taxas por horário passam a seguir esse fuso.

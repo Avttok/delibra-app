@@ -244,10 +244,12 @@ fun MapaG(onCorrida: (String) -> Unit) {
     // percursos: o selecionado mostra o dia todo; os outros, só o trecho atual
     val regSel = selecionado?.let { registrosDe(dados, it) }.orEmpty()
     fun filtrar(regs: List<com.pwexpress.core.mapa.RegistroPercurso>) = if (verProcurando) regs else regs.filter { it.corrida }
-    val percursos = if (!comTrilhas || !verPercursos) emptyList() else motoboys.flatMap { m ->
-        if (m.id == selecionado) filtrar(regSel).let { lista -> lista.mapIndexed { i, r -> com.pwexpress.core.mapa.PercursoMapa.de(r, destaque = destaque == regSel.indexOf(r), apagado = destaque != null && destaque != regSel.indexOf(r)) } }
+    // cada camada funciona sozinha: só pings (sem a linha), só a linha (sem pings) ou os dois
+    val semLinha = !verPercursos
+    val percursos = if (!comTrilhas || (!verPercursos && !verPings)) emptyList() else motoboys.flatMap { m ->
+        if (m.id == selecionado) filtrar(regSel).let { lista -> lista.mapIndexed { i, r -> com.pwexpress.core.mapa.PercursoMapa.de(r, destaque = destaque == regSel.indexOf(r), apagado = destaque != null && destaque != regSel.indexOf(r), semLinha = semLinha) } }
         else if (st(m.id) == "offline") emptyList()
-        else filtrar(registrosDe(dados, m.id)).lastOrNull()?.let { r -> listOf(com.pwexpress.core.mapa.PercursoMapa.de(r, apagado = selecionado != null)) }.orEmpty()
+        else filtrar(registrosDe(dados, m.id)).lastOrNull()?.let { r -> listOf(com.pwexpress.core.mapa.PercursoMapa.de(r, apagado = selecionado != null, semLinha = semLinha)) }.orEmpty()
     }
     val pontosCalor = when (calor) {
         Calor.DESLIGADO -> null
@@ -307,6 +309,7 @@ fun MapaG(onCorrida: (String) -> Unit) {
         controles = {
             PwBotaoIcone(PwIcones.Layers, "Camadas do mapa", { camadasAbertas = true }, ativo = camadasAbertas, tamanho = 44.dp)
             PwBotaoIcone(PwIcones.Flame, "Calor: ${calor.rotulo}", { calor = Calor.entries[(calor.ordinal + 1) % Calor.entries.size] }, ativo = calor != Calor.DESLIGADO, tamanho = 44.dp)
+            BotaoAjustesG("Ajustes do mapa e do GPS", listOf("mapa", "rastreamento", "percurso", "navegacao", "regiao"))
         },
         topo = if (membroSel == null) null else ({
             CartaoSelecionado(membroSel, posSel, dados.corridas.firstOrNull { it.motoboyId == membroSel.id && it.ativa }, agora, seguir,
@@ -369,11 +372,11 @@ fun MapaG(onCorrida: (String) -> Unit) {
     if (camadasAbertas) com.pwexpress.core.designsystem.PwJanela("Camadas do mapa", { camadasAbertas = false }) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             TextoDica("Escolha o que aparece no mapa. Fica guardado neste aparelho.")
-            com.pwexpress.core.designsystem.PwInterruptor("Rotas planejadas", verRotas, { verRotas = it }, descricao = "O caminho das rotas ativas (toque numa parada para abrir a rota).", icone = PwIcones.Route)
+            com.pwexpress.core.designsystem.PwInterruptor("Rotas planejadas", verRotas, { verRotas = it }, descricao = "O caminho que falta, em branco (o feito de verdade fica dourado).", icone = PwIcones.Route)
             com.pwexpress.core.designsystem.PwInterruptor("Paradas das rotas", verParadas, { verParadas = it }, descricao = "Coletas e entregas numeradas, com ícone.", icone = PwIcones.MapPin)
             com.pwexpress.core.designsystem.PwInterruptor("Zona de cada entrega", verNomes, { verNomes = it }, descricao = "O raio da zona em volta de cada entrega.", icone = PwIcones.Radar)
             if (comTrilhas) {
-                com.pwexpress.core.designsystem.PwInterruptor("Percursos", verPercursos, { verPercursos = it }, descricao = "O caminho feito pelos motoboys (o selecionado mostra o dia todo).", icone = PwIcones.Footprints)
+                com.pwexpress.core.designsystem.PwInterruptor("Percursos (linha)", verPercursos, { verPercursos = it }, descricao = "A linha do caminho feito (o selecionado mostra o dia todo). Desligue e deixe os pings para ver só os pontos.", icone = PwIcones.Footprints)
                 com.pwexpress.core.designsystem.PwInterruptor("Também fora de corrida", verProcurando, { verProcurando = it }, descricao = "Inclui o caminho enquanto procuravam corrida, não só em rota.", icone = PwIcones.Search)
                 com.pwexpress.core.designsystem.PwInterruptor("Pings", verPings, { verPings = it }, descricao = "Os pontos de cada posição enviada pelo GPS.", icone = PwIcones.CircleDot)
             }
@@ -500,7 +503,7 @@ internal fun ListaRegistros(regs: List<com.pwexpress.core.mapa.RegistroPercurso>
 // =====================================================================
 
 @Composable
-fun CorridasG(onAbrir: (String) -> Unit, onNova: () -> Unit) {
+fun CorridasG(onAbrir: (String) -> Unit, onNova: () -> Unit, onHistorico: () -> Unit = {}) {
     val c = Pw.cores
     val dados by Gestao.dados.collectAsState()
     val erro by Gestao.erro.collectAsState()
@@ -547,9 +550,13 @@ fun CorridasG(onAbrir: (String) -> Unit, onNova: () -> Unit) {
                 PwBotaoIcone(PwIcones.Trash2, "Apagar selecionadas", { if (marcadas.isNotEmpty()) excluindo = true }, tamanho = 38.dp, habilitado = marcadas.isNotEmpty(), cor = c.vermelho)
                 PwBotaoIcone(PwIcones.X, "Cancelar seleção", { selecionando = false; marcadas.clear() }, tamanho = 38.dp)
             } else {
-                if (podeApagar) PwBotaoIcone(PwIcones.History, "Apagar histórico", { limpando = true }, tamanho = 38.dp)
+                if (podeApagar) PwBotaoIcone(PwIcones.Trash2, "Apagar histórico", { limpando = true }, tamanho = 38.dp)
                 if (podeApagar) PwBotaoIcone(PwIcones.ListChecks, "Selecionar para apagar", { selecionando = true; marcadas.clear() }, tamanho = 38.dp)
-                PwBotaoIcone(PwIcones.Plus, "Nova corrida", onNova, ativo = true, tamanho = 38.dp)
+                PwBotaoIcone(PwIcones.History, "Histórico de rotas", onHistorico, tamanho = 38.dp)
+                BotaoAjustesG("Ajustes das rotas", listOf("rotas", "despacho", "extensao", "quadro", "planejadas", "local", "pular", "offline", "comprovantes"))
+                // rota à mão só se o Dev ligar (o padrão é pedido → rota pelo sistema)
+                if (com.pwexpress.core.perfil.Perfis.perfil.collectAsState().value?.logico("dev_criar_rota_manual", false) == true)
+                    PwBotaoIcone(PwIcones.Plus, "Nova corrida", onNova, ativo = true, tamanho = 38.dp)
             }
         },
     ) {

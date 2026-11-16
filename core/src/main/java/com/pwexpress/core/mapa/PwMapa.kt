@@ -230,6 +230,13 @@ private fun MapaBase(
     }
     var mapa by remember { mutableStateOf<MapLibreMap?>(null) }
     var estilo by remember { mutableStateOf<Style?>(null) }
+    // rota planejada (linhas brancas): mostrar/esconder vale para todos os mapas do app
+    val verPlano by RotaPlanejada.visivel.collectAsState()
+    LaunchedEffect(estilo, verPlano) {
+        val s = estilo ?: return@LaunchedEffect
+        val vis = PropertyFactory.visibility(if (verPlano) Property.VISIBLE else Property.NONE)
+        listOf("plano", "rota", "rota-contorno", "rotas", "rotas-contorno").forEach { id -> s.getLayer(id)?.setProperties(vis) }
+    }
     var enquadrou by remember { mutableStateOf(false) }
 
     // ciclo de vida do MapView
@@ -342,7 +349,7 @@ private fun MapaBase(
         val cores = coresPercurso(percursoTeste)
         val validos = percursos.map { it.copy(pontos = it.pontos.filter { p -> coordenadaValida(p.first, p.second) }, linha = it.linha?.filter { p -> coordenadaValida(p.first, p.second) }) }
         (s.getSource("percursos") as? GeoJsonSource)?.setGeoJson(FeatureCollection.fromFeatures(
-            validos.filter { (it.linha ?: it.pontos).size >= 2 }.map { r ->
+            validos.filter { !it.semLinha && (it.linha ?: it.pontos).size >= 2 }.map { r ->
                 Feature.fromGeometry(LineString.fromLngLats((r.linha ?: r.pontos).map { Point.fromLngLat(it.second, it.first) })).apply {
                     addBooleanProperty("destaque", r.destaque); addBooleanProperty("apagado", r.apagado)
                 }
@@ -617,6 +624,13 @@ fun PwMapa(
             PwIcones.Maximize2, "Tela cheia", { cheio = true },
             modifier = Modifier.align(botaoTelaCheiaEm).padding(10.dp), tamanho = 40.dp,
         )
+        if (rota != null || rotas.isNotEmpty() || restanteDe != null) {
+            val padraoPlano = com.pwexpress.core.perfil.Perfis.perfil.collectAsState().value?.logico("mapa_rota_planejada", true) ?: true
+            var ver by com.pwexpress.core.designsystem.lembrarLigado("mapa_ver_plano", padraoPlano)
+            LaunchedEffect(ver) { RotaPlanejada.visivel.value = ver }
+            com.pwexpress.core.designsystem.PwBotaoIcone(if (ver) PwIcones.Eye else PwIcones.EyeOff, if (ver) "Esconder a rota planejada" else "Mostrar a rota planejada", { ver = !ver },
+                modifier = Modifier.align(androidx.compose.ui.Alignment.TopStart).padding(start = 10.dp, top = if (maximizavel && botaoTelaCheia && botaoTelaCheiaEm == androidx.compose.ui.Alignment.TopStart) 58.dp else 10.dp), tamanho = 36.dp, ativo = ver)
+        }
     }
     if (cheio) androidx.compose.ui.window.Dialog(
         onDismissRequest = { cheio = false },
@@ -720,8 +734,9 @@ private fun criarCamadas(ctx: Context, s: Style, escuro: Boolean, ouro: String, 
     // rota planejada inteira, só de fundo (quando já há o "a fazer" a partir do motoboy, ou tudo foi feito)
     s.addLayer(
         LineLayer("plano", "plano").withProperties(
-            PropertyFactory.lineColor(ouro), PropertyFactory.lineOpacity(0.35f), PropertyFactory.lineWidth(3f),
-            PropertyFactory.lineDasharray(arrayOf(1.5f, 2f)), PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+            // branca e fosca: o dourado fica só para o que o motoboy fez de verdade
+            PropertyFactory.lineColor("#F5F5F4"), PropertyFactory.lineOpacity(0.5f), PropertyFactory.lineWidth(3.5f),
+            PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
         ),
     )
     // a fazer: tracejado claro com contorno escuro (aparece no mapa claro e no noturno); o feito é a trilha dourada
@@ -806,3 +821,6 @@ private fun criarCamadas(ctx: Context, s: Style, escuro: Boolean, ouro: String, 
         ),
     )
 }
+
+/** Mostrar ou esconder a rota planejada (linhas brancas) em todos os mapas. O padrão vem de Ajustes → Mapa. */
+object RotaPlanejada { val visivel = kotlinx.coroutines.flow.MutableStateFlow(true) }

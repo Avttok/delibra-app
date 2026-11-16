@@ -74,14 +74,14 @@ private val ERROS_MOD = mapOf(
 private fun erroMod(m: String?) = ERROS_MOD.entries.firstOrNull { m?.contains(it.key) == true }?.value ?: "Não deu agora. Tente de novo."
 
 @Composable
-private fun ChipM(texto: String, ligado: Boolean, onClick: () -> Unit) {
+internal fun ChipM(texto: String, ligado: Boolean, onClick: () -> Unit) {
     val c = Pw.cores
     Text(texto, color = if (ligado) c.fundo else c.texto, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
         modifier = Modifier.clip(RoundedCornerShape(99.dp)).background(if (ligado) c.ouro else c.campo).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 7.dp))
 }
 
 @Composable
-private fun LinhaChips(content: @Composable () -> Unit) =
+internal fun LinhaChips(content: @Composable () -> Unit) =
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) { content() }
 
 @Composable

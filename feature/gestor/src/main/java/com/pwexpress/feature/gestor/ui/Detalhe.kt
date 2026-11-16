@@ -358,7 +358,7 @@ fun DetalheCorridaG(id: String, onVoltar: () -> Unit) {
     if (excluir && corrida != null) DialogoExcluirCorridas(listOf(corrida), onFechar = { excluir = false }, onExcluidas = { excluir = false; onVoltar() })
 }
 
-private fun rotuloParada(s: String) = when (s) { "a_caminho" -> "A caminho"; "chegou" -> "No local"; "concluida" -> "Concluída"; else -> "Pendente" }
+internal fun rotuloParada(s: String) = when (s) { "a_caminho" -> "A caminho"; "chegou" -> "No local"; "concluida" -> "Concluída"; else -> "Pendente" }
 
 @Composable
 private fun Comprovante(rotulo: String, caminho: String) {

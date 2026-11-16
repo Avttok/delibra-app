@@ -79,6 +79,8 @@ object PwIcones {
     val Pin: ImageVector by lazy { icone("pin", "M12 17v5", "M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z") }
     val DoorOpen: ImageVector by lazy { icone("door-open", "M11 20H2", "M11 4.562v16.157a1 1 0 0 0 1.242.97L19 20V5.562a2 2 0 0 0-1.515-1.94l-4-1A2 2 0 0 0 11 4.561z", "M11 4H8a2 2 0 0 0-2 2v14", "M14 12h.01", "M22 20h-3") }
     val Wrench: ImageVector by lazy { icone("wrench", "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z") }
+    val ExternalLink: ImageVector by lazy { icone("external-link", "M15 3h6v6", "M10 14 21 3", "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6") }
+    val TriangleAlert: ImageVector by lazy { icone("triangle-alert", "m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3", "M12 9v4", "M12 17h.01") }
     val Circle: ImageVector by lazy { icone("circle", "M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0") }
     val ListPlus: ImageVector by lazy { icone("list-plus", "M11 12H3", "M16 6H3", "M16 18H3", "M18 9v6", "M21 12h-6") }
     val BadgePlus: ImageVector by lazy { icone("badge-plus", "M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z", "M12 8v8", "M8 12h8") }

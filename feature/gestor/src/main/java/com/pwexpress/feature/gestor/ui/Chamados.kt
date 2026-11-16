@@ -286,3 +286,68 @@ private val ROTULO_PEN = mapOf(
     "atraso" to "Atraso", "manual" to "Manual", "cancelamento" to "Cancelamento",
     "pulo" to "Parada liberada fora do raio", "avaliacao" to "Avaliação ruim",
 )
+
+/**
+ * Pedido urgente de motoboy (liberar parada ou cancelar rota): em qualquer tela, abre uma janela com
+ * Liberar/Negar e toca alto até alguém responder (igual à oferta do motoboy). Confere a cada 5 s.
+ */
+@Composable
+internal fun ChamadoUrgenteG(onAbrir: (String) -> Unit) {
+    val c = Pw.cores
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val escopo = rememberCoroutineScope()
+    var fila by remember { mutableStateOf<List<ChamadoG>>(emptyList()) }
+    val dispensados = remember { mutableSetOf<String>() }
+    var ocupado by remember { mutableStateOf(false) }
+    var resposta by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        while (true) {
+            fila = ChamadosG.abertos().filter { it.status == "pendente" && it.id !in dispensados }
+            delay(5_000)
+        }
+    }
+    val atual = fila.firstOrNull()
+    // som em loop + vibração enquanto houver pedido esperando
+    androidx.compose.runtime.DisposableEffect(atual?.id) {
+        if (atual == null) return@DisposableEffect onDispose { }
+        val som = runCatching {
+            android.media.MediaPlayer().apply {
+                setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+                setDataSource(ctx, android.net.Uri.parse("android.resource://${ctx.packageName}/${com.pwexpress.core.R.raw.pwex_urgente}"))
+                isLooping = true; prepare(); start()
+            }
+        }.getOrNull()
+        val vib = ctx.getSystemService(android.os.Vibrator::class.java)
+        runCatching { vib?.vibrate(android.os.VibrationEffect.createWaveform(longArrayOf(0, 600, 300, 600, 900), 0)) }
+        onDispose { runCatching { som?.stop(); som?.release() }; runCatching { vib?.cancel() } }
+    }
+    if (atual == null) return
+    fun responder(aprovar: Boolean) {
+        ocupado = true
+        escopo.launch {
+            ChamadosG.responder(atual.id, aprovar, resposta, null)
+                .onSuccess { com.pwexpress.core.designsystem.PwToast.mostrar(if (atual.pular) (if (aprovar) "Parada liberada." else "Pedido negado.") else (if (aprovar) "Cancelamento aprovado." else "Cancelamento negado.")) }
+                .onFailure { com.pwexpress.core.designsystem.PwToast.mostrar(it.message ?: "Não deu certo.", com.pwexpress.core.designsystem.TipoAviso.ERRO) }
+            dispensados += atual.id; fila = fila.drop(1); resposta = ""; ocupado = false
+        }
+    }
+    PwJanela(if (atual.pular) "Liberar parada?" else "Cancelar a rota?", onFechar = { dispensados += atual.id; fila = fila.drop(1) }) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(if (atual.pular) PwIcones.LockOpen else PwIcones.Hand, null, tint = c.vermelho, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(10.dp))
+            Text(if (atual.pular) "${atual.motoboyNome} está fora do raio e pede para liberar a parada ${(atual.paradaOrdem ?: 0) + 1} da rota ${atual.numeroExibicao}."
+                else "${atual.motoboyNome} pede para cancelar a rota ${atual.numeroExibicao} (${atual.feitas} de ${atual.paradas} paradas feitas).",
+                color = c.texto, fontWeight = FontWeight.Bold, fontFamily = Archivo)
+        }
+        atual.paradaEndereco?.let { Text(it, color = c.texto2, fontSize = 13.sp) }
+        PwCartao { PwRotulo("Motivo"); Text(atual.motivo, color = c.texto) }
+        PwCampo(resposta, { resposta = it }, "Resposta para o motoboy (opcional)")
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            PwBotaoPerigo("Negar", { responder(false) }, modifier = Modifier.weight(1f), icone = PwIcones.X, habilitado = !ocupado)
+            PwBotaoOuro(if (atual.pular) "Liberar" else "Aprovar", onClick = { responder(true) }, icone = PwIcones.Check, habilitado = !ocupado, modifier = Modifier.weight(1f))
+        }
+        PwBotaoVidro("Ver a rota", onClick = { dispensados += atual.id; fila = fila.drop(1); onAbrir(atual.corridaId) }, icone = PwIcones.Route, modifier = Modifier.fillMaxWidth())
+        if (fila.size > 1) TextoDica("Mais ${fila.size - 1} esperando depois deste.")
+    }
+}

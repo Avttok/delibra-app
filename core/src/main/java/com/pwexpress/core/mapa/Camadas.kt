@@ -86,10 +86,12 @@ data class PercursoMapa(
     val pontos: List<Pair<Double, Double>>, val destaque: Boolean = false, val apagado: Boolean = false,
     /** Linha pelas ruas (se nula, liga os pings). Os pings continuam nos [pontos]. */
     val linha: List<Pair<Double, Double>>? = null,
+    /** Só os pings, sem a linha (camada "Percursos" desligada e "Pings" ligada). */
+    val semLinha: Boolean = false,
 ) {
     companion object {
-        fun de(r: RegistroPercurso, destaque: Boolean = false, apagado: Boolean = false) =
-            PercursoMapa(r.pontos.map { it.lat to it.lng }, destaque, apagado, r.caminho)
+        fun de(r: RegistroPercurso, destaque: Boolean = false, apagado: Boolean = false, semLinha: Boolean = false) =
+            PercursoMapa(r.pontos.map { it.lat to it.lng }, destaque, apagado, r.caminho, semLinha)
     }
 }
 

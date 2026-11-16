@@ -36,7 +36,7 @@ object Caminho {
     private suspend fun osrm(pontos: List<Pair<Double, Double>>): String? = withContext(Dispatchers.IO) {
         tentar {
             val coords = pontos.joinToString(";") { "%.6f,%.6f".format(java.util.Locale.US, it.second, it.first) }
-            val c = URL("https://router.project-osrm.org/route/v1/driving/$coords?overview=full&geometries=polyline").openConnection() as HttpURLConnection
+            val c = URL("${ServidoresMapa.osrm}/route/v1/driving/$coords?overview=full&geometries=polyline").openConnection() as HttpURLConnection
             c.connectTimeout = 8_000; c.readTimeout = 10_000
             c.setRequestProperty("User-Agent", "PWExpress-app (pwexpress.vercel.app)")
             val corpo = c.inputStream.bufferedReader().use { it.readText() }

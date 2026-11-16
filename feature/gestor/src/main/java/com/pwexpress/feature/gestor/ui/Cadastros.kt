@@ -814,6 +814,7 @@ private fun EditarMembroG(m: com.pwexpress.feature.gestor.data.MembroG, eu: Bool
     }
 
     if (eu) { TextoDica("Esta é a sua conta: nome e foto você muda no seu perfil."); return }
+    if (m.supervisor && !m.gestor && com.pwexpress.feature.gestor.data.Permissoes.estado.value.pode("cargos_personalizados")) PwCartao { EscolherCargoG(m.id) }
     PwCartao(cor = c.vermelho.copy(alpha = 0.45f)) {
         PwRotulo("Zona de perigo")
         Espaco(6)
@@ -1205,6 +1206,14 @@ fun ConfiguracoesG(onVoltar: (() -> Unit)?, onAbrir: (TelaG) -> Unit = {}) {
                 "operacao" -> listOf(Triple("Exceções", PwIcones.Layers, TelaG.Excecoes), Triple("Tipos de pedido", PwIcones.ClipboardList, TelaG.CatalogoT(Catalogo.TIPOS)))
                 "sistema" -> listOf(Triple("Histórico de mudanças", PwIcones.History, TelaG.Historico), Triple("Exceções", PwIcones.Layers, TelaG.Excecoes))
                 else -> listOf(Triple("Exceções", PwIcones.Layers, TelaG.Excecoes))
+            } + when (a?.chave) {
+                // modalidades: o Dev libera cada uma (Permissões dos gestores)
+                "operacao" -> listOfNotNull(
+                    Triple("Campos próprios", PwIcones.ListPlus, TelaG.Modalidade("campos")).takeIf { com.pwexpress.feature.gestor.data.Permissoes.estado.value.pode("campos_personalizados") },
+                    Triple("Nomes próprios", PwIcones.PenLine, TelaG.Modalidade("nomes")).takeIf { com.pwexpress.feature.gestor.data.Permissoes.estado.value.pode("rotulos") },
+                    Triple("Cargos", PwIcones.UserCog, TelaG.Modalidade("cargos")).takeIf { com.pwexpress.feature.gestor.data.Permissoes.estado.value.pode("cargos_personalizados") })
+                "preco", "motoboys" -> listOfNotNull(Triple("Taxas e bônus", PwIcones.BadgePlus, TelaG.Modalidade("taxas")).takeIf { com.pwexpress.feature.gestor.data.Permissoes.estado.value.pode("regras_extras") })
+                else -> emptyList()
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PwRotulo("Peças do lego"); Spacer(Modifier.width(8.dp))

@@ -63,6 +63,8 @@ data class Referencia(val nome: String, val distanciaM: Int?, val tipo: String?,
 data class Corrida(
     val id: String,
     val numero: Long,
+    /** Tipo de pedido da rota (nomes próprios e campos da parada dependem dele). */
+    val tipoPedido: String? = null,
     val status: String,
     val teste: Boolean,
     /** O que o motoboy recebe (nunca o total nem o percentual). */
@@ -130,6 +132,7 @@ internal fun JsonElement.paraCorrida(): Corrida {
     return Corrida(
         id = o.texto("id")!!,
         numero = o.texto("numero")?.toLongOrNull() ?: 0,
+        tipoPedido = o.texto("tipo_pedido"),
         status = o.texto("status").orEmpty(),
         teste = o.logico("teste"),
         valorMotoboy = o.decimal("valor_motoboy"),

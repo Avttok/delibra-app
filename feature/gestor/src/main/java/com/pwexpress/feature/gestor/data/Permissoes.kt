@@ -42,5 +42,6 @@ val ACOES_GESTOR = listOf(
     "forcar_inicio" to "Forçar início de planejada", "chat_apagar" to "Apagar mensagens de outros", "mudar_marca" to "Mudar a marca da empresa",
     "modo_teste" to "Usar o modo teste", "ver_carteira" to "Ver a carteira", "regras_por_cliente" to "Regras por cliente",
     "regras_por_motoboy" to "Regras por motoboy", "penalidades" to "Penalidades",
-    "integracao_api" to "API para lojas",
+    "integracao_api" to "API para lojas", "campos_personalizados" to "Campos próprios", "regras_extras" to "Taxas e bônus",
+    "cargos_personalizados" to "Cargos", "rotulos" to "Nomes próprios",
 )

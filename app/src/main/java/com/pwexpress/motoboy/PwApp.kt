@@ -37,6 +37,7 @@ class PwApp : Application() {
         com.pwexpress.core.marca.MarcaEmpresa.iniciar(this)
         PwNotificacoes.criarCanais(this)
         ligarModulos()
+        escopo.launch(kotlinx.coroutines.Dispatchers.IO) { com.pwexpress.core.mapa.ServidoresMapa.carregar() }
     }
 
     /** Único ponto onde os módulos se conhecem. */

@@ -131,7 +131,7 @@ object Navegacao {
             put("costing", PreferenciaRota.perfil)
             putJsonObject("directions_options") { put("language", "pt-BR"); put("units", "kilometers") }
         }.toString()
-        val r = json.parseToJsonElement(http("https://valhalla1.openstreetmap.de/route", corpo)).jsonObject
+        val r = json.parseToJsonElement(http("${ServidoresMapa.valhalla}/route", corpo)).jsonObject
         val trip = r["trip"]!!.jsonObject
         val pontos = ArrayList<Pair<Double, Double>>()
         val manobras = ArrayList<Manobra>()
@@ -178,7 +178,7 @@ object Navegacao {
 
     private fun osrm(pts: List<Pair<Double, Double>>): RotaNavegacao {
         val coords = pts.joinToString(";") { "%.6f,%.6f".format(java.util.Locale.US, it.second, it.first) }
-        val r = json.parseToJsonElement(http("https://router.project-osrm.org/route/v1/driving/$coords?overview=full&geometries=polyline6&steps=true")).jsonObject
+        val r = json.parseToJsonElement(http("${ServidoresMapa.osrm}/route/v1/driving/$coords?overview=full&geometries=polyline6&steps=true")).jsonObject
         val rota = (r["routes"] as JsonArray).first().jsonObject
         val pontos = decodificarPolyline((rota["geometry"] as JsonPrimitive).content, 6)
         val manobras = ArrayList<Manobra>()

@@ -239,7 +239,7 @@ fun CorridaScreen(
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        PwRotulo("${parada.ordem + 1}/${corrida.paradas.size} · ${if (coleta) "Coleta" else "Entrega"}")
+                        PwRotulo("${parada.ordem + 1}/${corrida.paradas.size} · ${com.pwexpress.core.perfil.Modalidades.nomeParada(coleta, corrida.tipoPedido)}")
                         Text(parada.endereco, color = c.texto, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
                     Spacer(Modifier.width(8.dp))
@@ -260,7 +260,7 @@ fun CorridaScreen(
                 val coleta = parada.tipo == TipoParada.COLETA
                 PwCartao(destaque = true) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        PwRotulo("Parada ${parada.ordem + 1} de ${corrida.paradas.size} · ${if (coleta) "Coleta" else "Entrega"}", Modifier.weight(1f))
+                        PwRotulo("Parada ${parada.ordem + 1} de ${corrida.paradas.size} · ${com.pwexpress.core.perfil.Modalidades.nomeParada(coleta, corrida.tipoPedido)}", Modifier.weight(1f))
                         IndicadorDistancia(distancia, noLocal, corrida.exigirNoLocal)
                         Spacer(Modifier.width(6.dp))
                         BotaoMapa("", PwIcones.EyeOff) { minimizado = true }
@@ -311,7 +311,7 @@ fun CorridaScreen(
                         Spacer(Modifier.width(10.dp))
                         Column {
                             Text(
-                                "${p.ordem + 1}. ${if (p.tipo == TipoParada.COLETA) "Coleta" else "Entrega"}" +
+                                "${p.ordem + 1}. ${com.pwexpress.core.perfil.Modalidades.nomeParada(p.tipo == TipoParada.COLETA, corrida.tipoPedido)}" +
                                     if (p.status == StatusParada.CONCLUIDA) " · concluída" else "",
                                 fontWeight = FontWeight.SemiBold, color = c.texto,
                             )
@@ -346,7 +346,7 @@ private fun BotaoAcao(
 ) {
     val c = Pw.cores
     val coleta = parada.tipo == TipoParada.COLETA
-    val precisa = corrida.exigencias(parada).alguma
+    val precisa = corrida.exigencias(parada).alguma || com.pwexpress.core.perfil.Modalidades.camposDaParada(coleta, corrida.tipoPedido).isNotEmpty()
     val (rotulo, icone, acao) = when {
         parada.status != StatusParada.CHEGOU -> Triple("Cheguei no local", PwIcones.MapPin, { onAvancar("chegou", false) })
         coleta && precisa -> Triple("Confirmar coleta", PwIcones.PackageCheck, onComprovante)
@@ -436,13 +436,20 @@ private fun ComprovanteEntrega(corrida: Corrida, parada: Parada, posicaoInicial:
     var erro by remember { mutableStateOf<String?>(null) }
     val ex = corrida.exigencias(parada)
     val coleta = parada.tipo == TipoParada.COLETA
+    // campos próprios da empresa para esta parada (Ajustes → Modalidades → Campos próprios)
+    val campos = remember(parada.id) { com.pwexpress.core.perfil.Modalidades.camposDaParada(coleta, corrida.tipoPedido) }
+    val respostas = remember(parada.id) { androidx.compose.runtime.mutableStateMapOf<String, String>() }
+    val fotosCampo = remember(parada.id) { androidx.compose.runtime.mutableStateMapOf<String, ByteArray>() }
+    var campoFoto by remember { mutableStateOf<String?>(null) }
 
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val arq = arquivoFoto
         if (ok && arq != null) {
             scope.launch {
-                foto = runCatching { withContext(Dispatchers.Default) { Fotos.preparar(arq) } }
+                val lida = runCatching { withContext(Dispatchers.Default) { Fotos.preparar(arq) } }
                     .onFailure { erro = "Não foi possível ler a foto." }.getOrNull()
+                val alvo = campoFoto
+                if (alvo != null) { if (lida != null) fotosCampo[alvo] = lida; campoFoto = null } else foto = lida
                 arq.delete()
             }
         }
@@ -454,7 +461,8 @@ private fun ComprovanteEntrega(corrida: Corrida, parada: Parada, posicaoInicial:
             ex.codigo && codigo.length != 4 -> "Digite o código de 4 dígitos."
             ex.foto && foto == null -> "Tire a foto do comprovante."
             ex.assinatura && assinatura.vazia -> "Colete a assinatura."
-            else -> null
+            else -> campos.firstOrNull { k -> k.obrigatorio && if (k.tipo == "foto") fotosCampo[k.chave] == null else respostas[k.chave].isNullOrBlank() }
+                ?.let { k -> if (k.tipo == "foto") "Tire a foto: ${k.rotulo}." else "Preencha: ${k.rotulo}." }
         }
         if (erro != null) return
         enviando = true
@@ -464,6 +472,7 @@ private fun ComprovanteEntrega(corrida: Corrida, parada: Parada, posicaoInicial:
                 val f = foto
                 if (ex.foto && f != null) add(Corridas.FotoFila("foto_path", "foto", f, "image/jpeg"))
                 if (ex.assinatura) add(Corridas.FotoFila("assinatura_path", "assinatura", withContext(Dispatchers.Default) { assinatura.exportarPng() }, "image/png"))
+                fotosCampo.forEach { (k, b) -> add(Corridas.FotoFila("resp_$k", "campo-$k", b, "image/jpeg")) }
             }
             etapa = "Conferindo localização…"
             val posicao = PosicaoAtual.obter(ctx, 8_000) ?: posicaoInicial
@@ -473,6 +482,8 @@ private fun ComprovanteEntrega(corrida: Corrida, parada: Parada, posicaoInicial:
                 buildJsonObject {
                     put("recebedor_nome", nome.trim())
                     put("codigo", codigo)
+                    // respostas dos campos próprios: vão junto da etapa (também sem internet)
+                    respostas.forEach { (k, v) -> if (v.isNotBlank()) put("resp_$k", v.trim()) }
                 },
                 posicao = posicao,
                 ignorarLocal = ignorarLocal,
@@ -523,6 +534,36 @@ private fun ComprovanteEntrega(corrida: Corrida, parada: Parada, posicaoInicial:
                     TextButton(onClick = { assinatura.limpar() }) { Text("Limpar", color = c.ouro) }
                 }
                 PainelAssinatura(assinatura)
+            }
+        }
+
+        if (campos.isNotEmpty()) PwCartao {
+            Titulo(PwIcones.ListChecks, "Informações da parada")
+            campos.forEach { k ->
+                val rot = k.rotulo + if (k.obrigatorio) " *" else ""
+                when (k.tipo) {
+                    "sim_nao" -> com.pwexpress.core.designsystem.PwInterruptor(rot, respostas[k.chave] == "true", { respostas[k.chave] = it.toString() }, descricao = k.dica)
+                    "escolha" -> Column(Modifier.padding(vertical = 6.dp)) {
+                        Text(rot, color = c.texto2, fontSize = 13.sp)
+                        k.opcoes.forEach { o ->
+                            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { respostas[k.chave] = o }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(if (respostas[k.chave] == o) PwIcones.CircleCheck else PwIcones.Circle, null, tint = if (respostas[k.chave] == o) c.ouro else c.texto3, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp)); Text(o, color = c.texto)
+                            }
+                        }
+                    }
+                    "foto" -> Column(Modifier.padding(vertical = 6.dp)) {
+                        Text(rot, color = c.texto2, fontSize = 13.sp)
+                        fotosCampo[k.chave]?.let { b -> Fotos.miniatura(b)?.let { Image(it.asImageBitmap(), k.rotulo, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().height(160.dp).clip(RoundedCornerShape(14.dp))) } }
+                        PwBotaoVidro(if (fotosCampo[k.chave] == null) "Tirar foto" else "Tirar outra", onClick = {
+                            val (arq, uri) = Fotos.novoDestino(ctx); arquivoFoto = arq; campoFoto = k.chave; camera.launch(uri)
+                        }, icone = PwIcones.Camera, modifier = Modifier.fillMaxWidth())
+                    }
+                    else -> OutlinedTextField(respostas[k.chave] ?: "", { respostas[k.chave] = it }, label = { Text(rot + if (k.tipo == "dinheiro") " (R$)" else "") },
+                        supportingText = k.dica?.let { d -> { Text(d) } }, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = when (k.tipo) { "numero", "dinheiro" -> KeyboardType.Decimal; "telefone" -> KeyboardType.Phone; "documento" -> KeyboardType.Number; else -> KeyboardType.Text }),
+                        modifier = Modifier.fillMaxWidth())
+                }
             }
         }
 

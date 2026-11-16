@@ -264,7 +264,7 @@ fun DetalheCorridaG(id: String, onVoltar: () -> Unit) {
                     }
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text("${if (p.coleta) "Coleta" else "Entrega"} · ${rotuloParada(p.status)}", color = c.texto, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        Text("${com.pwexpress.core.perfil.Modalidades.nomeParada(p.coleta)} · ${rotuloParada(p.status)}", color = c.texto, fontWeight = FontWeight.SemiBold, maxLines = 1)
                         Text(p.endereco, color = c.texto2, fontSize = 13.5.sp)
                         listOfNotNull(p.contatoNome, p.contatoTelefone).joinToString(" ").takeIf { it.isNotBlank() }?.let { TextoDica(it) }
                         p.instrucoes?.let { TextoDica(it) }

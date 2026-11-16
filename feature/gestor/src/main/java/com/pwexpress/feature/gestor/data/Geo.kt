@@ -38,7 +38,7 @@ object Geo {
 
     suspend fun buscarEnderecos(texto: String): List<EnderecoG> {
         if (texto.trim().length < 4) return emptyList()
-        val corpo = get("https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=br&limit=6&accept-language=pt-BR&q=${URLEncoder.encode(texto, "UTF-8")}") ?: return emptyList()
+        val corpo = get("${com.pwexpress.core.mapa.ServidoresMapa.nominatim}/search?format=jsonv2&countrycodes=br&limit=6&accept-language=pt-BR&q=${URLEncoder.encode(texto, "UTF-8")}") ?: return emptyList()
         return tentar {
             (Json.parseToJsonElement(corpo) as JsonArray).mapNotNull { e ->
                 val o = e as? JsonObject ?: return@mapNotNull null
@@ -48,7 +48,7 @@ object Geo {
     }
 
     suspend fun enderecoDoPonto(lat: Double, lng: Double): String {
-        val corpo = get("https://nominatim.openstreetmap.org/reverse?format=jsonv2&accept-language=pt-BR&lat=$lat&lon=$lng")
+        val corpo = get("${com.pwexpress.core.mapa.ServidoresMapa.nominatim}/reverse?format=jsonv2&accept-language=pt-BR&lat=$lat&lon=$lng")
         return corpo?.let { tentar { encurtar(Json.parseToJsonElement(it).jsonObject.str("display_name").orEmpty()) }.getOrNull() }
             ?.ifBlank { null } ?: "%.5f, %.5f".format(lat, lng)
     }
@@ -56,7 +56,7 @@ object Geo {
     suspend fun calcularRota(pontos: List<Pair<Double, Double>>): RotaG? {
         if (pontos.size < 2) return null
         val coords = pontos.joinToString(";") { "${it.second},${it.first}" }
-        val corpo = get("https://router.project-osrm.org/route/v1/driving/$coords?overview=full&geometries=polyline") ?: return null
+        val corpo = get("${com.pwexpress.core.mapa.ServidoresMapa.osrm}/route/v1/driving/$coords?overview=full&geometries=polyline") ?: return null
         return tentar {
             val o = Json.parseToJsonElement(corpo).jsonObject
             val r = (o["routes"] as JsonArray).first().jsonObject

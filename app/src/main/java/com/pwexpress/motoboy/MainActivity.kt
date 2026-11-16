@@ -295,15 +295,18 @@ class MainActivity : ComponentActivity() {
                         }
                         o != null -> OfertaScreen(o, onFim = { }, modifier = conteudo)
                         !preparado -> PrimeiraConfiguracao(onPronto = { preparado = true }, modifier = conteudo)
-                        a != null && !verQuadroEmRota -> CorridaScreen(a, admin = p?.admin == true, modifier = conteudo, chatLigado = chatLigado,
+                        a != null && !verQuadroEmRota -> CorridaScreen(a, admin = p?.logico("especial_ignora_local", false) == true, modifier = conteudo, chatLigado = chatLigado,
                             onPainelGestor = if (podeTrocar) ({ trocar(Painel.GESTOR) }) else null,
                             onPegarMais = if ((p?.numero("motoboy_rotas_simultaneas", 1.0) ?: 1.0) > 1.0 && ativasTodas.size < (p?.numero("motoboy_rotas_simultaneas", 1.0) ?: 1.0).toInt())
                                 ({ verQuadroEmRota = true; aba = "corridas" }) else null)
                         naConfig && efetivo == Painel.MOTOBOY -> com.pwexpress.motoboy.ui.ConfigMotoApp(onVoltar = { naConfig = false }, modifier = conteudo)
                         else -> Box(conteudo.fillMaxSize()) {
                             val comPlanejadas = p?.modulo("corridas_planejadas") != false
-                            val comCarteira = p?.modulo("carteira") != false && p?.holeriteVisivel != false
-                            val abaMotoboy = when { aba == "corridas" -> "corridas"; aba == "carteira" && comCarteira -> "carteira"; else -> "inicio" }
+                            // cada aba pode ser escondida pelo Dev e pelo gestor (também por motoboy): Ajustes → Motoboys → App do motoboy
+                            val comCarteira = p?.modulo("carteira") != false && p?.holeriteVisivel != false && p?.logico("motoboy_aba_holerite", true) != false
+                            val comRotas = p?.logico("motoboy_aba_rotas", true) != false
+                            val comDia = p?.logico("motoboy_aba_dia", true) != false
+                            val abaMotoboy = when { aba == "corridas" && comRotas -> "corridas"; aba == "carteira" && comCarteira -> "carteira"; aba == "dia" && comDia -> "dia"; else -> "inicio" }
                             androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
                                 PwTopo { AcoesTopo(efetivo, podeTrocar, ::trocar) { conta = true } }
                                 if (a != null) com.pwexpress.motoboy.ui.FaixaVoltarCorrida(
@@ -313,13 +316,24 @@ class MainActivity : ComponentActivity() {
                                     when (abaMotoboy) {
                                         "corridas" -> PlanejadasScreen(onIniciada = { aba = "inicio"; verQuadroEmRota = false }, comPlanejadas = comPlanejadas)
                                         "carteira" -> com.pwexpress.feature.corridas.ui.CarteiraScreen()
+                                        // Seu dia: ganhos, rotas, km e nota, numa aba só para isso
+                                        "dia" -> com.pwexpress.core.designsystem.PwPagina {
+                                            com.pwexpress.core.designsystem.PwCabeca(PwIcones.LayoutDashboard, "Seu dia", "Ganhos, rotas e km de hoje")
+                                            com.pwexpress.feature.corridas.ui.AvisoSuspensao()
+                                            CartaoGanhos(onCarteira = if (comCarteira) ({ aba = "carteira" }) else null)
+                                            com.pwexpress.feature.corridas.ui.MinhaNota()
+                                            com.pwexpress.feature.tracking.ui.PainelEnvio()
+                                        }
+                                        // Início: só o botão (e os avisos que impedem de trabalhar)
                                         else -> TrackingScreen(
                                             saudacao = NomePerfil(s.email).substringBefore(" "),
                                             extras = {
                                                 androidx.compose.foundation.layout.Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(14.dp)) {
                                                     com.pwexpress.feature.corridas.ui.AvisoSuspensao()
-                                                    CartaoGanhos(onCarteira = if (comCarteira) ({ aba = "carteira" }) else null)
-                                                    com.pwexpress.feature.corridas.ui.MinhaNota()
+                                                    if (!comDia) {
+                                                        CartaoGanhos(onCarteira = if (comCarteira) ({ aba = "carteira" }) else null)
+                                                        com.pwexpress.feature.corridas.ui.MinhaNota()
+                                                    }
                                                 }
                                             },
                                             chips = { com.pwexpress.feature.tracking.ui.ChipInicio(PwIcones.Radar, com.pwexpress.motoboy.ui.textoRaio(p?.raioKm, p?.raioModo ?: "posicao")) { raioAberto = true } },
@@ -335,7 +349,8 @@ class MainActivity : ComponentActivity() {
                             PwBarraAbas(
                                 listOfNotNull(
                                     PwAba("inicio", "Início", PwIcones.House),
-                                    PwAba("corridas", "Rotas", PwIcones.Route, livres + if (comPlanejadas) reservas else 0),
+                                    if (comDia) PwAba("dia", "Seu dia", PwIcones.LayoutDashboard) else null,
+                                    if (comRotas) PwAba("corridas", "Rotas", PwIcones.Route, livres + if (comPlanejadas) reservas else 0) else null,
                                     if (comCarteira) PwAba("carteira", "Holerite", PwIcones.ReceiptText) else null,
                                 ),
                                 abaMotoboy, { aba = it },

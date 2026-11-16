@@ -34,6 +34,7 @@ sealed interface TelaG {
     data class Corrida(val id: String) : TelaG
     data object NovaCorrida : TelaG
     data object NovoPedido : TelaG
+    data class EditarPedido(val id: String) : TelaG
     data class Empresa(val id: String?) : TelaG
     data class Membro(val id: String) : TelaG
     data object Financeiro : TelaG
@@ -149,6 +150,7 @@ fun GestorApp(
                 when (atual) {
                     is TelaG.Corrida -> DetalheCorridaG(atual.id, onVoltar = ::voltar)
                     TelaG.NovoPedido -> NovoPedidoG(onVoltar = ::voltar, onCriado = { voltar(); aba = "operacao"; subOperacao = 0 })
+                    is TelaG.EditarPedido -> NovoPedidoG(onVoltar = ::voltar, onCriado = { voltar() }, editar = atual.id)
                     TelaG.NovaCorrida -> NovaCorridaG(onVoltar = ::voltar, onCriada = { id -> voltar(); abrir(TelaG.Corrida(id)) })
                     is TelaG.Empresa -> EmpresaG(atual.id, onVoltar = ::voltar)
                     is TelaG.Membro -> MembroG(atual.id, meuId = meuId, onVoltar = ::voltar)

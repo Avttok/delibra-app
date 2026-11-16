@@ -116,6 +116,7 @@ fun PedidosG(onNovo: () -> Unit = {}) {
             PwBotaoIcone(PwIcones.Sparkles, "Montar rotas agora", {
                 if (!ocupado) { ocupado = true; escopo.launch { Gestao.roteirizarAgora().onSuccess { PwToast.mostrar("Rotas montadas com os pedidos aprovados.", TipoAviso.OK) }.onFailure { PwToast.mostrar(it.message ?: "Erro", TipoAviso.ERRO) }; Gestao.atualizar(); ocupado = false } }
             }, tamanho = 38.dp)
+            BotaoAjustesG("Ajustes dos pedidos", listOf("pedidos", "aprender", "rotas", "cli_pode", "faturas"))
             PwBotaoIcone(PwIcones.Plus, "Novo pedido", onNovo, ativo = true, tamanho = 38.dp)
         }
         CampoBusca(busca, { busca = it }, "Buscar nº, cliente, endereço, motoboy…")
@@ -338,6 +339,9 @@ private fun JanelaPedido(p: PedidoG, empresa: String?, onFechar: () -> Unit) {
                 else rodar(if (p.cobranca == "pre_pago" && p.pagamentoStatus == "pendente") "Aprovado. Cliente pré-pago: a rota sai quando o pagamento for confirmado." else "Aprovado: vai para as rotas.") { Gestao.revisarPedido(p.id, "aprovar", if (mudou) valorNum else null, motivo.ifBlank { null }) }
             }, icone = PwIcones.Check, habilitado = !ocupado)
         }
+        // editar com as mesmas opções da criação (antes de qualquer coleta ou entrega feita)
+        if (p.status in setOf("recebido", "aprovado", "roteirizado", "em_rota") && p.pontos.none { it.status == "concluido" })
+            PwBotaoVidro("Editar pedido", onClick = { GestorNav.abrir(TelaG.EditarPedido(p.id)) }, icone = PwIcones.Pencil, modifier = Modifier.fillMaxWidth())
         if (p.status in setOf("recebido", "aprovado")) {
             if (!recusar) PwBotaoPerigo("Recusar pedido", onClick = { recusar = true }, modifier = Modifier.fillMaxWidth())
             else {

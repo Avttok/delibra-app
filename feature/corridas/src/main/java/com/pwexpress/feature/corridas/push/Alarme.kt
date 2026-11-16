@@ -133,6 +133,32 @@ object Alarme {
         ctx.getSystemService(NotificationManager::class.java)?.notify(NOTIF_OFERTA, n)
     }
 
+    private const val CANAL_URGENTE = "pwex_urgente_v1"
+
+    /**
+     * Pedido urgente para o gestor (motoboy fora do raio pedindo liberação, ou pedindo para cancelar):
+     * toca alto e repete até abrir, como a oferta do motoboy. Abre direto na rota.
+     */
+    fun urgenteGestor(ctx: Context, id: Int, titulo: String, texto: String, alvo: String) {
+        criarCanais(ctx)
+        val nm = ctx.getSystemService(NotificationManager::class.java) ?: return
+        val som = Uri.parse("${ContentResolver.SCHEME_ANDROID_RESOURCE}://${ctx.packageName}/${R.raw.pwex_oferta}")
+        nm.createNotificationChannel(NotificationChannel(CANAL_URGENTE, "Pedidos urgentes dos motoboys", NotificationManager.IMPORTANCE_HIGH).apply {
+            description = "Liberar parada e cancelar rota: toca alto até você abrir"
+            setSound(som, AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+            enableVibration(true); vibrationPattern = longArrayOf(0, 600, 300, 600, 300, 900)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC; setBypassDnd(true)
+        })
+        val abrir = PwNotificacoes.abrirApp(ctx, id, alvo)
+        val n = PwNotificacoes.base(ctx, CANAL_URGENTE).setContentTitle(titulo).setContentText(texto)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(texto))
+            .setPriority(NotificationCompat.PRIORITY_MAX).setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setContentIntent(abrir).apply { if (abrir != null) setFullScreenIntent(abrir, true) }
+            .setAutoCancel(true).setTimeoutAfter(10 * 60_000L).build()
+        n.flags = n.flags or Notification.FLAG_INSISTENT
+        nm.notify(id, n)
+    }
+
     fun pararOferta(ctx: Context) {
         ctx.getSystemService(NotificationManager::class.java)?.cancel(NOTIF_OFERTA)
     }

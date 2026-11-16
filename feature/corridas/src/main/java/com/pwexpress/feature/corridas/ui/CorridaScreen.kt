@@ -85,7 +85,7 @@ import java.io.File
 
 /**
  * Corrida em andamento: mapa com a rota dourada, uma parada por vez.
- * [admin] = conta gestor + motoboy (pode ignorar a localização em corridas de teste).
+ * [admin] = permissão especial do Dev (avançar fora do local em corridas de teste).
  */
 @Composable
 fun CorridaScreen(

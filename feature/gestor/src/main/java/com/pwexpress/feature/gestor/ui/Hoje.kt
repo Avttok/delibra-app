@@ -59,14 +59,27 @@ internal fun HojeG(onAba: (String) -> Unit) {
     val c = Pw.cores
     var p by remember { mutableStateOf<JsonObject?>(null) }
     var erro by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) {
+    // outra data: o mesmo painel daquele dia
+    var dia by remember { mutableStateOf(java.time.LocalDate.now()) }
+    val ehHoje = dia == java.time.LocalDate.now()
+    LaunchedEffect(dia) {
+        p = null
         while (true) {
-            Gestao.rpcJson("painel_do_dia").onSuccess { p = it as? JsonObject; erro = null }.onFailure { erro = it.message }
+            Gestao.rpcJson("painel_do_dia", kotlinx.serialization.json.buildJsonObject { put("p_dia", kotlinx.serialization.json.JsonPrimitive(dia.toString())) })
+                .onSuccess { p = it as? JsonObject; erro = null }.onFailure { erro = it.message }
             delay(30_000)
         }
     }
     PwPagina {
-        TituloTela("Hoje", java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("EEEE, dd 'de' MMMM", java.util.Locale("pt", "BR"))), PwIcones.LayoutDashboard)
+        TituloTela(if (ehHoje) "Hoje" else "Dia", dia.format(java.time.format.DateTimeFormatter.ofPattern(if (ehHoje) "EEEE, dd 'de' MMMM" else "EEEE, dd/MM/yyyy", java.util.Locale("pt", "BR"))), PwIcones.LayoutDashboard)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.ChevronLeft, "Dia anterior", { dia = dia.minusDays(1) }, tamanho = 38.dp)
+            com.pwexpress.core.designsystem.PwBotaoVidro(dia.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")), onClick = { dia = java.time.LocalDate.now() }, icone = PwIcones.CalendarClock)
+            com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.ChevronRight, "Próximo dia", { if (!ehHoje) dia = dia.plusDays(1) }, tamanho = 38.dp, habilitado = !ehHoje)
+            Spacer(Modifier.weight(1f))
+            BotaoAjustesG("Ajustes gerais", listOf("plataforma", "quadro", "despacho"))
+        }
+        if (!ehHoje) TextoDica("Mostrando o dia escolhido. Toque na data para voltar para hoje. Os números de agora (na rua, online) são sempre ao vivo.")
         PwErro(erro)
         val d = p ?: return@PwPagina
         fun n(k: String) = d.int(k) ?: 0
@@ -89,7 +102,7 @@ internal fun HojeG(onAba: (String) -> Unit) {
             }
         }
         PwCartao(destaque = true) {
-            PwRotulo("Faturado hoje")
+            PwRotulo(if (ehHoje) "Faturado hoje" else "Faturado no dia")
             Text(moedaBr(d.dbl("faturamento_hoje")), color = c.ouro, fontFamily = ArchivoLargo, fontWeight = FontWeight.Black, fontSize = 34.sp)
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 MiniValor("Empresa", moedaBr(d.dbl("gestao_hoje")), Modifier.weight(1f))

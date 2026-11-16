@@ -34,6 +34,7 @@ sealed interface TelaG {
     data class Corrida(val id: String) : TelaG
     data object NovaCorrida : TelaG
     data object NovoPedido : TelaG
+    data class EditarPedido(val id: String) : TelaG
     data class Empresa(val id: String?) : TelaG
     data class Membro(val id: String) : TelaG
     data object Financeiro : TelaG
@@ -41,6 +42,7 @@ sealed interface TelaG {
     data object Dev : TelaG
     data object Excecoes : TelaG
     data object Historico : TelaG
+    data object HistoricoRotas : TelaG
     data class CatalogoT(val cat: Catalogo) : TelaG
     /** Ajustes → Modalidades: "campos", "nomes", "taxas" ou "cargos". */
     data class Modalidade(val qual: String) : TelaG
@@ -135,6 +137,8 @@ fun GestorApp(
 
     Box(modifier.fillMaxSize()) {
         val atual = pilha.lastOrNull()
+        // pedido urgente de motoboy (liberar parada, cancelar rota): janela com som em qualquer tela
+        ChamadoUrgenteG(onAbrir = { abrir(TelaG.Corrida(it)) })
         Column(Modifier.fillMaxSize()) {
             if (atual == null) topo()
             faixa?.invoke()
@@ -146,6 +150,7 @@ fun GestorApp(
                 when (atual) {
                     is TelaG.Corrida -> DetalheCorridaG(atual.id, onVoltar = ::voltar)
                     TelaG.NovoPedido -> NovoPedidoG(onVoltar = ::voltar, onCriado = { voltar(); aba = "operacao"; subOperacao = 0 })
+                    is TelaG.EditarPedido -> NovoPedidoG(onVoltar = ::voltar, onCriado = { voltar() }, editar = atual.id)
                     TelaG.NovaCorrida -> NovaCorridaG(onVoltar = ::voltar, onCriada = { id -> voltar(); abrir(TelaG.Corrida(id)) })
                     is TelaG.Empresa -> EmpresaG(atual.id, onVoltar = ::voltar)
                     is TelaG.Membro -> MembroG(atual.id, meuId = meuId, onVoltar = ::voltar)
@@ -153,6 +158,7 @@ fun GestorApp(
                     TelaG.Configuracoes -> ConfiguracoesG(onVoltar = ::voltar, onAbrir = { abrir(it) })
                     TelaG.Excecoes -> ExcecoesG(onVoltar = ::voltar)
                     TelaG.Historico -> HistoricoG(onVoltar = ::voltar)
+                    TelaG.HistoricoRotas -> HistoricoRotasG(onVoltar = ::voltar, onAbrir = { abrir(TelaG.Corrida(it)) })
                     is TelaG.CatalogoT -> CatalogoG(atual.cat, onVoltar = ::voltar)
                     is TelaG.Modalidade -> ModalidadeG(atual.qual, onVoltar = ::voltar)
                     TelaG.Dev -> DevG(onVoltar = ::voltar)
@@ -166,7 +172,7 @@ fun GestorApp(
                             listOf(paraRevisar, planejadas + semMotoboy).let { if (comPedidos) it else it.drop(1) },
                         ) { i ->
                             if (comPedidos && i == 0) PedidosG(onNovo = { abrir(TelaG.NovoPedido) })
-                            else CorridasG(onAbrir = { abrir(TelaG.Corrida(it)) }, onNova = { abrir(TelaG.NovaCorrida) })
+                            else CorridasG(onAbrir = { abrir(TelaG.Corrida(it)) }, onNova = { abrir(TelaG.NovaCorrida) }, onHistorico = { abrir(TelaG.HistoricoRotas) })
                         }
                         "pessoas" -> ComSubAbas(listOf("Clientes" to PwIcones.Building2, "Equipe" to PwIcones.Users), subPessoas, { subPessoas = it }) { i ->
                             if (i == 0) EmpresasG(onAbrir = { abrir(TelaG.Empresa(it)) }) else EquipeG(onAbrir = { abrir(TelaG.Membro(it)) })

@@ -115,7 +115,13 @@ class FcmService : FirebaseMessagingService() {
                 PwDestaque.mostrar(message.data["titulo"] ?: "EMERGÊNCIA", message.data["texto"], EstiloDestaque.CANCELADA, duracaoMs = 12_000)
             }
             // avisos do gestor: motoboy pedindo para cancelar ou liberar parada, motoboy suspenso, nota ruim, rota fechada sem sinal
-            "chamado_cancelar", "motoboy_suspenso", "chamado_pular", "avaliacao_ruim", "corrida_fechada_auto" -> {
+            // pedido urgente do motoboy: toca alto até o gestor abrir
+            "chamado_cancelar", "chamado_pular" -> {
+                val corrida = message.data["corrida_id"].orEmpty()
+                Alarme.urgenteGestor(applicationContext, 4500 + ((message.data["chamado_id"] ?: corrida).hashCode() and 0xFF),
+                    message.data["titulo"] ?: "Motoboy pedindo resposta", message.data["texto"] ?: "", if (corrida.isNotBlank()) "gestor:corrida:$corrida" else "gestor:equipe")
+            }
+            "motoboy_suspenso", "avaliacao_ruim", "corrida_fechada_auto" -> {
                 val corrida = message.data["corrida_id"].orEmpty()
                 val idN = 4500 + ((message.data["chamado_id"] ?: corrida).hashCode() and 0xFF)
                 PwNotificacoes.cartao(applicationContext, idN, PwNotificacoes.CANAL_AVISOS,

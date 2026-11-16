@@ -54,6 +54,7 @@ import com.pwexpress.core.designsystem.PwToast
 import com.pwexpress.core.designsystem.PwValor
 import com.pwexpress.core.designsystem.TemaApp
 import com.pwexpress.core.designsystem.TipoAviso
+import com.pwexpress.feature.gestor.data.iso
 import com.pwexpress.core.designsystem.moedaBr
 import com.pwexpress.core.mapa.PinoMapa
 import com.pwexpress.core.mapa.PwMapa
@@ -77,8 +78,12 @@ import java.util.Calendar
 internal fun iconeDoNome(nome: String?): ImageVector = com.pwexpress.core.designsystem.iconePorNome(nome)
 
 private var seqItem = 0
-private class ItemForm(val categoria: CategoriaG?, val entrega: String? = null) {
+/** Item da coleta ("o que se coleta aqui"). [destinos]: quanto dele vai para cada entrega (chave do ponto → quantidade). */
+private class ItemForm(val categoria: CategoriaG?, val coleta: String? = null) {
     val chave = "i${++seqItem}"
+    val destinos = androidx.compose.runtime.mutableStateMapOf<String, Int>()
+    val total get() = (num(quantidade) ?: 1.0).toInt().coerceAtLeast(1)
+    val livre get() = total - destinos.values.sum()
     var descricao by mutableStateOf("")
     var quantidade by mutableStateOf("1")
     var peso by mutableStateOf("")
@@ -96,7 +101,7 @@ private fun num(s: String) = s.trim().replace(',', '.').toDoubleOrNull()
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun NovoPedidoG(onVoltar: () -> Unit, onCriado: () -> Unit) {
+fun NovoPedidoG(onVoltar: () -> Unit, onCriado: () -> Unit, editar: String? = null) {
     val c = Pw.cores
     val dados by Gestao.dados.collectAsState()
     val teste by TemaApp.modoTeste.collectAsState()
@@ -122,6 +127,41 @@ fun NovoPedidoG(onVoltar: () -> Unit, onCriado: () -> Unit) {
     var orc by remember { mutableStateOf<JsonObject?>(null) }
     var erro by remember { mutableStateOf<String?>(null) }
     var enviando by remember { mutableStateOf(false) }
+
+    // editar: carrega o pedido no mesmo formulário da criação
+    var numeroEd by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(editar, categorias) {
+        val id = editar ?: return@LaunchedEffect
+        if (numeroEd != null) return@LaunchedEffect
+        Gestao.rpcJson("pedido_para_editar", buildJsonObject { put("p_pedido", id) }).onSuccess { e ->
+            val d = e as? JsonObject ?: return@onSuccess
+            fun JsonObject.t(k: String) = (this[k] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
+            numeroEd = d.t("numero")?.toLongOrNull()
+            empresaId = d.t("empresa_id"); avulso = d.t("cliente_nome").orEmpty(); urgente = d.t("urgente") == "true"
+            tipoPedido = d.t("tipo_pedido") ?: "padrao"; obs = d.t("observacoes").orEmpty()
+            d.t("quando")?.let { q -> iso(q)?.let { planejar = true; quando = it } }
+            (d["regras"] as? JsonObject)?.let { regras = it }
+            paradas.clear()
+            (d["pontos"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.forEach { x ->
+                paradas.add(ParadaForm(x.t("tipo") == "coleta").apply {
+                    endereco = x.t("endereco").orEmpty(); lat = x.t("lat")?.toDoubleOrNull(); lng = x.t("lng")?.toDoubleOrNull()
+                    contato = x.t("contato_nome").orEmpty(); telefone = x.t("contato_telefone").orEmpty(); instrucoes = x.t("instrucoes").orEmpty()
+                    exigeFoto = x.t("exige_foto") == "true"; exigeNome = x.t("exige_nome") == "true"; exigeAssinatura = x.t("exige_assinatura") == "true"; exigeCodigo = x.t("exige_codigo") == "true"
+                    janelaDe = x.t("janela_de").orEmpty(); janelaAte = x.t("janela_ate").orEmpty()
+                })
+            }
+            val c0 = paradas.firstOrNull { it.coleta }?.chave
+            itens.clear()
+            (d["itens"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.forEach { x ->
+                val col = x.t("coleta")?.toIntOrNull()?.let { paradas.getOrNull(it)?.chave } ?: c0
+                itens.add(ItemForm(categorias.find { it.id == x.t("categoria_id") }, col).apply {
+                    descricao = x.t("descricao").orEmpty(); quantidade = x.t("quantidade") ?: "1"
+                    peso = x.t("peso_kg").orEmpty(); comp = x.t("comprimento_cm").orEmpty(); larg = x.t("largura_cm").orEmpty(); alt = x.t("altura_cm").orEmpty(); valor = x.t("valor_declarado").orEmpty()
+                    x.t("entrega")?.toIntOrNull()?.let { paradas.getOrNull(it)?.chave }?.let { destinos[it] = total }
+                })
+            }
+        }.onFailure { erro = it.message }
+    }
 
     fun escolherCliente(id: String?) {
         empresaId = id
@@ -167,22 +207,31 @@ fun NovoPedidoG(onVoltar: () -> Unit, onCriado: () -> Unit) {
             })
         }
     }
+    // cada item da coleta vira uma linha por entrega (com a quantidade daquela entrega); o que sobrar vai "para todas"
     fun itensJson() = buildJsonArray {
+        val entregas = paradas.filter { !it.coleta }.map { it.chave }
         itens.forEach { x ->
-            add(buildJsonObject {
-                put("descricao", x.descricao.trim()); x.categoria?.let { put("categoria_id", it.id) } ?: put("categoria_id", JsonNull)
-                put("quantidade", (num(x.quantidade) ?: 1.0).toInt().coerceAtLeast(1))
-                num(x.peso)?.let { put("peso_kg", it) }; num(x.comp)?.let { put("comprimento_cm", it) }
-                num(x.larg)?.let { put("largura_cm", it) }; num(x.alt)?.let { put("altura_cm", it) }; num(x.valor)?.let { put("valor_declarado", it) }
-                // pacote de uma entrega só: vai com o índice do ponto (igual ao site do cliente)
-                paradas.indexOfFirst { it.chave == x.entrega }.takeIf { it >= 0 }?.let { put("entrega", it) }
-            })
+            val partes = x.destinos.filter { (k, q) -> q > 0 && k in entregas }.toList().toMutableList<Pair<String?, Int>>()
+            if (partes.isEmpty() && entregas.size == 1) partes.add(entregas[0] to x.total)
+            val sobra = x.total - partes.sumOf { it.second }
+            if (sobra > 0 || partes.isEmpty()) partes.add(null to sobra.coerceAtLeast(1))
+            partes.forEach { (entrega, q) ->
+                add(buildJsonObject {
+                    put("descricao", x.descricao.trim()); x.categoria?.let { put("categoria_id", it.id) } ?: put("categoria_id", JsonNull)
+                    put("quantidade", q)
+                    num(x.peso)?.let { put("peso_kg", it) }; num(x.comp)?.let { put("comprimento_cm", it) }
+                    num(x.larg)?.let { put("largura_cm", it) }; num(x.alt)?.let { put("altura_cm", it) }
+                    num(x.valor)?.let { put("valor_declarado", kotlin.math.round(it * q / x.total * 100) / 100) }
+                    paradas.indexOfFirst { it.chave == x.coleta }.takeIf { it >= 0 }?.let { put("coleta", it) }
+                    paradas.indexOfFirst { it.chave == entrega }.takeIf { it >= 0 }?.let { put("entrega", it) }
+                })
+            }
         }
     }
     val quandoIso = if (planejar) Instant.ofEpochMilli(quando).toString() else null
 
     // orçamento ao vivo
-    val chaveOrc = listOf(regras.toString(), empresaId, tipoPedido, urgente, quandoIso, rota?.distanciaM, chaveRota, distEntrega.toMap(), itens.joinToString { "${it.categoria?.id}${it.quantidade}${it.peso}${it.comp}${it.larg}${it.alt}${it.entrega}" }).joinToString("§")
+    val chaveOrc = listOf(regras.toString(), empresaId, tipoPedido, urgente, quandoIso, rota?.distanciaM, chaveRota, distEntrega.toMap(), itens.joinToString { "${it.categoria?.id}${it.quantidade}${it.peso}${it.comp}${it.larg}${it.alt}${it.coleta}${it.destinos.toMap()}" }).joinToString("§")
     LaunchedEffect(chaveOrc) {
         if (paradas.any { it.lat == null }) { orc = null; return@LaunchedEffect }
         delay(450)
@@ -204,6 +253,7 @@ fun NovoPedidoG(onVoltar: () -> Unit, onCriado: () -> Unit) {
         enviando = true
         escopo.launch {
             Gestao.criarPedido(buildJsonObject {
+                editar?.let { put("editar_id", it) }
                 empresaId?.let { put("empresa_id", it) } ?: put("cliente_nome", avulso.trim())
                 put("teste", teste); quandoIso?.let { put("quando", it) }; put("urgente", urgente); put("tipo_pedido", tipoPedido)
                 obs.trim().takeIf { it.isNotEmpty() }?.let { put("observacoes", it) }
@@ -211,7 +261,7 @@ fun NovoPedidoG(onVoltar: () -> Unit, onCriado: () -> Unit) {
                 put("pontos", pontosJson()); put("itens", itensJson())
                 if (regras.isNotEmpty()) put("regras", JsonObject(regras))
             }).onSuccess {
-                PwToast.mostrar("O roteirizador já está montando a rota.", TipoAviso.OK, "Pedido criado")
+                PwToast.mostrar(if (editar != null) "As rotas que ainda não saíram foram refeitas." else "O roteirizador já está montando a rota.", TipoAviso.OK, if (editar != null) "Pedido salvo" else "Pedido criado")
                 Gestao.atualizar(); onCriado()
             }.onFailure { erro = it.message }
             enviando = false
@@ -219,7 +269,10 @@ fun NovoPedidoG(onVoltar: () -> Unit, onCriado: () -> Unit) {
     }
 
     PwPagina {
-        Cabecalho("Novo pedido", onVoltar, subtitulo = if (teste) "Pedido de teste" else "Vira rota sozinho")
+        Cabecalho(if (editar != null) "Editar pedido" + (numeroEd?.let { " #$it" } ?: "") else "Novo pedido", onVoltar,
+            subtitulo = if (editar != null) "Ao salvar, as rotas que ainda não saíram são refeitas" else if (teste) "Pedido de teste" else "Vira rota sozinho") {
+            BotaoAjustesG("Ajustes do pedido", listOf("pedidos", "precocliente", "preco", "comprovantes", "cli_pode"))
+        }
 
         PwCartao {
             PwRotulo("Cliente")
@@ -254,15 +307,36 @@ fun NovoPedidoG(onVoltar: () -> Unit, onCriado: () -> Unit) {
         paradas.forEachIndexed { i, p ->
             CartaoParadaForm(p, i, paradas.size,
                 onMover = { d -> val j = i + d; if (j in paradas.indices) { val x = paradas.removeAt(i); paradas.add(j, x) } },
-                onRemover = { itens.removeAll { it.entrega == p.chave }; paradas.remove(p) }, onMarcar = { marcando = p }, comOpcoes = true)
-            // o que vai para esta entrega, direto no ponto (como no site do cliente)
-            if (!p.coleta) Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 4.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("O que vai para esta entrega", color = c.texto2, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                onRemover = { itens.removeAll { it.coleta == p.chave }; itens.forEach { it.destinos.remove(p.chave) }; paradas.remove(p) }, onMarcar = { marcando = p }, comOpcoes = true)
+            // coleta: o que se coleta aqui (todos os produtos e os detalhes)
+            if (p.coleta) Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 4.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("O que se coleta aqui", color = c.texto2, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     categorias.forEach { k -> Ficha(k.nome, if (k.perigoso) PwIcones.FlaskConical else iconeDoNome(k.icone), false, if (k.perigoso) c.vermelho else null) { itens.add(ItemForm(k, p.chave)) } }
                     Ficha("Outro", PwIcones.Package, false) { itens.add(ItemForm(null, p.chave)) }
                 }
-                itens.filter { it.entrega == p.chave }.forEach { x -> CartaoItem(x, onRemover = { itens.remove(x) }) }
+                itens.filter { it.coleta == p.chave }.forEach { x -> CartaoItem(x, onRemover = { itens.remove(x) }) }
+            }
+            // entrega: os itens das coletas viram botões; toque para mandar para cá (com − e + quando há mais de um)
+            if (!p.coleta) Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 4.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("O que vai para esta entrega", color = c.texto2, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                val daColeta = itens.filter { x -> paradas.any { it.chave == x.coleta && it.coleta } }
+                if (daColeta.isEmpty()) TextoDica("Coloque os itens na coleta e escolha aqui o que vem para esta entrega.")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    daColeta.forEach { x ->
+                        val aqui = x.destinos[p.chave] ?: 0
+                        val nome = x.descricao.trim().ifEmpty { x.categoria?.nome ?: "Item" } + if (x.total > 1) " $aqui/${x.total}" else ""
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Ficha(nome, if (x.categoria?.perigoso == true) PwIcones.FlaskConical else iconeDoNome(x.categoria?.icone), aqui > 0) {
+                                if (aqui > 0) x.destinos.remove(p.chave) else if (x.livre > 0) x.destinos[p.chave] = if (x.total == 1) 1 else x.livre
+                            }
+                            if (x.total > 1 && aqui > 0) {
+                                PwBotaoIcone(PwIcones.Minus, "Menos", { if (aqui <= 1) x.destinos.remove(p.chave) else x.destinos[p.chave] = aqui - 1 }, tamanho = 30.dp)
+                                PwBotaoIcone(PwIcones.Plus, "Mais", { if (x.livre > 0) x.destinos[p.chave] = aqui + 1 }, tamanho = 30.dp, habilitado = x.livre > 0)
+                            }
+                        }
+                    }
+                }
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -275,17 +349,6 @@ fun NovoPedidoG(onVoltar: () -> Unit, onCriado: () -> Unit) {
         }
 
         PwCartao {
-            var paraTodos by remember { mutableStateOf(false) }
-            if (!paraTodos && itens.none { it.entrega == null }) {
-                com.pwexpress.core.designsystem.PwBotaoVidro("Especificar pacote para todas as entregas", onClick = { paraTodos = true }, icone = PwIcones.Boxes, modifier = Modifier.fillMaxWidth())
-            } else {
-                PwRotulo("Para todas as entregas")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    categorias.forEach { k -> Ficha(k.nome, if (k.perigoso) PwIcones.FlaskConical else iconeDoNome(k.icone), false, if (k.perigoso) c.vermelho else null) { itens.add(ItemForm(k)) } }
-                    Ficha("Outro", PwIcones.Package, false) { itens.add(ItemForm(null)) }
-                }
-                itens.filter { it.entrega == null }.forEach { x -> CartaoItem(x, onRemover = { itens.remove(x) }) }
-            }
             PwCampo(obs, { obs = it }, "Observações para o motoboy", linhas = 2)
         }
 
@@ -314,7 +377,7 @@ fun NovoPedidoG(onVoltar: () -> Unit, onCriado: () -> Unit) {
         com.pwexpress.core.designsystem.PwBotaoVidro("Regras deste pedido" + if (regras.isNotEmpty()) " (${regras.size})" else "", onClick = { editandoRegras = true },
             icone = PwIcones.Layers, modifier = Modifier.fillMaxWidth())
         PwErro(erro)
-        PwBotaoOuro(if (enviando) "Criando…" else "Criar pedido", onClick = ::enviar, icone = PwIcones.Package2, habilitado = !enviando, altura = 58.dp)
+        PwBotaoOuro(if (enviando) (if (editar != null) "Salvando…" else "Criando…") else if (editar != null) "Salvar pedido" else "Criar pedido", onClick = ::enviar, icone = PwIcones.Package2, habilitado = !enviando, altura = 58.dp)
     }
 
     marcando?.let { p ->

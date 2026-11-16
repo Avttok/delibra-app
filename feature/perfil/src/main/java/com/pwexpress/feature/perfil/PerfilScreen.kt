@@ -167,7 +167,8 @@ fun PerfilScreen(
         CartaoDoisPassos()
 
         // ---------------------------------------------------------- diagnóstico (administrador)
-        if (perfil?.admin == true) {
+        // diagnóstico: permissão especial que só o Dev concede (para todos, por empresa ou por pessoa)
+        if (perfil?.dev == true || perfil?.logico("especial_diagnostico", false) == true) {
             PwCartao {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(PwIcones.Bug, null, tint = c.ouro, modifier = Modifier.size(18.dp))

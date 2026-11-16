@@ -229,6 +229,11 @@ private fun MapaBase(
         }
     }
     var mapa by remember { mutableStateOf<MapLibreMap?>(null) }
+    // + e − vindos dos botões da própria tela (alinhados com os outros botões dela)
+    LaunchedEffect(mapa) {
+        val m = mapa ?: return@LaunchedEffect
+        ControleMapa.zoom.collect { d -> m.animateCamera(if (d > 0) CameraUpdateFactory.zoomIn() else CameraUpdateFactory.zoomOut(), 250) }
+    }
     var estilo by remember { mutableStateOf<Style?>(null) }
     // rota planejada (linhas brancas): mostrar/esconder vale para todos os mapas do app
     val verPlano by RotaPlanejada.visivel.collectAsState()
@@ -534,15 +539,15 @@ private fun MapaBase(
             botoes?.invoke(this)
             if (controles) {
                 if (botoes != null) androidx.compose.foundation.layout.Spacer(Modifier.size(4.dp))
-                com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.Plus, "Aproximar", { mapa?.animateCamera(CameraUpdateFactory.zoomIn(), 250) }, tamanho = 44.dp)
-                com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.Minus, "Afastar", { mapa?.animateCamera(CameraUpdateFactory.zoomOut(), 250) }, tamanho = 44.dp)
+                com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.Plus, "Aproximar", { mapa?.animateCamera(CameraUpdateFactory.zoomIn(), 250) }, tamanho = 40.dp)
+                com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.Minus, "Afastar", { mapa?.animateCamera(CameraUpdateFactory.zoomOut(), 250) }, tamanho = 40.dp)
                 minhaPosicao?.let { eu ->
                     com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.LocateFixed, "Ir até mim", {
                         mapa?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(eu.first, eu.second), maxOf(mapa?.cameraPosition?.zoom ?: 15.0, 15.0)), 500)
-                    }, tamanho = 44.dp)
+                    }, tamanho = 40.dp)
                 }
                 if (controlesLocais) com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.Store, if (comLocais) "Esconder estabelecimentos" else "Mostrar estabelecimentos",
-                    { Estabelecimentos.definir(!comLocais) }, tamanho = 44.dp, ativo = comLocais)
+                    { Estabelecimentos.definir(!comLocais) }, tamanho = 40.dp, ativo = comLocais)
             }
         }
     }
@@ -624,12 +629,12 @@ fun PwMapa(
             PwIcones.Maximize2, "Tela cheia", { cheio = true },
             modifier = Modifier.align(botaoTelaCheiaEm).padding(10.dp), tamanho = 40.dp,
         )
-        if (rota != null || rotas.isNotEmpty() || restanteDe != null) {
+        if (maximizavel && (rota != null || rotas.isNotEmpty() || restanteDe != null)) {
             val padraoPlano = com.pwexpress.core.perfil.Perfis.perfil.collectAsState().value?.logico("mapa_rota_planejada", true) ?: true
             var ver by com.pwexpress.core.designsystem.lembrarLigado("mapa_ver_plano", padraoPlano)
             LaunchedEffect(ver) { RotaPlanejada.visivel.value = ver }
             com.pwexpress.core.designsystem.PwBotaoIcone(if (ver) PwIcones.Eye else PwIcones.EyeOff, if (ver) "Esconder a rota planejada" else "Mostrar a rota planejada", { ver = !ver },
-                modifier = Modifier.align(androidx.compose.ui.Alignment.TopStart).padding(start = 10.dp, top = if (maximizavel && botaoTelaCheia && botaoTelaCheiaEm == androidx.compose.ui.Alignment.TopStart) 58.dp else 10.dp), tamanho = 36.dp, ativo = ver)
+                modifier = Modifier.align(androidx.compose.ui.Alignment.BottomEnd).padding(end = 10.dp, bottom = (margemBaixo + atribuicaoAcima + 10).dp), tamanho = 36.dp, ativo = ver)
         }
     }
     if (cheio) androidx.compose.ui.window.Dialog(
@@ -824,3 +829,15 @@ private fun criarCamadas(ctx: Context, s: Style, escuro: Boolean, ouro: String, 
 
 /** Mostrar ou esconder a rota planejada (linhas brancas) em todos os mapas. O padrão vem de Ajustes → Mapa. */
 object RotaPlanejada { val visivel = kotlinx.coroutines.flow.MutableStateFlow(true) }
+
+/** Aproximar (+1) e afastar (−1) pedidos pelos botões da tela, para o mapa que estiver aberto. */
+object ControleMapa { val zoom = kotlinx.coroutines.flow.MutableSharedFlow<Int>(extraBufferCapacity = 4) }
+
+/** Botão de olho da rota planejada para telas que põem os botões do mapa numa coluna própria. */
+@androidx.compose.runtime.Composable
+fun BotaoRotaPlanejada(tamanho: androidx.compose.ui.unit.Dp = 40.dp) {
+    val padraoPlano = com.pwexpress.core.perfil.Perfis.perfil.collectAsState().value?.logico("mapa_rota_planejada", true) ?: true
+    var ver by com.pwexpress.core.designsystem.lembrarLigado("mapa_ver_plano", padraoPlano)
+    LaunchedEffect(ver) { RotaPlanejada.visivel.value = ver }
+    com.pwexpress.core.designsystem.PwBotaoIcone(if (ver) PwIcones.Eye else PwIcones.EyeOff, if (ver) "Esconder a rota planejada" else "Mostrar a rota planejada", { ver = !ver }, tamanho = tamanho, ativo = ver)
+}

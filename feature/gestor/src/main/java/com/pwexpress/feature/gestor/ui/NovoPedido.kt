@@ -108,7 +108,8 @@ fun NovoPedidoG(onVoltar: () -> Unit, onCriado: () -> Unit, editar: String? = nu
     val escopo = rememberCoroutineScope()
     var tipos by remember { mutableStateOf<List<TipoPedidoG>>(emptyList()) }
     var categorias by remember { mutableStateOf<List<CategoriaG>>(emptyList()) }
-    LaunchedEffect(Unit) { Gestao.catalogoPedido().let { (t, k) -> tipos = t; categorias = k } }
+    var catalogoOk by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { Gestao.catalogoPedido().let { (t, k) -> tipos = t; categorias = k }; catalogoOk = true }
 
     var empresaId by remember { mutableStateOf<String?>(null) }
     var avulso by remember { mutableStateOf("") }
@@ -130,9 +131,10 @@ fun NovoPedidoG(onVoltar: () -> Unit, onCriado: () -> Unit, editar: String? = nu
 
     // editar: carrega o pedido no mesmo formulário da criação
     var numeroEd by remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(editar, categorias) {
+    LaunchedEffect(editar, catalogoOk) {
         val id = editar ?: return@LaunchedEffect
-        if (numeroEd != null) return@LaunchedEffect
+        // espera o catálogo (as categorias dos itens) para não perder o tipo de cada item
+        if (!catalogoOk || numeroEd != null) return@LaunchedEffect
         Gestao.rpcJson("pedido_para_editar", buildJsonObject { put("p_pedido", id) }).onSuccess { e ->
             val d = e as? JsonObject ?: return@onSuccess
             fun JsonObject.t(k: String) = (this[k] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content

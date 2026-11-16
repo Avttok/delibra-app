@@ -200,8 +200,8 @@ internal fun Detalhe(icone: androidx.compose.ui.graphics.vector.ImageVector, tex
 }
 
 @Composable
-internal fun TituloTela(titulo: String, subtitulo: String? = null, icone: androidx.compose.ui.graphics.vector.ImageVector) {
-    com.pwexpress.core.designsystem.PwCabeca(icone, titulo, subtitulo)
+internal fun TituloTela(titulo: String, subtitulo: String? = null, icone: androidx.compose.ui.graphics.vector.ImageVector, acoes: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {}) {
+    com.pwexpress.core.designsystem.PwCabeca(icone, titulo, subtitulo, acoes = acoes)
 }
 
 /** Topo das telas abertas por cima: voltar, título de uma linha e ações em ícone. */

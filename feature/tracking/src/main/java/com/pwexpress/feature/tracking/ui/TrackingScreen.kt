@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -132,13 +133,17 @@ fun TrackingScreen(
         }
     }
 
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxSize()) {
+    val alturaTela = maxHeight
     Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         if (saudacao.isNotBlank()) {
             Text("Olá, $saudacao", style = MaterialTheme.typography.headlineMedium, color = c.texto, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+        // o botão fica no meio da tela (com os atalhos logo abaixo); o resto, se houver, vem depois rolando
+        Column(Modifier.fillMaxWidth().heightIn(min = (alturaTela - 72.dp).coerceAtLeast(0.dp)), verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically)) {
 
         // ---------------------------------------------------------- o botão
         var toquesSeguidos by remember { mutableStateOf(0) }
@@ -200,8 +205,10 @@ fun TrackingScreen(
             if (info.naFila > 0) Chip(PwIcones.Clock, "${info.naFila} na fila", c.ouro, onConfiguracoes)
         }
         aviso?.let { Text(it, color = c.vermelho, fontSize = 13.5.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) }
+        }
 
         Box(Modifier.alvoTour("dia")) { extras() }
+    }
     }
 
 }

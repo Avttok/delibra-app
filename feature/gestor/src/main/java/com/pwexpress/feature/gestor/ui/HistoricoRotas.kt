@@ -73,9 +73,9 @@ import java.time.LocalDate
  * Mesma cascata das Configurações: o Dev decide o que o gestor vê e muda; o que é do Dev fica travado.
  */
 @Composable
-internal fun BotaoAjustesG(titulo: String, grupos: List<String>, chaves: List<String> = emptyList()) {
+internal fun BotaoAjustesG(titulo: String, grupos: List<String>, chaves: List<String> = emptyList(), tamanho: androidx.compose.ui.unit.Dp = 38.dp) {
     var aberto by remember { mutableStateOf(false) }
-    PwBotaoIcone(PwIcones.Settings2, titulo, { aberto = true }, tamanho = 38.dp)
+    PwBotaoIcone(PwIcones.Settings2, titulo, { aberto = true }, tamanho = tamanho)
     if (aberto) AjustesRapidosG(titulo, grupos, chaves) { aberto = false }
 }
 
@@ -302,4 +302,49 @@ private fun LinhaValor(rotulo: String, valor: Double?, fraco: Boolean = false) {
         Text(rotulo, color = if (fraco) c.texto3 else c.texto2, fontSize = if (fraco) 12.sp else 13.5.sp, modifier = Modifier.weight(1f))
         Text(valor?.let { moedaBr(it) } ?: "—", color = if (fraco) c.texto3 else c.texto, fontSize = if (fraco) 12.sp else 13.5.sp, fontWeight = if (fraco) FontWeight.Normal else FontWeight.SemiBold)
     }
+}
+
+/** As rotas de um cliente ou de um motoboy dentro do cadastro dele (90 dias); cada uma abre a ficha completa por cima. */
+@Composable
+internal fun RotasDeG(cliente: String? = null, motoboy: String? = null) {
+    val c = Pw.cores
+    val teste by TemaApp.modoTeste.collectAsState()
+    var lista by remember { mutableStateOf<List<JsonObject>?>(null) }
+    var aberta by remember { mutableStateOf<String?>(null) }
+    var busca by remember { mutableStateOf("") }
+    LaunchedEffect(cliente, motoboy, busca, teste) {
+        kotlinx.coroutines.delay(250)
+        Gestao.rpcJson("historico_rotas", buildJsonObject {
+            put("p", buildJsonObject {
+                put("de", LocalDate.now().minusDays(90).toString()); put("ate", LocalDate.now().toString())
+                cliente?.let { put("cliente", it) }; motoboy?.let { put("motoboy", it) }
+                if (busca.isNotBlank()) put("busca", busca.trim()); put("teste", teste); put("limite", 100)
+            })
+        }).onSuccess { lista = (it as? JsonArray)?.mapNotNull { e -> e as? JsonObject }.orEmpty() }.onFailure { lista = emptyList() }
+    }
+    val l = lista ?: run { PwCarregando(); return }
+    val feitas = l.filter { it.str("status") == "concluida" }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        Resumo("${feitas.size}", "concluídas", Modifier.weight(1f))
+        Resumo("%.0f".format(feitas.sumOf { it.dbl("km") ?: 0.0 }), "km", Modifier.weight(1f))
+        Resumo(moedaBr(feitas.sumOf { it.dbl(if (motoboy != null) "valor_motoboy" else "valor") ?: 0.0 }), if (motoboy != null) "para ele" else "faturado", Modifier.weight(1.4f))
+    }
+    CampoBusca(busca, { busca = it }, "Nº da rota ou do pedido, endereço…")
+    if (l.isEmpty()) PwVazio("Nenhuma rota nos últimos 90 dias.", icone = PwIcones.History)
+    l.forEach { x ->
+        val st = x.str("status").orEmpty()
+        PwCartao(modifier = Modifier.clickable { aberta = x.str("id") }) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text((if (x.bool2("teste")) "T" else "#") + (x.long("numero") ?: 0), color = c.texto, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(8.dp))
+                PwSelo(com.pwexpress.core.perfil.Modalidades.nomeStatus("rota", st, Status.padroes[st] ?: st, x.str("tipo_pedido")), corStatus(st, c))
+                Spacer(Modifier.weight(1f))
+                TextoDica(dataHora(iso(x.str("quando"))))
+            }
+            Text((if (motoboy != null) x.str("cliente") else x.str("motoboy")) ?: "—", color = c.texto2, fontSize = 13.sp)
+            TextoDica("${x.int("feitas") ?: 0}/${x.int("entregas") ?: 0} entregas · ${x.dbl("km") ?: 0.0} km" +
+                (x.dbl(if (motoboy != null) "valor_motoboy" else "valor")?.let { " · ${moedaBr(it)}" } ?: ""))
+        }
+    }
+    aberta?.let { id -> FichaRotaG(id, onFechar = { aberta = null }, onAbrir = { aberta = null; GestorNav.abrir(TelaG.Corrida(it)) }, onTrocar = { aberta = it }) }
 }

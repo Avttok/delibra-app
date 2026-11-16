@@ -127,7 +127,8 @@ fun EmpresasG(onAbrir: (String?) -> Unit) {
     }
     Box(Modifier.fillMaxSize()) {
         LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 190.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            item { TituloTela("Clientes", if (dados.empresas.size == 1) "1 cliente cadastrado" else "${dados.empresas.size} clientes cadastrados", PwIcones.Building2) }
+            item { TituloTela("Clientes", if (dados.empresas.size == 1) "1 cliente cadastrado" else "${dados.empresas.size} clientes cadastrados", PwIcones.Building2) {
+                BotaoAjustesG("Ajustes dos clientes", listOf("cli_cadastro", "cli_pode", "cli_ve", "faturas", "avaliacoes", "rastreio", "notafiscal")) } }
             item { CadastrosPendentesG() }
             if (dados.empresas.size > 0) item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -212,6 +213,7 @@ fun EmpresaG(id: String?, onVoltar: () -> Unit) {
     PwPagina {
         Cabecalho(if (e == null) "Novo cliente" else e.nome, onVoltar, subtitulo = "Dados, preço, pagamento e coleta padrão") {
             if (e != null) com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.Share2, "Mandar no chat", { com.pwexpress.core.chat.Chat.compartilhar(com.pwexpress.core.chat.Anexo("cliente", e.id, e.nome)) })
+            BotaoAjustesG("Ajustes dos clientes", listOf("cli_cadastro", "cli_pode", "cli_ve", "faturas", "avaliacoes", "rastreio", "notafiscal"))
         }
         if (e != null) {
             val ctxCli = LocalContext.current
@@ -224,8 +226,10 @@ fun EmpresaG(id: String?, onVoltar: () -> Unit) {
                         }.onFailure { erro = it.message }
                 }
             }, icone = PwIcones.Store, modifier = Modifier.fillMaxWidth())
-            PwSegmentado(listOf("Dados" to PwIcones.Building2, "Regras" to PwIcones.Layers, "Zonas" to PwIcones.MapPin, "" to PwIcones.Gavel), aba, { aba = it })
+            PwSegmentado(listOf((if (aba == 0) "Dados" else "") to PwIcones.Building2, (if (aba == 1) "Regras" else "") to PwIcones.Layers, (if (aba == 2) "Zonas" else "") to PwIcones.MapPin,
+                (if (aba == 3) "Penalidades" else "") to PwIcones.Gavel, (if (aba == 4) "Rotas" else "") to PwIcones.Route), aba, { aba = it })
             when (aba) {
+                4 -> { RotasDeG(cliente = e.id); return@PwPagina }
                 1 -> { RegrasDoAlvoG("cliente", e.id, e.nome); return@PwPagina }
                 3 -> { PenalidadesG("cliente", e.id); return@PwPagina }
                 2 -> {
@@ -425,7 +429,8 @@ fun EquipeG(onAbrir: (String) -> Unit) {
         .sortedBy { m -> when (dados.posicao(m.id)?.status) { "em_corrida" -> 0; "disponivel" -> 1; else -> 2 } }
     Box(Modifier.fillMaxSize()) {
         LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 190.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            item { TituloTela("Equipe", if (dados.equipe.size == 1) "1 pessoa" else "${dados.equipe.size} pessoas", PwIcones.Users) }
+            item { TituloTela("Equipe", if (dados.equipe.size == 1) "1 pessoa" else "${dados.equipe.size} pessoas", PwIcones.Users) {
+                BotaoAjustesG("Ajustes da equipe e dos motoboys", listOf("perfil", "app_motoboy", "mb_ve", "veiculo", "penalidades", "emergencia", "jogo", "regiao")) } }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     CampoBusca(busca, { busca = it }, "Buscar por nome ou e-mail…")
@@ -588,6 +593,7 @@ fun MembroG(id: String, meuId: String?, onVoltar: () -> Unit) {
         val comPercursos = m.motoboy && modulo("trilhas_mapa")
         val abas = listOfNotNull(
             Triple("registro", "Registro", PwIcones.History),
+            Triple("rotas", "Rotas", PwIcones.Package).takeIf { m.motoboy },
             Triple("percursos", "Percursos", PwIcones.Route).takeIf { comPercursos },
             Triple("veiculo", "Veículo", PwIcones.Bike).takeIf { m.motoboy },
             Triple("medalhas", "Medalhas", PwIcones.Trophy).takeIf { m.motoboy },
@@ -601,6 +607,7 @@ fun MembroG(id: String, meuId: String?, onVoltar: () -> Unit) {
         val souDev = com.pwexpress.core.perfil.Perfis.perfil.collectAsState().value?.dev == true
         when (abas.getOrNull(aba)?.first) {
             "registro" -> RegistroG(m.id)
+            "rotas" -> RotasDeG(motoboy = m.id)
             "percursos" -> PercursosMembroG(m.id, m.modoTeste)
             "veiculo" -> VeiculoG(m.id)
             "medalhas" -> {
@@ -929,7 +936,8 @@ private fun ClientesCarteiraG(onVoltar: (() -> Unit)?, abas: @Composable () -> U
     var periodo by remember { mutableIntStateOf(2) }
     val l = corridasDoPeriodo(periodo, teste)
     PwPagina {
-        if (onVoltar != null) Cabecalho("Carteira", onVoltar, subtitulo = "Por cliente") else TituloTela("Carteira", "Por cliente", PwIcones.Wallet)
+        if (onVoltar != null) Cabecalho("Carteira", onVoltar, subtitulo = "Por cliente") { BotaoAjustesG("Ajustes de pagamento e cobrança", AJ_CARTEIRA) }
+            else TituloTela("Carteira", "Por cliente", PwIcones.Wallet) { BotaoAjustesG("Ajustes de pagamento e cobrança", AJ_CARTEIRA) }
         abas()
         PwFiltros(listOf("Hoje" to 0, "7 dias" to 0, "Este mês" to 0, "30 dias" to 0), periodo, { periodo = it })
         val x = l ?: run { PwCarregando(); return@PwPagina }
@@ -959,7 +967,8 @@ private fun ExtratoCarteiraG(onVoltar: (() -> Unit)?, abas: @Composable () -> Un
     var busca by remember { mutableStateOf("") }
     val l = corridasDoPeriodo(periodo, teste)
     PwPagina {
-        if (onVoltar != null) Cabecalho("Carteira", onVoltar, subtitulo = "Extrato") else TituloTela("Carteira", "Extrato", PwIcones.Wallet)
+        if (onVoltar != null) Cabecalho("Carteira", onVoltar, subtitulo = "Extrato") { BotaoAjustesG("Ajustes de pagamento e cobrança", AJ_CARTEIRA) }
+            else TituloTela("Carteira", "Extrato", PwIcones.Wallet) { BotaoAjustesG("Ajustes de pagamento e cobrança", AJ_CARTEIRA) }
         abas()
         PwFiltros(listOf("Hoje" to 0, "7 dias" to 0, "Este mês" to 0, "30 dias" to 0), periodo, { periodo = it })
         CampoBusca(busca, { busca = it }, "Buscar por número, motoboy ou cliente")
@@ -1455,3 +1464,5 @@ private fun VincularClienteG(id: String, nome: String) {
         }
     })
 }
+
+private val AJ_CARTEIRA = listOf("pagamento", "pag_combinar", "pag_zonas", "pag_km", "pag_entrega", "pag_fixo", "pag_periodo", "mb_ve", "faturas", "integracoes")

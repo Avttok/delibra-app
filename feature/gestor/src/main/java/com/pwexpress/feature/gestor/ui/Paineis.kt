@@ -90,6 +90,8 @@ private fun TelaComMapa(
     acoesGaveta: @Composable RowScope.() -> Unit = {},
     /** Botões a mais no canto do mapa (ex.: camadas). */
     controles: @Composable ColumnScope.() -> Unit = {},
+    /** false = a tela já tem os estabelecimentos em outro lugar (ex.: Camadas do mapa). */
+    locaisNaColuna: Boolean = true,
     /** Cartão por cima do mapa, no alto (ex.: motoboy selecionado). */
     topo: (@Composable () -> Unit)? = null,
     lista: LazyListScope.() -> Unit,
@@ -110,9 +112,16 @@ private fun TelaComMapa(
 
         // controles do mapa (canto superior direito)
         Column(Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (comLocais) PwBotaoIcone(PwIcones.Store, if (locais) "Ocultar estabelecimentos" else "Mostrar estabelecimentos", { Estabelecimentos.definir(!locais) }, ativo = locais, tamanho = 44.dp)
-            PwBotaoIcone(PwIcones.Crosshair, "Enquadrar tudo", { enquadrar++ }, tamanho = 44.dp)
-            PwBotaoIcone(if (cheio) PwIcones.Lista else PwIcones.Maximize2, if (cheio) "Mostrar a lista" else "Tela cheia", { cheio = !cheio }, ativo = cheio, tamanho = 44.dp)
+            // todos os botões do mapa numa coluna só, do mesmo tamanho (o + e o − junto, não soltos no meio)
+            // com a lista aberta o espaço é pouco: o zoom fica no gesto de pinça
+            if (cheio || !mostrando) {
+                PwBotaoIcone(PwIcones.Plus, "Aproximar", { com.pwexpress.core.mapa.ControleMapa.zoom.tryEmit(1) }, tamanho = 40.dp)
+                PwBotaoIcone(PwIcones.Minus, "Afastar", { com.pwexpress.core.mapa.ControleMapa.zoom.tryEmit(-1) }, tamanho = 40.dp)
+            }
+            PwBotaoIcone(PwIcones.Crosshair, "Enquadrar tudo", { enquadrar++ }, tamanho = 40.dp)
+            com.pwexpress.core.mapa.BotaoRotaPlanejada()
+            PwBotaoIcone(if (cheio) PwIcones.Lista else PwIcones.Maximize2, if (cheio) "Mostrar a lista" else "Tela cheia", { cheio = !cheio }, ativo = cheio, tamanho = 40.dp)
+            if (comLocais && locaisNaColuna) PwBotaoIcone(PwIcones.Store, if (locais) "Ocultar estabelecimentos" else "Mostrar estabelecimentos", { Estabelecimentos.definir(!locais) }, ativo = locais, tamanho = 40.dp)
             controles()
         }
         topo?.let { t -> Box(Modifier.align(Alignment.TopStart).padding(top = 10.dp, start = 12.dp, end = 68.dp)) { t() } }
@@ -296,7 +305,7 @@ fun MapaG(onCorrida: (String) -> Unit) {
         titulo = "Mapa",
         subtitulo = "$emServico em serviço · ${todos.size} motoboy${if (todos.size == 1) "" else "s"} · ${ativas.size} rota${if (ativas.size == 1) "" else "s"} ativa${if (ativas.size == 1) "" else "s"}",
         mapa = { margem, enquadrar ->
-            PwMapa(maximizavel = false, controles = true, controlesLocais = false,
+            PwMapa(maximizavel = false, controles = false, controlesLocais = false,
                 paradas = paradasMapa.map { it.second }, rota = null, rotas = rotasMapa, caminhoAuto = false, minhaPosicao = null, marcadores = marcadores, modifier = Modifier.fillMaxSize(),
                 enquadrar = enquadrar, onMarcador = ::escolher, seguir = selecionado.takeIf { seguir && destaque == null }, destacar = selecionado,
                 onArrastou = { if (seguir) seguir = false }, irPara = irPara,
@@ -307,9 +316,9 @@ fun MapaG(onCorrida: (String) -> Unit) {
             )
         },
         controles = {
-            PwBotaoIcone(PwIcones.Layers, "Camadas do mapa", { camadasAbertas = true }, ativo = camadasAbertas, tamanho = 44.dp)
-            PwBotaoIcone(PwIcones.Flame, "Calor: ${calor.rotulo}", { calor = Calor.entries[(calor.ordinal + 1) % Calor.entries.size] }, ativo = calor != Calor.DESLIGADO, tamanho = 44.dp)
-            BotaoAjustesG("Ajustes do mapa e do GPS", listOf("mapa", "rastreamento", "percurso", "navegacao", "regiao"))
+            PwBotaoIcone(PwIcones.Layers, "Camadas do mapa", { camadasAbertas = true }, ativo = camadasAbertas, tamanho = 40.dp)
+            PwBotaoIcone(PwIcones.Flame, "Calor: ${calor.rotulo}", { calor = Calor.entries[(calor.ordinal + 1) % Calor.entries.size] }, ativo = calor != Calor.DESLIGADO, tamanho = 40.dp)
+            BotaoAjustesG("Ajustes do mapa e do GPS", listOf("mapa", "rastreamento", "percurso", "navegacao", "regiao"), tamanho = 40.dp)
         },
         topo = if (membroSel == null) null else ({
             CartaoSelecionado(membroSel, posSel, dados.corridas.firstOrNull { it.motoboyId == membroSel.id && it.ativa }, agora, seguir,
@@ -543,7 +552,7 @@ fun CorridasG(onAbrir: (String) -> Unit, onNova: () -> Unit, onHistorico: () -> 
             val caminhos by androidx.compose.runtime.produceState(emptyList<String>(), ativas.map { it.id + (it.rota?.length ?: 0) }) {
                 value = ativas.mapNotNull { cor -> cor.rota ?: com.pwexpress.core.mapa.Caminho.entre(cor.paradas.map { it.lat to it.lng }) }
             }
-            PwMapa(maximizavel = false, controles = true, controlesLocais = false, paradas = pinos, rota = null, rotas = caminhos, caminhoAuto = false, minhaPosicao = null, marcadores = online, modifier = Modifier.fillMaxSize(), enquadrar = "${pinos.size}-$enquadrar", margemBaixo = margem)
+            PwMapa(maximizavel = false, controles = false, controlesLocais = false, paradas = pinos, rota = null, rotas = caminhos, caminhoAuto = false, minhaPosicao = null, marcadores = online, modifier = Modifier.fillMaxSize(), enquadrar = "${pinos.size}-$enquadrar", margemBaixo = margem)
         },
         acoesGaveta = {
             if (selecionando) {

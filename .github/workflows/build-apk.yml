@@ -39,6 +39,11 @@ jobs:
             echo "::warning::Secret DELIBRA_KEYSTORE_B64 ausente: APK assinado com a chave de desenvolvimento."
           fi
 
+      - name: Testes da lógica (percurso, trilha, nomes e campos próprios)
+        run: |
+          chmod +x gradlew
+          ./gradlew :core:testDebugUnitTest --stacktrace
+
       - name: Compilar APK assinado
         env:
           DELIBRA_KEYSTORE_SENHA: ${{ secrets.DELIBRA_KEYSTORE_SENHA }}

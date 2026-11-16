@@ -126,7 +126,7 @@ fun DetalheCorridaG(id: String, onVoltar: () -> Unit) {
                     com.pwexpress.core.mapa.MarcadorMapa(corrida.motoboyId ?: "moto", la, lo, corHex(c.ouro), mb?.nome?.substringBefore(" ") ?: "Motoboy", foto = mb?.foto, prioridade = 2)
                 }),
                 modifier = Modifier.fillMaxWidth().height(220.dp),
-                trilhas = if (feito.size >= 2) listOf(com.pwexpress.core.mapa.TrilhaMapa(feito + listOfNotNull(posMoto))) else emptyList(),
+                trilhas = com.pwexpress.core.mapa.trilhasDoFeito(feito, posMoto),
                 restanteDe = posMoto,
             )
         }

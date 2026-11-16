@@ -301,6 +301,11 @@ internal fun DevSaudeG() {
                 val f = t.int("falhas_24h") ?: 0
                 PwSelo(if (f > 0) "$f falha(s)" else "ok", if (f > 0) c.vermelho else c.verde)
             }
+            val erro = t.str("erro")
+            if ((t.int("falhas_24h") ?: 0) > 0 && !erro.isNullOrBlank()) {
+                Text(explicarErroTarefa(erro) + (t.str("erro_em")?.let { " · ${haQuanto(it)}" } ?: ""), color = c.vermelho, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                Text(erro.take(300), color = c.texto3, fontSize = 11.sp)
+            }
         }
     }
     val mig = d.arr("migracoes")
@@ -536,4 +541,13 @@ internal fun DevApagarContasG() {
             }
         }, cheio = true, habilitado = senha.isNotEmpty() && !ocupado, modifier = Modifier.fillMaxWidth())
     }
+}
+
+/** Explica em português o erro de uma tarefa automática (o texto original vem logo abaixo). */
+internal fun explicarErroTarefa(e: String): String = when {
+    Regex("lock timeout|canceling statement due to lock", RegexOption.IGNORE_CASE).containsMatchIn(e) -> "Esperou demais por uma trava do banco. Normal durante uma atualização: a tarefa roda de novo sozinha."
+    Regex("statement timeout", RegexOption.IGNORE_CASE).containsMatchIn(e) -> "Demorou mais que o limite e foi interrompida. Se repetir, avise o Dev."
+    Regex("deadlock", RegexOption.IGNORE_CASE).containsMatchIn(e) -> "Duas tarefas brigaram pelo mesmo dado ao mesmo tempo. Ela roda de novo sozinha."
+    Regex("connection|terminat", RegexOption.IGNORE_CASE).containsMatchIn(e) -> "A conexão com o banco caiu no meio. Ela roda de novo sozinha."
+    else -> "Falhou nesta execução. As próximas seguem normalmente; se o número subir, veja o detalhe."
 }

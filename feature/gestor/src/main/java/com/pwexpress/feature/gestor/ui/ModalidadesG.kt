@@ -140,6 +140,7 @@ private fun EditorCampo(inicial: JsonObject, onFechar: () -> Unit, onSalvo: () -
     var opcoes by remember { mutableStateOf(inicial.l("opcoes").joinToString("\n")) }
     var quem by remember { mutableStateOf(inicial.t("quem_preenche") ?: "qualquer") }
     var pontoTipo by remember { mutableStateOf(inicial.t("ponto_tipo")) }
+    var etapa by remember { mutableStateOf(inicial.t("etapa") ?: "concluir") }
     var obrig by remember { mutableStateOf(inicial.b("obrigatorio")) }
     var vCli by remember { mutableStateOf(inicial["visivel_cliente"]?.let { (it as? JsonPrimitive)?.booleanOrNull } ?: true) }
     var vMoto by remember { mutableStateOf(inicial["visivel_motoboy"]?.let { (it as? JsonPrimitive)?.booleanOrNull } ?: true) }
@@ -152,7 +153,10 @@ private fun EditorCampo(inicial: JsonObject, onFechar: () -> Unit, onSalvo: () -
         PwRotulo("Tipo")
         LinhaChips { TIPOS_CAMPO.filter { it.first != "foto" || ent == "ponto" }.forEach { (k, r) -> ChipM(r, tipo == k) { tipo = k } } }
         if (tipo == "escolha") PwCampo(opcoes, { opcoes = it }, "Opções (uma por linha)")
-        if (ent == "ponto") { PwRotulo("Em qual parada"); LinhaChips { listOf(null to "As duas", "coleta" to "Só coleta", "entrega" to "Só entrega").forEach { (k, r) -> ChipM(r, pontoTipo == k) { pontoTipo = k } } } }
+        if (ent == "ponto") {
+            PwRotulo("Em qual parada"); LinhaChips { listOf(null to "As duas", "coleta" to "Só coleta", "entrega" to "Só entrega").forEach { (k, r) -> ChipM(r, pontoTipo == k) { pontoTipo = k } } }
+            PwRotulo("Quando o motoboy responde"); LinhaChips { listOf("chegou" to "Ao chegar", "concluir" to "Ao concluir").forEach { (k, r) -> ChipM(r, etapa == k) { etapa = k } } }
+        }
         PwRotulo("Quem preenche")
         LinhaChips { QUEM.forEach { (k, r) -> ChipM(r, quem == k) { quem = k } } }
         PwInterruptor("Obrigatório", obrig, { obrig = it })
@@ -165,7 +169,7 @@ private fun EditorCampo(inicial: JsonObject, onFechar: () -> Unit, onSalvo: () -
                 Gestao.rpcJson("salvar_campo", buildJsonObject { put("p", buildJsonObject {
                     inicial.t("id")?.let { put("id", it) }; put("entidade", ent); put("rotulo", rotulo.trim()); put("dica", dica.trim()); put("tipo", tipo)
                     put("opcoes", buildJsonArray { opcoes.lines().map { it.trim() }.filter { it.isNotEmpty() }.forEach { add(JsonPrimitive(it)) } })
-                    put("quem_preenche", quem); put("ponto_tipo", pontoTipo ?: ""); put("obrigatorio", obrig); put("visivel_cliente", vCli); put("visivel_motoboy", vMoto); put("ativo", ativo)
+                    put("quem_preenche", quem); put("ponto_tipo", pontoTipo ?: ""); put("obrigatorio", obrig); put("visivel_cliente", vCli); put("visivel_motoboy", vMoto); put("ativo", ativo); put("etapa", etapa)
                 }) }).onSuccess { PwToast.mostrar("Campo salvo."); onSalvo() }.onFailure { PwToast.mostrar(erroMod(it.message), TipoAviso.ERRO) }
                 ocupado = false
             }
@@ -178,22 +182,34 @@ private fun EditorCampo(inicial: JsonObject, onFechar: () -> Unit, onSalvo: () -
 @Composable
 private fun NomesG() {
     val escopo = rememberCoroutineScope()
+    var todos by remember { mutableStateOf<List<JsonObject>?>(null) }
+    var tipos by remember { mutableStateOf<List<JsonObject>>(emptyList()) }
+    var tipo by remember { mutableStateOf("") }   // "" = todos os tipos de pedido
     val valores = remember { mutableStateMapOf<String, String>() }
     val salvos = remember { mutableStateMapOf<String, String>() }
-    var carregou by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        Gestao.rpcJson("rotulos_editor").onSuccess { e -> lista(e).filter { (it.t("tipo_pedido") ?: "").isEmpty() && !it.b("da_plataforma") }.forEach { r ->
-            valores[r.t("alvo")!!] = r.t("texto").orEmpty(); salvos[r.t("alvo")!!] = r.t("texto").orEmpty() } }
-        carregou = true
-    }
-    if (!carregou) { PwCarregando(); return }
+    var versao by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) { tipos = Gestao.tabela("tipos_pedido", "select=chave,nome&order=ordem") }
+    LaunchedEffect(versao) { Gestao.rpcJson("rotulos_editor").onSuccess { todos = lista(it) }.onFailure { todos = emptyList() } }
+    val t = todos ?: run { PwCarregando(); return }
+    fun doTipo(x: String) = t.filter { (it.t("tipo_pedido") ?: "") == x && !it.b("da_plataforma") }.associate { it.t("alvo").orEmpty() to it.t("texto").orEmpty() }
+    LaunchedEffect(t, tipo) { val m = doTipo(tipo); valores.clear(); valores.putAll(m); salvos.clear(); salvos.putAll(m) }
+    val geral = doTipo("")
     TextoDica("Os nomes que a equipe e os clientes veem. Vazio = o padrão. O funcionamento continua o mesmo.")
+    if (tipos.size > 1) {
+        PwRotulo("Valem para")
+        LinhaChips {
+            ChipM("Todos os pedidos", tipo == "") { tipo = "" }
+            tipos.forEach { k -> ChipM(k.t("nome") ?: k.t("chave").orEmpty(), tipo == k.t("chave")) { tipo = k.t("chave").orEmpty() } }
+        }
+        if (tipo.isNotEmpty()) TextoDica("Só nos pedidos deste tipo. Vazio = o nome de \u201cTodos os pedidos\u201d.")
+    }
     @Composable fun linha(alvo: String, padrao: String) {
+        val base = if (tipo.isNotEmpty()) geral[alvo]?.takeIf { it.isNotBlank() } ?: padrao else padrao
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PwCampo(valores[alvo] ?: "", { valores[alvo] = it }, padrao, modifier = Modifier.weight(1f))
+            PwCampo(valores[alvo] ?: "", { valores[alvo] = it }, base, modifier = Modifier.weight(1f))
             PwBotaoVidro("Salvar", habilitado = (valores[alvo] ?: "") != (salvos[alvo] ?: ""), onClick = {
-                escopo.launch { Gestao.rpcJson("salvar_rotulo", buildJsonObject { put("p_alvo", alvo); put("p_texto", valores[alvo] ?: "") })
-                    .onSuccess { salvos[alvo] = valores[alvo] ?: ""; PwToast.mostrar("Nome salvo. Vale ao abrir o app de novo.") }.onFailure { PwToast.mostrar(erroMod(it.message), TipoAviso.ERRO) } }
+                escopo.launch { Gestao.rpcJson("salvar_rotulo", buildJsonObject { put("p_alvo", alvo); put("p_texto", valores[alvo] ?: ""); put("p_tipo_pedido", tipo) })
+                    .onSuccess { salvos[alvo] = valores[alvo] ?: ""; versao++; PwToast.mostrar("Nome salvo. Vale ao abrir o app de novo.") }.onFailure { PwToast.mostrar(erroMod(it.message), TipoAviso.ERRO) } }
             })
         }
     }

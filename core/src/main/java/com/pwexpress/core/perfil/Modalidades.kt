@@ -15,6 +15,8 @@ object Modalidades {
     data class Campo(
         val chave: String, val rotulo: String, val dica: String?, val tipo: String, val opcoes: List<String>, val obrigatorio: Boolean,
         val quemPreenche: String, val entidade: String, val pontoTipo: String?, val tiposPedido: List<String>, val visivelMotoboy: Boolean,
+        /** "chegou" = perguntado ao chegar no endereço; "concluir" = no comprovante. */
+        val etapa: String = "concluir",
     )
 
     @Volatile var rotulos: Map<String, String> = emptyMap(); private set
@@ -28,7 +30,7 @@ object Modalidades {
             fun l(k: String) = (c[k] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content }
             Campo(t("chave") ?: return@mapNotNull null, t("rotulo") ?: "", t("dica"), t("tipo") ?: "texto", l("opcoes"),
                 (c["obrigatorio"] as? JsonPrimitive)?.booleanOrNull == true, t("quem_preenche") ?: "qualquer", t("entidade") ?: "",
-                t("ponto_tipo"), l("tipos_pedido"), (c["visivel_motoboy"] as? JsonPrimitive)?.booleanOrNull != false)
+                t("ponto_tipo"), l("tipos_pedido"), (c["visivel_motoboy"] as? JsonPrimitive)?.booleanOrNull != false, if (t("etapa") == "chegou") "chegou" else "concluir")
         }
     }
 
@@ -42,9 +44,9 @@ object Modalidades {
     fun nomeStatus(grupo: String, status: String, padrao: String, tipoPedido: String? = null): String =
         tipoPedido?.let { rotulos["$it|$grupo:$status"] } ?: rotulos["|$grupo:$status"] ?: padrao
 
-    /** Campos que o motoboy responde nesta parada. */
-    fun camposDaParada(coleta: Boolean, tipoPedido: String?): List<Campo> = campos.filter { c ->
-        c.entidade == "ponto" && c.visivelMotoboy && c.quemPreenche in setOf("motoboy", "qualquer")
+    /** Campos que o motoboy responde nesta parada, na etapa dada ("chegou" ou "concluir"). */
+    fun camposDaParada(coleta: Boolean, tipoPedido: String?, etapa: String = "concluir"): List<Campo> = campos.filter { c ->
+        c.entidade == "ponto" && c.visivelMotoboy && c.etapa == etapa && c.quemPreenche in setOf("motoboy", "qualquer")
             && (c.pontoTipo == null || c.pontoTipo == if (coleta) "coleta" else "entrega")
             && (c.tiposPedido.isEmpty() || tipoPedido == null || tipoPedido in c.tiposPedido)
     }

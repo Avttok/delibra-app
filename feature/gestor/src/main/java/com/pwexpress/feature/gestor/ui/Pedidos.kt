@@ -712,7 +712,7 @@ internal fun MapaPedidoG(p: PedidoG, altura: androidx.compose.ui.unit.Dp = 220.d
         val posMoto = moto?.takeIf { rota?.ativa == true }?.let { it.lat to it.lng }
         com.pwexpress.core.mapa.PwMapa(paradas = pinos, rota = rota?.rota, minhaPosicao = null, marcadores = listOfNotNull(moto),
             modifier = Modifier.fillMaxSize(), enquadrar = "${p.id}-${pinos.size}-${moto != null}", focar = foco, tituloTelaCheia = "Pedido ${p.numeroExibicao}",
-            trilhas = if (feito.size >= 2) listOf(com.pwexpress.core.mapa.TrilhaMapa(feito + listOfNotNull(posMoto))) else emptyList(),
+            trilhas = com.pwexpress.core.mapa.trilhasDoFeito(feito, posMoto),
             restanteDe = posMoto)
         if (rota != null) Row(Modifier.align(Alignment.TopEnd).padding(10.dp)) {
             PwSelo("Rota ${rota.numeroExibicao}" + (rota.motoboyId?.let { " · ${dados.membro(it)?.nome?.substringBefore(" ") ?: ""}" } ?: ""), c.ouro, icone = PwIcones.Route)
@@ -741,7 +741,7 @@ private fun DetalhesPedidoG(p: PedidoG, onFocar: (Double, Double) -> Unit = { _,
                 }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(com.pwexpress.core.perfil.Modalidades.nomeParada(pt.coleta) + if (pt.status == "concluido") " · feita" else "", color = if (pt.coleta) c.ouro else c.texto2,
+                    Text(com.pwexpress.core.perfil.Modalidades.nomeParada(pt.coleta, p.tipoPedido) + if (pt.status == "concluido") " · feita" else "", color = if (pt.coleta) c.ouro else c.texto2,
                         fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     Text(pt.endereco, color = c.texto, fontSize = 14.sp)
                     listOfNotNull(pt.contatoNome, pt.contatoTelefone, pt.instrucoes).takeIf { it.isNotEmpty() }?.let { TextoDica(it.joinToString(" · ")) }

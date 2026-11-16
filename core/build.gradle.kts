@@ -33,6 +33,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    // testes da lógica pura (sem aparelho): ./gradlew :core:testDebugUnitTest
+    testOptions { unitTests.isReturnDefaultValues = true }
 }
 
 kotlin {
@@ -40,6 +43,7 @@ kotlin {
 }
 
 dependencies {
+    testImplementation(libs.junit)
     api(platform(libs.androidx.compose.bom))
     api(libs.androidx.compose.ui)
     api(libs.androidx.compose.foundation)

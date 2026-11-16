@@ -55,7 +55,11 @@ fun separarRegistros(pings: List<PingMapa>): List<RegistroPercurso> {
     var atual: MutableList<PingMapa>? = null
     var tipoAtual = false; var corridaAtual: String? = null; var anterior = 0L
     for (p in pings.sortedBy { it.quando }) {
-        if (p.status == "offline" || !coordenadaValida(p.lat, p.lng)) { if (p.status == "offline") atual = null; continue }
+        if (p.status == "offline" || !coordenadaValida(p.lat, p.lng)) {
+            // ficou offline: fecha o trecho (sem perder o que veio antes) e o próximo ping começa outro
+            if (p.status == "offline") { atual?.let { out += RegistroPercurso(tipoAtual, corridaAtual, it.toList()) }; atual = null }
+            continue
+        }
         val corrida = p.status == "em_corrida"
         val cid = if (corrida) p.corridaId else null
         val u = atual?.lastOrNull()

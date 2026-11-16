@@ -42,7 +42,7 @@ import com.pwexpress.core.designsystem.PwVazio
 import com.pwexpress.core.designsystem.TipoAviso
 import com.pwexpress.core.designsystem.moedaBr
 import com.pwexpress.feature.gestor.data.Gestao
-import com.pwexpress.feature.gestor.data.StatusCorrida
+import com.pwexpress.feature.gestor.data.Status
 import com.pwexpress.feature.gestor.data.StatusPedido
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
@@ -199,7 +199,7 @@ private fun NomesG() {
     }
     PwCartao { PwRotulo("Tipos de parada"); linha("parada:coleta", "Coleta"); linha("parada:entrega", "Entrega") }
     PwCartao { PwRotulo("Status do pedido"); StatusPedido.padroes.forEach { (s, r) -> linha("pedido:$s", r) } }
-    PwCartao { PwRotulo("Status da rota"); StatusCorrida.padroes.forEach { (s, r) -> linha("rota:$s", r) } }
+    PwCartao { PwRotulo("Status da rota"); Status.padroes.forEach { (s, r) -> linha("rota:$s", r) } }
 }
 
 // =================================================================== taxas e bônus

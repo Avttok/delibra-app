@@ -73,9 +73,9 @@ import java.time.LocalDate
  * Mesma cascata das Configurações: o Dev decide o que o gestor vê e muda; o que é do Dev fica travado.
  */
 @Composable
-internal fun BotaoAjustesG(titulo: String, grupos: List<String>, chaves: List<String> = emptyList()) {
+internal fun BotaoAjustesG(titulo: String, grupos: List<String>, chaves: List<String> = emptyList(), tamanho: androidx.compose.ui.unit.Dp = 38.dp) {
     var aberto by remember { mutableStateOf(false) }
-    PwBotaoIcone(PwIcones.Settings2, titulo, { aberto = true }, tamanho = 38.dp)
+    PwBotaoIcone(PwIcones.Settings2, titulo, { aberto = true }, tamanho = tamanho)
     if (aberto) AjustesRapidosG(titulo, grupos, chaves) { aberto = false }
 }
 

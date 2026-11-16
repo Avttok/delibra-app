@@ -82,7 +82,11 @@ data class CorridaG(
     val aguardandoConfirmacao: Boolean = false,
     /** O motoboy vê o motivo do ajuste no holerite. */
     val pagAjusteMostrar: Boolean = true,
+    /** Tipo de pedido da rota (nomes próprios por tipo). */
+    val tipoPedido: String? = null,
 ) {
+    /** Nome do status com o nome próprio da empresa para o tipo de pedido desta rota. */
+    val nomeStatus get() = com.pwexpress.core.perfil.Modalidades.nomeStatus("rota", status, Status.padroes[status] ?: status, tipoPedido)
     val automatica get() = origem == "roteirizador"
     val entregas get() = paradas.count { !it.coleta }
     val numeroExibicao get() = if (teste) "T$numero" else "#$numero"
@@ -177,7 +181,7 @@ fun JsonObject.paraCorridaG() = CorridaG(
     paradas = arr("paradas").map { it.paraParadaG() }.sortedBy { it.ordem },
     origem = str("origem") ?: "manual", sugeridoMotoboyId = str("sugerido_motoboy_id"), modoDespacho = str("modo_despacho"), quadroDesde = iso(str("quadro_desde")),
     pagCalculo = obj("pag_calculo"), pagAjuste = dbl("pag_ajuste") ?: 0.0, pagAjusteMotivo = str("pag_ajuste_motivo"), perigoso = bool("tem_perigoso"),
-    aguardandoConfirmacao = bool("aguardando_confirmacao"), pagAjusteMostrar = boolOuNulo("pag_ajuste_mostrar") ?: true,
+    aguardandoConfirmacao = bool("aguardando_confirmacao"), pagAjusteMostrar = boolOuNulo("pag_ajuste_mostrar") ?: true, tipoPedido = str("tipo_pedido"),
 )
 
 // ------------------------------------------------------------------ pedidos (do site do cliente e do gestor)

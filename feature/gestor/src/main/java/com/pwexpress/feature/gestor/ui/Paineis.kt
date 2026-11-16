@@ -349,7 +349,7 @@ fun MapaG(onCorrida: (String) -> Unit) {
                     p?.precisaoM?.let { Detalhe(PwIcones.Crosshair, "± ${it.toInt()} m") }
                     p?.bateria?.let { Detalhe(PwIcones.BatteryMedium, "$it%") }
                 }
-                corrida?.let { Detalhe(PwIcones.Package, "Corrida ${it.numeroExibicao} · ${Status.rotulo[it.status]}") }
+                corrida?.let { Detalhe(PwIcones.Package, "Corrida ${it.numeroExibicao} · ${it.nomeStatus}") }
                 if (semSinal(p, agora)) Detalhe(PwIcones.Alerta, "Sem sinal recente", c.vermelho)
                 if (sel && m.modoTeste && dados.cfgBool("simulador_ligado", true)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

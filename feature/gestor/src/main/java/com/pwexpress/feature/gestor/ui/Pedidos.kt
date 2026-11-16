@@ -780,7 +780,7 @@ private fun DetalhesPedidoG(p: PedidoG, onFocar: (Double, Double) -> Unit = { _,
     if (rotas.isNotEmpty()) PwCartao {
         com.pwexpress.core.designsystem.PwRotulo("Rotas")
         rotas.forEach { r ->
-            TextoDica("Rota ${r.numeroExibicao} · ${com.pwexpress.feature.gestor.data.Status.rotulo[r.status] ?: r.status}" +
+            TextoDica("Rota ${r.numeroExibicao} · ${r.nomeStatus}" +
                 (r.motoboyId?.let { " · ${dados.membro(it)?.nome ?: ""}" } ?: "") + " · ${r.entregas} entrega${if (r.entregas == 1) "" else "s"}")
         }
     }

@@ -143,7 +143,7 @@ internal fun CartaoCorridaG(corrida: CorridaG, dados: Gestao.Dados, onClick: () 
             Text(moedaBr(corrida.valor), fontFamily = ArchivoLargo, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.texto, maxLines = 1, softWrap = false)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            PwSelo(Status.rotulo[corrida.status] ?: corrida.status, corStatus(corrida.status, c))
+            PwSelo(corrida.nomeStatus, corStatus(corrida.status, c))
             if (corrida.pagamentoStatus == "pago") PwSelo("PAGO", c.verde, icone = PwIcones.BadgeCheck)
             if (corrida.urgente) PwSelo("URGENTE", c.vermelho, icone = PwIcones.Flame)
         }

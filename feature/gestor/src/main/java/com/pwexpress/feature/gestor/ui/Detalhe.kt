@@ -132,7 +132,7 @@ fun DetalheCorridaG(id: String, onVoltar: () -> Unit) {
         }
 
         PwCartao {
-            Text(Status.rotulo[corrida.status] ?: corrida.status, style = TextStyle(fontFamily = ArchivoLargo, fontWeight = FontWeight.Black, fontSize = 22.sp), color = corStatus(corrida.status, c))
+            Text(corrida.nomeStatus, style = TextStyle(fontFamily = ArchivoLargo, fontWeight = FontWeight.Black, fontSize = 22.sp), color = corStatus(corrida.status, c))
             dados.ofertas.firstOrNull { it.corridaId == corrida.id }?.let { o ->
                 var resta by remember(o.id) { mutableStateOf(0L) }
                 LaunchedEffect(o.id) { while (true) { resta = ((o.expiraEm - System.currentTimeMillis()) / 1000).coerceAtLeast(0); delay(1000) } }
@@ -264,7 +264,7 @@ fun DetalheCorridaG(id: String, onVoltar: () -> Unit) {
                     }
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text("${com.pwexpress.core.perfil.Modalidades.nomeParada(p.coleta)} · ${rotuloParada(p.status)}", color = c.texto, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        Text("${com.pwexpress.core.perfil.Modalidades.nomeParada(p.coleta, corrida.tipoPedido)} · ${rotuloParada(p.status)}", color = c.texto, fontWeight = FontWeight.SemiBold, maxLines = 1)
                         Text(p.endereco, color = c.texto2, fontSize = 13.5.sp)
                         listOfNotNull(p.contatoNome, p.contatoTelefone).joinToString(" ").takeIf { it.isNotBlank() }?.let { TextoDica(it) }
                         p.instrucoes?.let { TextoDica(it) }

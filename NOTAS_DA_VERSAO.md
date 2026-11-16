@@ -9,7 +9,7 @@
 
 **Ajustes**
 - **Fuso horário da empresa**: escolha o fuso (Manaus, Cuiabá, Rio Branco e outros). O "hoje" do painel, os relatórios, o holerite, os horários de pedido e as taxas por horário passam a seguir esse fuso.
-- **Nomes por tipo de pedido**: dê nomes diferentes para cada tipo de pedido (em farmácia, "Entrega" pode virar "Dispensação"), além dos nomes gerais.
+- **Nomes por tipo de pedido**: dê nomes diferentes para cada tipo de pedido (em farmácia, "Entrega" pode virar "Dispensação"), além dos nomes gerais. Valem nas paradas e nos status das rotas e pedidos.
 - **Quando perguntar cada campo da parada**: escolha se o motoboy responde ao chegar ou ao concluir.
 
 **Para o suporte**

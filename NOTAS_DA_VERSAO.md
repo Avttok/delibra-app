@@ -23,6 +23,7 @@
 - **Delibra Dev**: área própria, com as mesmas 12 áreas no site (/dev) e no app — Comando ao vivo, Regras do Fantasma, Módulos, Permissões, Ajustes, Empresas, Pessoas, Explorador de dados, Auditoria, Novidades, Sistema e Minha conta Dev.
 - **Regras do Fantasma**: qualquer módulo, ação, permissão especial ou ajuste, para o sistema, uma empresa, um cliente, um cargo ou uma pessoa — com dias, horário, real/teste, validade, porquê e versões. O servidor obedece: nem app antigo nem API passam por cima.
 - **Delibra Dev na pílula** do topo do app, ao lado de motoboy e gestor.
+- **Matriz que muda ali mesmo**: toque no valor de uma pessoa (ou da empresa toda) e já vale.
 - **Ver como**: veja módulos, ações, ajustes, avisos e novidades exatamente como chegam para qualquer pessoa.
 - **Só no app / só no site** e **o que o gestor vê** (vê e muda, só vê, escondido) agora também nas regras.
 - **Você é imune**: nenhuma regra te afeta, a não ser as que você fizer para a sua própria conta.

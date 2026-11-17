@@ -138,14 +138,14 @@ fun GestorApp(
     Box(modifier.fillMaxSize()) {
         val atual = pilha.lastOrNull()
         // pedido urgente de motoboy (liberar parada, cancelar rota): janela com som em qualquer tela
-        ChamadoUrgenteG(onAbrir = { abrir(TelaG.Corrida(it)) })
+        if (modulo("penalidades")) ChamadoUrgenteG(onAbrir = { abrir(TelaG.Corrida(it)) })
         Column(Modifier.fillMaxSize()) {
             if (atual == null) topo()
             faixa?.invoke()
             // motoboy pedindo para cancelar: aparece em todas as telas até alguém responder
             // emergência: em todas as telas, até alguém marcar "Resolvido"
-            FaixaEmergenciasG(onAbrirCorrida = { abrir(TelaG.Corrida(it)) })
-            if (atual !is TelaG.Corrida) FaixaChamadosG(onAbrir = { abrir(TelaG.Corrida(it)) })
+            if (modulo("emergencia")) FaixaEmergenciasG(onAbrirCorrida = { abrir(TelaG.Corrida(it)) })
+            if (atual !is TelaG.Corrida && modulo("penalidades")) FaixaChamadosG(onAbrir = { abrir(TelaG.Corrida(it)) })
             Box(Modifier.weight(1f)) {
                 when (atual) {
                     is TelaG.Corrida -> DetalheCorridaG(atual.id, onVoltar = ::voltar)
@@ -163,8 +163,8 @@ fun GestorApp(
                     is TelaG.Modalidade -> ModalidadeG(atual.qual, onVoltar = ::voltar)
                     TelaG.Dev -> DevG(onVoltar = ::voltar)
                     null -> when (aba) {
-                        "mapa" -> ComSubAbas(listOf("Mapa" to PwIcones.Mapa, "Hoje" to PwIcones.LayoutDashboard), subMapa, { subMapa = it }) { i ->
-                            if (i == 0) MapaG(onCorrida = { abrir(TelaG.Corrida(it)) }) else HojeG(onAba = { a -> aba = a })
+                        "mapa" -> ComSubAbas(if (modulo("painel_dia")) listOf("Mapa" to PwIcones.Mapa, "Hoje" to PwIcones.LayoutDashboard) else listOf("Mapa" to PwIcones.Mapa), subMapa, { subMapa = it }) { i ->
+                            if (i == 0 || !modulo("painel_dia")) MapaG(onCorrida = { abrir(TelaG.Corrida(it)) }) else HojeG(onAba = { a -> aba = a })
                         }
                         "operacao" -> ComSubAbas(
                             if (comPedidos) listOf("Pedidos" to PwIcones.ClipboardList, "Rotas" to PwIcones.Route) else listOf("Rotas" to PwIcones.Route),
@@ -172,7 +172,7 @@ fun GestorApp(
                             listOf(paraRevisar, planejadas + semMotoboy).let { if (comPedidos) it else it.drop(1) },
                         ) { i ->
                             if (comPedidos && i == 0) PedidosG(onNovo = { abrir(TelaG.NovoPedido) })
-                            else CorridasG(onAbrir = { abrir(TelaG.Corrida(it)) }, onNova = { abrir(TelaG.NovaCorrida) }, onHistorico = { abrir(TelaG.HistoricoRotas) })
+                            else CorridasG(onAbrir = { abrir(TelaG.Corrida(it)) }, onNova = { abrir(TelaG.NovaCorrida) }, onHistorico = { if (com.pwexpress.core.perfil.Perfis.perfil.value?.modulo("historico_rotas") != false) abrir(TelaG.HistoricoRotas) else com.pwexpress.core.designsystem.PwToast.mostrar("O histórico de rotas está desligado pela plataforma.") })
                         }
                         "pessoas" -> ComSubAbas(listOf("Clientes" to PwIcones.Building2, "Equipe" to PwIcones.Users), subPessoas, { subPessoas = it }) { i ->
                             if (i == 0) EmpresasG(onAbrir = { abrir(TelaG.Empresa(it)) }) else EquipeG(onAbrir = { abrir(TelaG.Membro(it)) })

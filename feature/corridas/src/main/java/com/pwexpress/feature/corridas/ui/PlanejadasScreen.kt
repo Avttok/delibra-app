@@ -179,7 +179,7 @@ fun PlanejadasScreen(modifier: Modifier = Modifier, onIniciada: () -> Unit = {},
                 when {
                     h == null -> PwCarregando(texto = "Buscando suas rotas…")
                     h.isEmpty() -> PwVazio("Você ainda não fez nenhuma rota${if (com.pwexpress.core.designsystem.TemaApp.modoTeste.value) " de teste" else ""}.", icone = PwIcones.History)
-                    else -> h.forEach { f -> CartaoFeita(f, onAbrir = { fichaAberta = f.id }) }
+                    else -> h.forEach { f -> CartaoFeita(f, onAbrir = if (com.pwexpress.core.perfil.Perfis.perfil.value?.modulo("ficha_rota") != false) ({ fichaAberta = f.id }) else null) }
                 }
             }
             1 -> when {

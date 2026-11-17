@@ -229,7 +229,7 @@ fun EmpresaG(id: String?, onVoltar: () -> Unit) {
             PwSegmentado(listOf((if (aba == 0) "Dados" else "") to PwIcones.Building2, (if (aba == 1) "Regras" else "") to PwIcones.Layers, (if (aba == 2) "Zonas" else "") to PwIcones.MapPin,
                 (if (aba == 3) "Penalidades" else "") to PwIcones.Gavel, (if (aba == 4) "Rotas" else "") to PwIcones.Route), aba, { aba = it })
             when (aba) {
-                4 -> { RotasDeG(cliente = e.id); return@PwPagina }
+                4 -> { if (modulo("historico_rotas")) RotasDeG(cliente = e.id) else PwVazio("O histórico de rotas está desligado pela plataforma."); return@PwPagina }
                 1 -> { RegrasDoAlvoG("cliente", e.id, e.nome); return@PwPagina }
                 3 -> { PenalidadesG("cliente", e.id); return@PwPagina }
                 2 -> {
@@ -612,7 +612,7 @@ fun MembroG(id: String, meuId: String?, onVoltar: () -> Unit) {
         val comPercursos = m.motoboy && modulo("trilhas_mapa")
         val abas = listOfNotNull(
             Triple("registro", "Registro", PwIcones.History),
-            Triple("rotas", "Rotas", PwIcones.Package).takeIf { m.motoboy },
+            Triple("rotas", "Rotas", PwIcones.Package).takeIf { m.motoboy && modulo("historico_rotas") },
             Triple("percursos", "Percursos", PwIcones.Route).takeIf { comPercursos },
             Triple("veiculo", "Veículo", PwIcones.Bike).takeIf { m.motoboy },
             Triple("medalhas", "Medalhas", PwIcones.Trophy).takeIf { m.motoboy },

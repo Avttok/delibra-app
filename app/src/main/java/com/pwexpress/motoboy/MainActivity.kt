@@ -383,12 +383,15 @@ class MainActivity : ComponentActivity() {
                     if (simulador && podeSimular) com.pwexpress.motoboy.ui.SimuladorScreen(onFechar = { simulador = false }, kmhPadrao = perfil?.numero("simulador_velocidade_kmh", 35.0) ?: 35.0)
                     if (perfil?.dev == true && s != null) com.pwexpress.motoboy.ui.SeloModoDev(Modifier.align(Alignment.CenterStart).padding(bottom = 120.dp))
                     com.pwexpress.motoboy.ui.JanelaModoDev()
+                    // avisos do Dev (por empresa e cargo), logo abaixo do topo
+                    if (s != null && perfil?.modulo("avisos") != false) com.pwexpress.core.designsystem.AvisosDevFaixa(Modifier.align(Alignment.TopCenter).safeDrawingPadding().padding(top = 64.dp))
                     JanelaAtualizacao()
                     LaunchedEffect(Unit) { while (true) { delay(15 * 60_000L); Atualizador.verificarObrigatoria() } }
                     // tour na primeira vez de cada painel (depois, no menu da conta)
                     LaunchedEffect(efetivo, s != null, preparado) {
                         if (s == null || !preparado) return@LaunchedEffect
                         delay(1_200)
+                        if (perfil?.modulo("tour") == false) return@LaunchedEffect
                         if (efetivo == Painel.GESTOR) PwTour.primeiraVez("gestor-app", ToursApp.gestor) else PwTour.primeiraVez("motoboy", ToursApp.motoboy)
                     }
                     BackHandler(enabled = PwTour.aberto) { PwTour.fechar() }

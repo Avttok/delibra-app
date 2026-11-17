@@ -290,7 +290,10 @@ private fun PainelNotas(notas: String, onFechar: () -> Unit, onAtualizar: (() ->
             com.pwexpress.core.designsystem.PwBotaoIcone(PwIcones.X, "Fechar", onFechar)
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.borda))
-        com.pwexpress.core.designsystem.PwMarkdown(notas, Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 14.dp))
+        // cada pessoa vê só o que mudou nas áreas dela (o Dev vê tudo)
+        val perfilN by com.pwexpress.core.perfil.Perfis.perfil.collectAsState()
+        val notasDaArea = remember(notas, perfilN) { perfilN?.let { com.pwexpress.core.update.NotasPorArea.filtrar(notas, it.areasNovidades) } ?: notas }
+        com.pwexpress.core.designsystem.PwMarkdown(notasDaArea, Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 14.dp))
         if (onAtualizar != null) Box(Modifier.padding(16.dp)) { PwBotaoOuro("Atualizar agora", onClick = onAtualizar, icone = PwIcones.Download, altura = 54.dp) }
     }
 }

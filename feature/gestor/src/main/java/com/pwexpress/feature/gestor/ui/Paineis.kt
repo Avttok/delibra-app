@@ -119,7 +119,7 @@ private fun TelaComMapa(
                 PwBotaoIcone(PwIcones.Minus, "Afastar", { com.pwexpress.core.mapa.ControleMapa.zoom.tryEmit(-1) }, tamanho = 40.dp)
             }
             PwBotaoIcone(PwIcones.Crosshair, "Enquadrar tudo", { enquadrar++ }, tamanho = 40.dp)
-            com.pwexpress.core.mapa.BotaoRotaPlanejada()
+            if (modulo("rota_planejada")) com.pwexpress.core.mapa.BotaoRotaPlanejada()
             PwBotaoIcone(if (cheio) PwIcones.Lista else PwIcones.Maximize2, if (cheio) "Mostrar a lista" else "Tela cheia", { cheio = !cheio }, ativo = cheio, tamanho = 40.dp)
             if (comLocais && locaisNaColuna) PwBotaoIcone(PwIcones.Store, if (locais) "Ocultar estabelecimentos" else "Mostrar estabelecimentos", { Estabelecimentos.definir(!locais) }, ativo = locais, tamanho = 40.dp)
             controles()

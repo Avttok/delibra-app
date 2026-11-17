@@ -27,6 +27,22 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       # Chave de assinatura (secrets do repositório). Sem ela o build segue com a chave de desenvolvimento.
+      - name: Notas da versão por área (cada "## " precisa ser uma área)
+        run: |
+          python3 - <<'PY'
+          import re, sys, unicodedata
+          ok = {"todos", "motoboy", "gestor", "supervisor", "cliente", "dev"}
+          ruins = []
+          for l in open("NOTAS_DA_VERSAO.md", encoding="utf-8"):
+              if l.startswith("## "):
+                  t = unicodedata.normalize("NFD", l[3:].strip()).encode("ascii", "ignore").decode().lower()
+                  t = re.sub(r"^(para )?(o )?", "", t)
+                  if not any(t.startswith(a) for a in ok): ruins.append(l.strip())
+          if ruins:
+              print("::error::Títulos sem área nas notas: " + "; ".join(ruins) + " (use ## Todos, ## Motoboy, ## Gestor, ## Supervisor, ## Cliente ou ## Dev)")
+              sys.exit(1)
+          print("Notas por área ok.")
+          PY
       - name: Preparar assinatura digital
         env:
           KS_B64: ${{ secrets.DELIBRA_KEYSTORE_B64 }}

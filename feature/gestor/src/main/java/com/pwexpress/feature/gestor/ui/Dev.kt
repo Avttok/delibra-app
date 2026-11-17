@@ -102,49 +102,27 @@ fun DevG(onVoltar: () -> Unit) {
     }
 
     PwPagina {
-        Cabecalho("Console Dev", onVoltar, subtitulo = "O sistema inteiro, sem filtro")
-        // mesmas áreas do console do site: Agora · Negócio · Sistema
-        PwFiltros(listOf("Visão geral" to 0, "Saúde" to 0, "Aparelhos" to 0, "Tarefas" to 0, "Empresas" to 0, "Usuários" to 0, "Permissões" to 0, "Faturamento" to 0,
-            "Módulos" to 0, "Integrações" to 0, "Versão do app" to 0, "Conversas" to 0, "Registro" to 0, "Apagar" to 0), aba, { aba = it })
+        Cabecalho("Delibra Dev", onVoltar, subtitulo = AREAS_DEV[aba].second)
+        // as mesmas áreas do Delibra Dev no site (/dev)
+        FaixaDelibraDev("O sistema inteiro, sem filtro. Você só é afetado pelo que definir para si.")
+        PwFiltros(AREAS_DEV.map { it.second to 0 }, aba, { aba = it })
         PwErro(erro)
-        when (aba) {
-            1 -> { DevSaudeG(); return@PwPagina }
-            3 -> { TarefasDevG(painel?.arr("tarefas"), onMudou = { escopo.launch { carregar() } }); return@PwPagina }
-            4 -> { DevEmpresasG(); return@PwPagina }
-            5 -> { DevUsuariosG(); return@PwPagina }
-            6 -> { DevPermissoesG(); return@PwPagina }
-            7 -> { DevFaturamentoG(); DevPagamentosG(); return@PwPagina }
-            9 -> { DevIntegracoesG(); return@PwPagina }
-            10 -> { VersaoAppG(); return@PwPagina }
-            11 -> { DevConversasG(); return@PwPagina }
-            13 -> { ApagarTudoG(); return@PwPagina }
-        }
-        val sub = when (aba) { 8 -> 0; 0 -> 1; 2 -> 2; else -> 3 }
-        if (sub == 1) DevOcultoG()
-        when (sub) {
-            0 -> {
-                val l = modulos ?: run { PwCarregando(); return@PwPagina }
-                ModulosDevG(l) { m, ligado, papeis -> salvar(m, ligado, papeis) }
+        when (AREAS_DEV[aba].first) {
+            "comando" -> ComandoDevG()
+            "regras" -> RegrasDevG()
+            "modulos" -> { val l = modulos ?: run { PwCarregando(); return@PwPagina }; ModulosDevG(l) { m, ligado, papeis -> salvar(m, ligado, papeis) } }
+            "permissoes" -> { PwRotulo("Pessoa × permissão"); MatrizDevG(); PwRotulo("O que os gestores podem"); DevPermissoesG() }
+            "ajustes" -> {
+                PwBotaoVidro("Abrir todos os ajustes", onClick = { GestorNav.abrirConfiguracoes() }, icone = PwIcones.Settings2, modifier = Modifier.fillMaxWidth())
+                TextoDica("Com uma empresa em foco, o que você salva vale só para ela. Para uma pessoa, um cliente ou um cargo, use as Regras do Fantasma.")
+                VersaoAppG(); DevIntegracoesG()
             }
-            1 -> {
-                DevPushG()
-                val cont = painel?.obj("contagens") ?: run { PwCarregando(); return@PwPagina }
-                PwBotaoVidro("Atualizar números", onClick = { escopo.launch { carregar() } }, icone = PwIcones.RefreshCw, modifier = Modifier.fillMaxWidth())
-                CONTAGENS_GRUPOS.forEach { (g, lista) ->
-                    PwRotulo(g)
-                    lista.chunked(2).forEach { par ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            par.forEach { (k, r) ->
-                                val v = cont.dbl(k)
-                                PwNumero(r, if (k.endsWith("_30d")) moedaBr(v ?: 0.0) else if (v != null && v % 1.0 != 0.0) numeroBr(v) else "%,d".format(BR, v?.toLong() ?: 0L), Modifier.weight(1f))
-                            }
-                            if (par.size == 1) Spacer(Modifier.weight(1f))
-                        }
-                    }
-                }
-            }
-            2 -> AparelhosDevG(painel?.arr("aparelhos"))
-            else -> {
+            "empresas" -> { DevEmpresasG(); DevFaturamentoG(); DevPagamentosG() }
+            "pessoas" -> DevUsuariosG()
+            "dados" -> ExploradorDevG()
+            "auditoria" -> {
+                RegistroDevG()
+                PwRotulo("Exclusões")
                 val ex = painel?.arr("exclusoes") ?: run { PwCarregando(); return@PwPagina }
                 if (ex.isEmpty()) PwVazio("Nada apagado até agora.", icone = PwIcones.History)
                 ex.forEach { x ->
@@ -153,11 +131,45 @@ fun DevG(onVoltar: () -> Unit) {
                         TextoDica(listOfNotNull(x.str("por")?.let { "por $it" }, com.pwexpress.feature.gestor.data.iso(x.str("quando"))?.let { dataHora(it) }, x.str("motivo")?.let { "“$it”" }).joinToString(" · "))
                     }
                 }
+                PwRotulo("Conversas"); DevConversasG()
+            }
+            "novidades" -> NovidadesDevG()
+            "sistema" -> {
+                var sub by remember { mutableIntStateOf(0) }
+                PwFiltros(listOf("Números" to 0, "Saúde" to 0, "Aparelhos" to 0, "Tarefas" to 0, "Apagar" to 0), sub, { sub = it })
+                when (sub) {
+                    0 -> {
+                        DevPushG()
+                        val cont = painel?.obj("contagens") ?: run { PwCarregando(); return@PwPagina }
+                        PwBotaoVidro("Atualizar números", onClick = { escopo.launch { carregar() } }, icone = PwIcones.RefreshCw, modifier = Modifier.fillMaxWidth())
+                        CONTAGENS_GRUPOS.forEach { (g, lista) ->
+                            PwRotulo(g)
+                            lista.chunked(2).forEach { par ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    par.forEach { (k, r) ->
+                                        val v = cont.dbl(k)
+                                        PwNumero(r, if (k.endsWith("_30d")) moedaBr(v ?: 0.0) else if (v != null && v % 1.0 != 0.0) numeroBr(v) else "%,d".format(BR, v?.toLong() ?: 0L), Modifier.weight(1f))
+                                    }
+                                    if (par.size == 1) Spacer(Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                    1 -> DevSaudeG()
+                    2 -> AparelhosDevG(painel?.arr("aparelhos"))
+                    3 -> TarefasDevG(painel?.arr("tarefas"), onMudou = { escopo.launch { carregar() } })
+                    else -> ApagarTudoG()
+                }
+            }
+            "conta" -> {
+                DevOcultoG()
+                PwRotulo("Regras só para você")
+                TextoDica("Por padrão nada te afeta: você vê tudo e tem todas as permissões. Crie uma regra aqui para ver o sistema como outra pessoa veria. A verificação em duas etapas é opcional.")
+                RegrasDevG(soMinhas = true)
             }
         }
     }
 }
-
 
 /**
  * Versão do app que deve rodar (igual ao site): uma build escolhida ou "sempre a mais nova".

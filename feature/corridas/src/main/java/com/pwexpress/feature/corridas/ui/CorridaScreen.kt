@@ -169,7 +169,7 @@ fun CorridaScreen(
         }
         // ---------------------------------------------------------- navegação curva a curva (dentro do app)
         if (parada != null && !comprovanteAberto && !chegadaAberta) {
-            NavegacaoBanner(parada.id, parada.lat to parada.lng, Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp))
+            if (com.pwexpress.core.perfil.Perfis.perfil.value?.modulo("navegacao") != false) NavegacaoBanner(parada.id, parada.lat to parada.lng, Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp))
         }
         // ---------------------------------------------------------- mapa
         Box(Modifier.fillMaxWidth().then(if (minimizado) Modifier.weight(1f) else Modifier.height(320.dp))) {
@@ -227,7 +227,7 @@ fun CorridaScreen(
                     }
                     if (onPainelGestor != null) BotaoMapa("", PwIcones.ShieldCheck, descricao = "Painel do gestor", onClick = onPainelGestor)
                     BotaoMapa("", PwIcones.Maximize2, descricao = "Mapa em tela cheia") { abrirCheio++ }
-                    BotaoEmergencia(tamanho = 40.dp)
+                    if (com.pwexpress.core.perfil.Perfis.perfil.value?.modulo("emergencia") != false) BotaoEmergencia(tamanho = 40.dp)
                     Spacer(Modifier.weight(1f))
                     if (parada != null) {
                         BotaoMapa(if (comTexto) "Maps" else "", PwIcones.Navigation, descricao = "Abrir no Maps") { abrirMaps(ctx, parada) }

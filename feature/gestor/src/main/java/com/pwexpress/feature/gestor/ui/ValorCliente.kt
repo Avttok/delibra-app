@@ -89,7 +89,7 @@ internal fun ValorClienteG(pedido: String, orc: JsonObject?, regrasIniciais: Jso
     var previa by remember(pedido) { mutableStateOf<JsonObject?>(null) }
     val atual = JsonObject(regras.toMap())
     val mudou = atual != salvas
-    val pode = !bloqueado && com.pwexpress.feature.gestor.data.Permissoes.estado.value.pode("editar_valor_pedido")
+    val pode = !bloqueado && com.pwexpress.feature.gestor.data.Permissoes.estado.value.pode("editar_valor_pedido") && com.pwexpress.core.perfil.Perfis.perfil.value?.modulo("orcamento_editavel") != false
     LaunchedEffect(atual.toString()) {
         if (!mudou) { previa = null; return@LaunchedEffect }
         delay(350)

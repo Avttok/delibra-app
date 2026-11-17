@@ -53,6 +53,8 @@ data class Perfil(
     /** Líder de equipe (o gestor escolhe o que ele pode). */
     val supervisor: Boolean = false,
     val permissoes: Map<String, Boolean> = emptyMap(),
+    /** Cargos da conta como o servidor manda (dev, gestor, supervisor, motoboy, cliente). */
+    val papeis: List<String> = emptyList(),
     /** Empresa suspensa ou cancelada pelo Dev ("suspensa"/"cancelada"); null = acesso normal. */
     val empresaBloqueada: String? = null,
     val empresaBloqueadaMotivo: String? = null,
@@ -62,8 +64,12 @@ data class Perfil(
 ) {
     /** Supervisor pode fazer isto? (gestor e Dev podem tudo) */
     fun pode(acao: String, padrao: Boolean = true): Boolean = dev || !supervisor || (permissoes[acao] ?: padrao)
-    /** O módulo está valendo para esta conta? (sem registro = ligado; o Dev sempre vê) */
-    fun modulo(chave: String): Boolean = dev || modulos[chave] != false
+    /** O módulo está valendo para esta conta? (sem registro = ligado). O servidor já resolve o Dev:
+     *  ele vê tudo, a não ser o que ele mesmo desligou para si nas Regras do Fantasma. */
+    fun modulo(chave: String): Boolean = modulos[chave] != false
+
+    /** Áreas das novidades que esta conta vê (o Dev vê todas). */
+    val areasNovidades: Set<String> get() = com.pwexpress.core.update.NotasPorArea.areasDe(papeis, dev)
 
     /** Conta gestor + motoboy: tem as ferramentas de administrador no app. */
     val admin: Boolean get() = gestor && motoboy
@@ -294,6 +300,7 @@ object Perfis {
             empresaBloqueadaMotivo = ((o["organizacao"] as? JsonObject)?.get("suspensa_motivo") as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content,
             suspensoAte = (o["suspenso_ate"] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content,
             suspensoMotivo = (o["suspenso_motivo"] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content,
+            papeis = (o["papeis"] as? kotlinx.serialization.json.JsonArray)?.map { it.jsonPrimitive.content }.orEmpty(),
             soCliente = (o["papeis"] as? kotlinx.serialization.json.JsonArray)?.map { it.jsonPrimitive.content }?.let { p -> "cliente" in p && p.none { it in listOf("gestor", "motoboy", "dev", "supervisor") } } ?: false,
         )
     }

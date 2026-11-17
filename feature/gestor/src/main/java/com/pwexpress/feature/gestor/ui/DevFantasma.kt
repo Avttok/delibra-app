@@ -476,11 +476,35 @@ internal fun MatrizDevG() {
     var org by remember { mutableStateOf<String?>(null) }
     val chaves = remember { androidx.compose.runtime.mutableStateListOf("modulo:pedidos", "modulo:carteira", "modulo:chat", "acao:criar_contas", "especial_ignora_local") }
     var linhas by remember { mutableStateOf<List<JsonObject>?>(null) }
+    var regras by remember { mutableStateOf<List<JsonObject>>(emptyList()) }
     var busca by remember { mutableStateOf("") }
+    var versao by remember { mutableIntStateOf(0) }
+    var salvando by remember { mutableStateOf<String?>(null) }
+    val escopo = rememberCoroutineScope()
     LaunchedEffect(Unit) { dev("dev_comando").onSuccess { empresas = it.comoObjeto()?.arr("empresas").orEmpty() } }
-    LaunchedEffect(org, chaves.toList()) {
+    fun regraDe(esc: String, alvo: String, chave: String) = regras.firstOrNull { it.str("escopo") == esc && it.str("alvo") == alvo && it.str("chave") == chave }
+    // muda ali mesmo: sim/não com um toque, só para a pessoa (ou para a empresa toda)
+    fun gravar(esc: String, alvo: String, nome: String, chave: String, valor: Boolean, celula: String) {
+        salvando = celula
+        escopo.launch {
+            val atual = regraDe(esc, alvo, chave)
+            val p = buildJsonObject {
+                atual?.forEach { (k, v) -> put(k, v) }
+                put("chave", chave); put("escopo", esc); put("alvo", alvo); put("valor", valor); put("ativo", true)
+                if (atual == null) { put("condicoes", buildJsonObject { }); put("porque", "Mudado na matriz para $nome") }
+            }
+            dev("dev_salvar_regra", args("p" to p)).onSuccess { PwToast.mostrar("${catalogo.firstOrNull { it.chave == chave }?.rotulo ?: chave}: ${if (valor) "sim" else "não"} para $nome.") }
+                .onFailure { PwToast.mostrar("Não salvou: ${traduzirDev(it.message)}", TipoAviso.ERRO) }
+            salvando = null; versao++
+        }
+    }
+    fun tirar(esc: String, alvo: String, chave: String) {
+        val id = regraDe(esc, alvo, chave)?.str("id") ?: return
+        escopo.launch { dev("dev_apagar_regra", args("p_id" to id)).onSuccess { PwToast.mostrar("Voltou ao que vinha antes.") }; versao++ }
+    }
+    LaunchedEffect(org, chaves.toList(), versao) {
         val o = org ?: return@LaunchedEffect
-        linhas = null
+        dev("dev_regras").onSuccess { regras = it.comoLista() }
         dev("dev_matriz", args("p_org" to o, "p_chaves" to buildJsonArray { chaves.forEach { add(JsonPrimitive(it)) } })).onSuccess { linhas = it.comoLista() }
             .onFailure { PwToast.mostrar(traduzirDev(it.message), TipoAviso.ERRO) }
     }
@@ -492,6 +516,21 @@ internal fun MatrizDevG() {
     }
     if (org == null) { PwVazio("Escolha uma empresa para ver o que cada pessoa (equipe e clientes) pode, e por quê.", icone = PwIcones.ShieldCheck); return }
     val l = linhas ?: run { PwCarregando(); return }
+    TextoDica("Toque no valor para mudar só para aquela pessoa; ↺ volta ao que vinha antes. Para a empresa toda, use os botões abaixo de cada coluna. Vale na hora.")
+    val nomeOrg = empresas.firstOrNull { it.str("id") == org }?.str("nome") ?: "a empresa"
+    PwCartao(padding = androidx.compose.foundation.layout.PaddingValues(14.dp)) {
+        Text("Para $nomeOrg inteira", color = c.texto, fontWeight = FontWeight.Bold)
+        chaves.forEach { k ->
+            val daEmp = regraDe("empresa", org!!, k)
+            Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(catalogo.firstOrNull { it.chave == k }?.rotulo ?: k, color = c.texto2, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                ChipDev("Sim", daEmp?.str("valor") == "true") { gravar("empresa", org!!, nomeOrg, k, true, "e:$k") }
+                Spacer(Modifier.width(4.dp))
+                ChipDev("Não", daEmp?.str("valor") == "false") { gravar("empresa", org!!, nomeOrg, k, false, "e:$k") }
+                if (daEmp != null) { Spacer(Modifier.width(4.dp)); ChipDev("↺", false) { tirar("empresa", org!!, k) } }
+            }
+        }
+    }
     l.forEach { p ->
         PwCartao(padding = androidx.compose.foundation.layout.PaddingValues(14.dp)) {
             Text(p.str("nome") ?: "—", color = c.texto, fontWeight = FontWeight.Bold)
@@ -503,12 +542,17 @@ internal fun MatrizDevG() {
                         Text(catalogo.firstOrNull { it.chave == k }?.rotulo ?: k, color = c.texto2, fontSize = 13.sp)
                         Text(v?.str("motivo") ?: "", color = if (v?.str("fonte") == "regra") c.vermelho else c.texto3, fontSize = 11.5.sp)
                     }
-                    Text(valorTexto(v?.get("valor")), color = when (v?.str("valor")) { "true" -> c.verde; "false" -> c.vermelho; else -> c.texto }, fontWeight = FontWeight.Bold)
+                    val celula = "${p.str("id")}:$k"
+                    val bool = v?.str("valor") == "true" || v?.str("valor") == "false"
+                    if (regraDe("pessoa", p.str("id") ?: "", k) != null) { ChipDev("↺", false) { tirar("pessoa", p.str("id") ?: "", k) }; Spacer(Modifier.width(4.dp)) }
+                    ChipDev(if (salvando == celula) "…" else valorTexto(v?.get("valor")), v?.str("fonte") == "regra") {
+                        if (bool && salvando == null) gravar("pessoa", p.str("id") ?: "", p.str("nome") ?: "", k, v?.str("valor") != "true", celula)
+                        else if (!bool) PwToast.mostrar("Para números e textos, use Regras do Fantasma → Pessoa.")
+                    }
                 }
             }
         }
     }
-    TextoDica("Para mudar só para uma pessoa, crie uma regra em Regras do Fantasma → Pessoa.")
 }
 
 // ───────────────────────────────────────────────────────────── Explorador de dados

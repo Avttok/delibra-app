@@ -1,14 +1,11 @@
 ## Delibra · novidades
 
 **Para o motoboy**
-- **Botão no meio da tela**: o botão de ficar online/offline agora fica centralizado no Início.
+- **Ficha de cada rota**: em Rotas → Histórico, toque numa rota para ver o mapa com o caminho que você fez, cada parada com os horários, o pagamento linha a linha e os pedidos que você fez ao gestor.
+- **Botão no meio da tela**: o botão de ficar online/offline fica centralizado no Início.
 
 **No mapa**
-- **Botões alinhados**: aproximar, afastar, enquadrar, tela cheia e os outros ficam numa coluna só, do mesmo tamanho. Com a lista aberta, o zoom é pelo gesto de pinça.
-- **Mostrar ou esconder a rota planejada** junto dos outros botões do mapa.
+- **Botões alinhados**: aproximar, afastar, enquadrar e os outros numa coluna só, do mesmo tamanho.
 
 **Para o gestor**
-- **Tudo da rota sem sair dela**: no detalhe da rota, "Pedidos, valores e tudo o que aconteceu" abre os pedidos com os itens, os valores, as avaliações, os pedidos do motoboy e as ofertas.
-- **Rotas dentro do cadastro**: o cliente e o motoboy ganharam a aba Rotas, com as rotas dos últimos 90 dias e a ficha completa de cada uma.
-- **Ajustes na hora** também em Clientes, Equipe, Carteira e no detalhe da rota.
-- **Editar pedido**: os itens mantêm a categoria ao abrir para editar.
+- **Tudo da rota sem sair dela**, **rotas dentro do cliente e do motoboy** e **ajustes na hora** em Clientes, Equipe, Carteira e no detalhe da rota.

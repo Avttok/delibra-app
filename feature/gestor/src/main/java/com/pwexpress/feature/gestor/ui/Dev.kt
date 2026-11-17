@@ -111,7 +111,11 @@ fun DevG(onVoltar: () -> Unit) {
             "comando" -> ComandoDevG()
             "regras" -> RegrasDevG()
             "modulos" -> { val l = modulos ?: run { PwCarregando(); return@PwPagina }; ModulosDevG(l) { m, ligado, papeis -> salvar(m, ligado, papeis) } }
-            "permissoes" -> { PwRotulo("Pessoa × permissão"); MatrizDevG(); PwRotulo("O que os gestores podem"); DevPermissoesG() }
+            "permissoes" -> {
+                var sub by remember { mutableIntStateOf(0) }
+                PwFiltros(listOf("Pessoa × permissão" to 0, "Ver como" to 0, "O que os gestores podem" to 0), sub, { sub = it })
+                when (sub) { 0 -> MatrizDevG(); 1 -> VerComoDevG(); else -> DevPermissoesG() }
+            }
             "ajustes" -> {
                 PwBotaoVidro("Abrir todos os ajustes", onClick = { GestorNav.abrirConfiguracoes() }, icone = PwIcones.Settings2, modifier = Modifier.fillMaxWidth())
                 TextoDica("Com uma empresa em foco, o que você salva vale só para ela. Para uma pessoa, um cliente ou um cargo, use as Regras do Fantasma.")

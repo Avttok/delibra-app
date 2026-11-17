@@ -15,6 +15,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -26,11 +27,25 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pwexpress.core.PwCore
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+
+/**
+ * Sinais instantâneos do Dev (push silencioso "sinal"): avisos, empresa congelada, regras, módulos e sessão.
+ * Quem recebe o push chama [recebido]; a faixa de avisos e o perfil recarregam na hora.
+ */
+object SinaisDev {
+    val versao = kotlinx.coroutines.flow.MutableStateFlow(0)
+    suspend fun recebido(qual: String?) {
+        if (qual == "sessao") { PwCore.auth.tokenValido(forcarRenovacao = true); return }   // revogada pelo Dev: sai na hora
+        com.pwexpress.core.perfil.Perfis.carregar()
+        versao.value++
+    }
+}
 
 /** Um aviso que o Dev mandou (por empresa e por cargo). */
 data class AvisoDev(val id: String, val texto: String, val nivel: String)
@@ -41,17 +56,27 @@ fun AvisosDevFaixa(modifier: Modifier = Modifier) {
     val c = Pw.cores
     var avisos by remember { mutableStateOf<List<AvisoDev>>(emptyList()) }
     val fechados = remember { mutableStateListOf<String>() }
-    LaunchedEffect(Unit) {
-        while (true) {
-            runCatching {
-                val r = PwCore.rpc.chamar("avisos_para_mim", JsonObject(emptyMap()))
-                if (r.ok) avisos = (Json.parseToJsonElement(r.corpo) as? JsonArray)?.mapNotNull { e ->
-                    val o = e as? JsonObject ?: return@mapNotNull null
-                    fun s(k: String) = (o[k] as? JsonPrimitive)?.content
-                    AvisoDev(s("id") ?: return@mapNotNull null, s("texto").orEmpty(), s("nivel") ?: "info")
-                }.orEmpty()
-            }
-            delay(60_000)
+    val ciclo = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val sinal by SinaisDev.versao.collectAsState()
+    suspend fun ler() = runCatching {
+        val r = PwCore.rpc.chamar("avisos_para_mim", JsonObject(emptyMap()))
+        if (r.ok) avisos = (Json.parseToJsonElement(r.corpo) as? JsonArray)?.mapNotNull { e ->
+            val o = e as? JsonObject ?: return@mapNotNull null
+            fun s(k: String) = (o[k] as? JsonPrimitive)?.content
+            AvisoDev(s("id") ?: return@mapNotNull null, s("texto").orEmpty(), s("nivel") ?: "info")
+        }.orEmpty()
+    }
+    LaunchedEffect(sinal) { if (sinal > 0) ler() }
+    // na tela: confere a cada 8 s, e na hora em que o app volta para a frente
+    LaunchedEffect(ciclo) {
+        ciclo.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+          var voltas = 0
+          while (true) {
+            ler()
+            // sem push (sem internet de dados ou sem token), o perfil se confere sozinho a cada ~40 s
+            if (++voltas % 5 == 0) runCatching { com.pwexpress.core.perfil.Perfis.carregar() }
+            delay(8_000)
+          }
         }
     }
     val lista = avisos.filter { it.nivel == "urgente" || it.id !in fechados }

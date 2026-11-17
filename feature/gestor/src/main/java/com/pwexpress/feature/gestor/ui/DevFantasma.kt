@@ -114,7 +114,9 @@ internal fun catalogoDev(modulos: List<Gestao.ModuloDev>): List<ChaveDev> =
     modulos.map { ChaveDev("modulo:${it.chave}", it.nome, "Módulo", "booleano") } +
         ACOES_GESTOR.map { (k, r) -> ChaveDev("acao:$k", r, "Ação", "booleano") } +
         PARAMETROS.map { p -> ChaveDev(p.chave, p.rotulo.removePrefix("Permissão especial: "), if (p.chave.startsWith("especial_")) "Permissão especial" else "Ajuste",
-            when (p.tipo) { "booleano" -> "booleano"; "numero", "opcoes" -> "numero"; else -> "texto" }) }
+            when (p.tipo) { "booleano" -> "booleano"; "numero", "opcoes" -> "numero"; else -> "texto" }) } +
+        // o nível de cada ajuste no painel do gestor
+        PARAMETROS.filter { !it.soDev }.map { p -> ChaveDev("nivel:${p.chave}", "${p.rotulo} (no painel do gestor)", "O que o gestor vê", "nivel") }
 
 @Composable
 private fun rememberCatalogo(): List<ChaveDev> {
@@ -365,6 +367,8 @@ private fun EditorRegraG(inicial: JsonObject?, catalogo: List<ChaveDev>, soPara:
     var ate by remember { mutableStateOf(cond?.str("ate").orEmpty()) }
     var teste by remember { mutableIntStateOf(when (cond?.get("teste")?.let { (it as? JsonPrimitive)?.content }) { "false" -> 1; "true" -> 2; else -> 0 }) }
     var duracao by remember { mutableIntStateOf(0) }
+    var aparelho by remember { mutableIntStateOf(when (cond?.str("aparelho")) { "app" -> 1; "site" -> 2; else -> 0 }) }
+    var nivel by remember { mutableIntStateOf(listOf("editar", "ver", "oculto").indexOf(inicial?.str("valor")).coerceAtLeast(0)) }
     val def = catalogo.firstOrNull { it.chave == chave }
     PwJanela(if (inicial == null) "Nova regra" else "Regra · versão ${inicial.int("versao") ?: 1}", onFechar) {
         PwRotulo("O que ela controla")
@@ -393,7 +397,8 @@ private fun EditorRegraG(inicial: JsonObject?, catalogo: List<ChaveDev>, soPara:
             }
         }
         PwRotulo("Valor")
-        if (def == null || def.valor == "booleano") PwInterruptor(if (def?.tipo == "Módulo") "Ligado" else "Sim / libera", valorBool, { valorBool = it })
+        if (def?.valor == "nivel") PwSegmentado(listOf("Vê e muda" to null, "Só vê" to null, "Escondido" to null), nivel, { nivel = it })
+        else if (def == null || def.valor == "booleano") PwInterruptor(if (def?.tipo == "Módulo") "Ligado" else "Sim / libera", valorBool, { valorBool = it })
         else PwCampo(valorTxt, { valorTxt = it }, "Valor", teclado = if (def.valor == "numero") androidx.compose.ui.text.input.KeyboardType.Decimal else androidx.compose.ui.text.input.KeyboardType.Text)
         PwRotulo("Quando (opcional)")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -404,6 +409,7 @@ private fun EditorRegraG(inicial: JsonObject?, catalogo: List<ChaveDev>, soPara:
             PwCampo(ate, { ate = it }, "Até (HH:MM)", Modifier.weight(1f))
         }
         PwSegmentado(listOf("Real e teste" to null, "Só real" to null, "Só teste" to null), teste, { teste = it })
+        PwSegmentado(listOf("Site e app" to null, "Só no app" to null, "Só no site" to null), aparelho, { aparelho = it })
         if (inicial == null) PwSegmentado(listOf("Sempre" to null, "1 hora" to null, "1 dia" to null, "1 semana" to null), duracao, { duracao = it })
         PwCampo(porque, { porque = it }, "Por quê", dica = "Aparece no “por quê” e no registro")
         val pronto = chave.isNotBlank() && (ESCOPOS[esc].first == "global" || alvo != null)
@@ -412,12 +418,14 @@ private fun EditorRegraG(inicial: JsonObject?, catalogo: List<ChaveDev>, soPara:
             val p = buildJsonObject {
                 inicial?.str("id")?.let { put("id", it) }
                 put("chave", chave); put("escopo", ESCOPOS[esc].first); put("alvo", alvo ?: "")
-                if (def == null || def.valor == "booleano") put("valor", valorBool)
+                if (def?.valor == "nivel") put("valor", listOf("editar", "ver", "oculto")[nivel])
+                else if (def == null || def.valor == "booleano") put("valor", valorBool)
                 else if (def.valor == "numero") put("valor", valorTxt.replace(",", ".").toDoubleOrNull() ?: 0.0) else put("valor", valorTxt)
                 put("condicoes", buildJsonObject {
                     if (dias.isNotEmpty()) put("dias", buildJsonArray { dias.sorted().forEach { add(JsonPrimitive(it)) } })
                     if (de.isNotBlank() && ate.isNotBlank()) { put("de", de.trim()); put("ate", ate.trim()) }
                     if (teste == 1) put("teste", false); if (teste == 2) put("teste", true)
+                    if (aparelho == 1) put("aparelho", "app"); if (aparelho == 2) put("aparelho", "site")
                 })
                 put("porque", porque); put("ativo", inicial?.bool("ativo") ?: true)
                 inicial?.str("valida_ate")?.let { put("valida_ate", it) }
@@ -632,3 +640,47 @@ internal val AREAS_DEV: List<Triple<String, String, ImageVector>> = listOf(
     Triple("sistema", "Sistema", PwIcones.Activity),
     Triple("conta", "Minha conta Dev", PwIcones.UserRound),
 )
+
+// ───────────────────────────────────────────────────────────── Ver como
+/** O sistema responde para o Dev exatamente como responderia para a pessoa (sem o Dev perder nada). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun VerComoDevG() {
+    val c = Pw.cores
+    val catalogo = rememberCatalogo()
+    var pessoa by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var v by remember { mutableStateOf<JsonObject?>(null) }
+    var busca by remember { mutableStateOf("") }
+    LaunchedEffect(pessoa) {
+        val p = pessoa ?: return@LaunchedEffect
+        v = null
+        dev("dev_ver_como", args("p_pessoa" to p.first)).onSuccess { v = it.comoObjeto() }.onFailure { PwToast.mostrar(traduzirDev(it.message), TipoAviso.ERRO) }
+    }
+    fun rot(k: String) = catalogo.firstOrNull { it.chave == k }?.rotulo ?: k
+    BuscaAlvo("perfis", "Ver o sistema como", pessoa?.second) { id, n -> pessoa = id to n }
+    if (pessoa == null) { PwVazio("Escolha uma pessoa: você vê os módulos, ações, ajustes, avisos e novidades como chegam para ela.", icone = PwIcones.Eye); return }
+    val x = v ?: run { PwCarregando(); return }
+    val perfil = x.obj("perfil")
+    Text("${perfil?.str("nome")} · ${perfil?.strs("papeis")?.joinToString()}${perfil?.obj("cargo")?.str("nome")?.let { " · cargo $it" } ?: ""}", color = c.texto, fontWeight = FontWeight.Bold)
+    val mods = perfil?.obj("modulos").orEmpty()
+    val off = mods.filter { (it.value as? JsonPrimitive)?.content == "false" }.keys
+    PwRotulo("Módulos desligados (${off.size})")
+    if (off.isEmpty()) TextoDica("Nenhum: vê tudo que a empresa tem.")
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { off.forEach { ChipDev(rot("modulo:$it"), false) {} } }
+    val acoes = x.obj("permissoes")?.obj("acoes").orEmpty().filter { (it.value as? JsonPrimitive)?.content == "false" }.keys
+    PwRotulo("Ações bloqueadas (${acoes.size})")
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { acoes.forEach { ChipDev(rot("acao:$it"), false) {} } }
+    PwRotulo("Avisos e novidades que chegam")
+    val av = (x["avisos"] as? JsonArray).comoLista()
+    if (av.isEmpty()) TextoDica("Nenhum aviso agora.") else av.forEach { TextoDica("• ${it.str("texto")}") }
+    TextoDica("${(x["novidades"] as? JsonArray)?.size ?: 0} novidade(s)")
+    PwRotulo("Ajustes que o app e o site recebem")
+    PwCampo(busca, { busca = it }, "Buscar ajuste")
+    val t = busca.trim().lowercase()
+    perfil?.obj("configuracoes").orEmpty().entries.filter { t.isEmpty() || "${it.key} ${rot(it.key)}".lowercase().contains(t) }.take(80).forEach { (k, valor) ->
+        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+            Text(rot(k), color = c.texto2, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            Text(valorTexto(valor), color = c.texto, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        }
+    }
+}

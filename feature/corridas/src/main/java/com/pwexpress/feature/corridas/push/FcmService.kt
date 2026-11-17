@@ -18,6 +18,8 @@ class FcmService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         when (message.data["tipo"]) {
+            // o Dev mudou algo (aviso, empresa congelada, regra, módulo, sessão): recarrega na hora, sem notificação
+            "sinal" -> runBlocking { withTimeoutOrNull(8_000) { com.pwexpress.core.designsystem.SinaisDev.recebido(message.data["qual"]) } }
             "oferta" -> {
                 // toca primeiro (não depende de rede), depois busca os detalhes e enriquece a notificação
                 val id = message.data["oferta_id"]

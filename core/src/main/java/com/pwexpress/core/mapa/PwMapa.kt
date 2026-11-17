@@ -633,7 +633,7 @@ fun PwMapa(
             val padraoPlano = com.pwexpress.core.perfil.Perfis.perfil.collectAsState().value?.logico("mapa_rota_planejada", true) ?: true
             var ver by com.pwexpress.core.designsystem.lembrarLigado("mapa_ver_plano", padraoPlano)
             LaunchedEffect(ver) { RotaPlanejada.visivel.value = ver }
-            com.pwexpress.core.designsystem.PwBotaoIcone(if (ver) PwIcones.Eye else PwIcones.EyeOff, if (ver) "Esconder a rota planejada" else "Mostrar a rota planejada", { ver = !ver },
+            com.pwexpress.core.designsystem.PwBotaoIcone(if (ver) PwIcones.Eye else PwIcones.EyeOff, if (ver) "Esconder a rota planejada" else "Mostrar a rota planejada", { ver = !ver; com.pwexpress.core.designsystem.PwToast.mostrar(if (ver) "Rota planejada (linha branca do que falta) aparecendo." else "Rota planejada (linha branca do que falta) escondida. O feito continua dourado.") },
                 modifier = Modifier.align(androidx.compose.ui.Alignment.BottomEnd).padding(end = 10.dp, bottom = (margemBaixo + atribuicaoAcima + 10).dp), tamanho = 36.dp, ativo = ver)
         }
     }
@@ -839,5 +839,5 @@ fun BotaoRotaPlanejada(tamanho: androidx.compose.ui.unit.Dp = 40.dp) {
     val padraoPlano = com.pwexpress.core.perfil.Perfis.perfil.collectAsState().value?.logico("mapa_rota_planejada", true) ?: true
     var ver by com.pwexpress.core.designsystem.lembrarLigado("mapa_ver_plano", padraoPlano)
     LaunchedEffect(ver) { RotaPlanejada.visivel.value = ver }
-    com.pwexpress.core.designsystem.PwBotaoIcone(if (ver) PwIcones.Eye else PwIcones.EyeOff, if (ver) "Esconder a rota planejada" else "Mostrar a rota planejada", { ver = !ver }, tamanho = tamanho, ativo = ver)
+    com.pwexpress.core.designsystem.PwBotaoIcone(if (ver) PwIcones.Eye else PwIcones.EyeOff, if (ver) "Esconder a rota planejada" else "Mostrar a rota planejada", { ver = !ver; com.pwexpress.core.designsystem.PwToast.mostrar(if (ver) "Rota planejada (linha branca do que falta) aparecendo." else "Rota planejada (linha branca do que falta) escondida. O feito continua dourado.") }, tamanho = tamanho, ativo = ver)
 }

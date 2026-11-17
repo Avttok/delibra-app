@@ -103,6 +103,7 @@ fun PlanejadasScreen(modifier: Modifier = Modifier, onIniciada: () -> Unit = {},
     val lista by Corridas.planejadas.collectAsState()
     val rotas by Corridas.rotas.collectAsState()
     val historico by Corridas.historico.collectAsState()
+    var fichaAberta by remember { mutableStateOf<String?>(null) }
     var aba by rememberSaveable { mutableIntStateOf(0) }
     var carregando by remember { mutableStateOf(true) }
     var erro by remember { mutableStateOf<String?>(null) }
@@ -178,7 +179,7 @@ fun PlanejadasScreen(modifier: Modifier = Modifier, onIniciada: () -> Unit = {},
                 when {
                     h == null -> PwCarregando(texto = "Buscando suas rotas…")
                     h.isEmpty() -> PwVazio("Você ainda não fez nenhuma rota${if (com.pwexpress.core.designsystem.TemaApp.modoTeste.value) " de teste" else ""}.", icone = PwIcones.History)
-                    else -> h.forEach { CartaoFeita(it) }
+                    else -> h.forEach { f -> CartaoFeita(f, onAbrir = { fichaAberta = f.id }) }
                 }
             }
             1 -> when {
@@ -200,6 +201,7 @@ fun PlanejadasScreen(modifier: Modifier = Modifier, onIniciada: () -> Unit = {},
         }
     }
 
+    fichaAberta?.let { FichaMinhaRota(it, onFechar = { fichaAberta = null }) }
     detalhe?.let { id ->
         val r = disponiveis.firstOrNull { it.id == id }
         if (r == null) detalhe = null

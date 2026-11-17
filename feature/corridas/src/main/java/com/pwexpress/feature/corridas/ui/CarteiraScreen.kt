@@ -246,9 +246,9 @@ private fun GraficoBarras(valores: List<Double>, rotulos: List<String>, destaque
 
 /** Cartão de uma corrida do histórico (aba Corridas → Histórico). */
 @Composable
-internal fun CartaoFeita(f: CorridaFeita) {
+internal fun CartaoFeita(f: CorridaFeita, onAbrir: (() -> Unit)? = null) {
     val c = Pw.cores
-    PwCartao {
+    PwCartao(modifier = if (onAbrir != null) Modifier.clickable(onClick = onAbrir) else Modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Corrida ${f.numeroExibicao}", color = c.texto, fontWeight = FontWeight.Bold, fontFamily = Archivo, fontSize = 15.sp, maxLines = 1)
             Spacer(Modifier.width(8.dp))

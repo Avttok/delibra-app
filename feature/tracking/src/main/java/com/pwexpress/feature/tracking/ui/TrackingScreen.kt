@@ -133,17 +133,17 @@ fun TrackingScreen(
         }
     }
 
-    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxSize()) {
-    val alturaTela = maxHeight
+    // tela fixa (não rola): saudação no alto, o botão no meio e os avisos embaixo
+    androidx.compose.foundation.layout.Box(modifier.fillMaxSize()) {
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
+        Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         if (saudacao.isNotBlank()) {
             Text("Olá, $saudacao", style = MaterialTheme.typography.headlineMedium, color = c.texto, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         // o botão fica no meio da tela (com os atalhos logo abaixo); o resto, se houver, vem depois rolando
-        Column(Modifier.fillMaxWidth().heightIn(min = (alturaTela - 72.dp).coerceAtLeast(0.dp)), verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically)) {
+        Column(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically)) {
 
         // ---------------------------------------------------------- o botão
         var toquesSeguidos by remember { mutableStateOf(0) }

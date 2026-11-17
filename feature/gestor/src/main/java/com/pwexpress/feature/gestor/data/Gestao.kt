@@ -300,9 +300,10 @@ object Gestao {
         }).exigirOk(::traduzir); Unit
     }
 
-    suspend fun criarConta(nome: String, email: String, senha: String, papeis: List<String>, repasse: Double?, empresaId: String? = null, organizacaoId: String? = null): Result<String> = acao {
+    suspend fun criarConta(nome: String, email: String, senha: String, papeis: List<String>, repasse: Double?, empresaId: String? = null, organizacaoId: String? = null, cargoId: String? = null): Result<String> = acao {
         PwCore.rpc.site("/api/equipe/criar", buildJsonObject {
             put("nome", nome); put("email", email); put("senha", senha)
+            cargoId?.let { put("cargo_id", it) }
             empresaId?.let { put("empresa_id", it) }
             organizacaoId?.let { put("organizacao_id", it) }
             put("papeis", buildJsonArray { papeis.forEach { add(JsonPrimitive(it)) } })
@@ -584,6 +585,7 @@ object Gestao {
         "acao_bloqueada" to "A plataforma não liberou isso para gestores.",
         "ajuste_bloqueado" to "Este ajuste está travado pela plataforma.",
         "apenas_dev_cria_gestor" to "Só o suporte da plataforma cria contas de gestor.",
+        "cargo_obrigatorio" to "Escolha o cargo da pessoa. Sem cargo cadastrado (Ajustes → Cargos), não dá para criar conta de equipe.",
         "holerite_fechado" to "O holerite deste motoboy já foi fechado: lance um ajuste no holerite.",
         "pag_token_invalido" to "Esse token não parece do Mercado Pago (começa com APP_USR- ou TEST-).",
         "rota_compartilhada_desligada" to "Abrir rota pelo chat está desligado.",

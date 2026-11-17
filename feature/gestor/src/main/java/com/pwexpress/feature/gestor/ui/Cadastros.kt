@@ -461,6 +461,8 @@ fun EquipeG(onAbrir: (String) -> Unit) {
             }
         }
         if (modulo("criar_contas")) PwBotaoFlutuante(PwIcones.UserPlus, "Nova conta", { criando = true }, Modifier.align(Alignment.BottomEnd).padding(end = 18.dp, bottom = 108.dp))
+        else PwBotaoFlutuante(PwIcones.UserPlus, "Criar contas está desligado", { com.pwexpress.core.designsystem.PwToast.mostrar("Criar contas está desligado para esta empresa. Peça ao suporte da plataforma (Dev → Módulos).") },
+            Modifier.align(Alignment.BottomEnd).padding(end = 18.dp, bottom = 108.dp))
     }
     if (criando) NovaContaG(dados.config.numero("repasse_motoboy_pct", 67.5), onFechar = { criando = false }, onCriada = { criando = false; it?.let(onAbrir) })
 }
@@ -548,21 +550,38 @@ private fun NovaContaG(repassePadrao: Double, onFechar: () -> Unit, onCriada: (S
         }
         val vagas = lembrarVagas()
         androidx.compose.runtime.LaunchedEffect(vagas["motoboy"]?.pode) { if (vagas["motoboy"]?.pode == false) motoboy = false }
+        // conta de equipe (supervisor) só com um cargo da empresa; só o Dev cria gestor
+        val souDevN = com.pwexpress.core.perfil.Perfis.perfil.collectAsState().value?.dev == true
+        var cargos by remember { mutableStateOf<List<Pair<String, String>>?>(null) }
+        var cargo by remember { mutableStateOf<String?>(null) }
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            cargos = (Gestao.rpcJson("cargos_da_empresa").getOrNull() as? kotlinx.serialization.json.JsonArray).orEmpty()
+                .mapNotNull { (it as? kotlinx.serialization.json.JsonObject)?.let { o -> o.str("id")?.let { id -> id to (o.str("nome") ?: "Cargo") } } }
+        }
+        val semCargos = cargos?.isEmpty() == true && !souDevN
         if (cliente == null) PwInterruptor("Motoboy", motoboy, { motoboy = it }, descricao = descVaga("Usa o app e recebe corridas", vagas["motoboy"], "motoboy"), icone = PwIcones.Bike,
             habilitado = motoboy || vagas["motoboy"]?.pode != false)
-        if (cliente == null) PwInterruptor("Gestor", gestor, { gestor = it; if (it) supervisor = false }, descricao = descVaga("Acessa o painel", vagas["gestor"], "gestor"), icone = PwIcones.ShieldCheck,
+        if (cliente == null && souDevN) PwInterruptor("Gestor", gestor, { gestor = it; if (it) supervisor = false }, descricao = descVaga("Acessa o painel", vagas["gestor"], "gestor"), icone = PwIcones.ShieldCheck,
             habilitado = gestor || vagas["gestor"]?.pode != false)
         // líder de equipe: faz só o que o gestor liberar (Equipe → pessoa → Permissões)
-        if (cliente == null) PwInterruptor("Supervisor", supervisor, { supervisor = it; if (it) gestor = false }, descricao = descVaga("Líder de equipe, com o que o gestor liberar", vagas["supervisor"], "supervisor"), icone = PwIcones.UserCog, cor = Pw.cores.azul,
-            habilitado = supervisor || vagas["supervisor"]?.pode != false)
+        if (cliente == null) PwInterruptor("Equipe / supervisor", supervisor, { supervisor = it; if (it) gestor = false },
+            descricao = if (semCargos) "Cadastre antes um cargo em Ajustes → Cargos" else descVaga("Faz o que o cargo dele permite", vagas["supervisor"], "supervisor"), icone = PwIcones.UserCog, cor = Pw.cores.azul,
+            habilitado = !semCargos && (supervisor || vagas["supervisor"]?.pode != false))
+        if (supervisor && !cargos.isNullOrEmpty()) {
+            com.pwexpress.core.designsystem.PwRotulo("Cargo *")
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                cargos!!.forEach { (id, n) -> ChipM(n, cargo == id) { cargo = id } }
+            }
+        }
         PwErro(erro)
         PwBotaoOuro(if (enviando) "Criando…" else "Criar conta", icone = PwIcones.UserPlus, habilitado = !enviando, onClick = {
+            if (supervisor && cargo == null && !souDevN) { erro = "Escolha o cargo da pessoa."; return@PwBotaoOuro }
             enviando = true
             escopo.launch {
                 Gestao.criarConta(
                     nome.trim(), email.trim(), senha,
                     if (cliente != null) listOf("cliente") else listOfNotNull("motoboy".takeIf { motoboy }, "gestor".takeIf { gestor }, "supervisor".takeIf { supervisor }),
-                    null, cliente?.id,
+                    null, cliente?.id, cargoId = cargo.takeIf { supervisor },
                 )
                     .onSuccess { criada = it; Gestao.atualizar() }.onFailure { erro = it.message }
                 enviando = false

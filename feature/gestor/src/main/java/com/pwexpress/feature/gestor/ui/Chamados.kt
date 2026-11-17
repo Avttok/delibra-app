@@ -307,9 +307,20 @@ internal fun ChamadoUrgenteG(onAbrir: (String) -> Unit) {
         }
     }
     val atual = fila.firstOrNull()
+    // silenciar: para o som e a vibração deste pedido (a janela fica até responder)
+    val mudos = remember { androidx.compose.runtime.mutableStateListOf<String>() }
+    val mudo = atual?.id?.let { it in mudos } == true
+    fun silenciar() {
+        atual?.id?.let { mudos.add(it) }
+        // a notificação insistente (som que repete) também para
+        runCatching {
+            val nm = ctx.getSystemService(android.app.NotificationManager::class.java)
+            nm?.activeNotifications?.filter { it.notification.channelId == "pwex_urgente_v1" }?.forEach { nm.cancel(it.id) }
+        }
+    }
     // som em loop + vibração enquanto houver pedido esperando
-    androidx.compose.runtime.DisposableEffect(atual?.id) {
-        if (atual == null) return@DisposableEffect onDispose { }
+    androidx.compose.runtime.DisposableEffect(atual?.id, mudo) {
+        if (atual == null || mudo) return@DisposableEffect onDispose { }
         val som = runCatching {
             android.media.MediaPlayer().apply {
                 setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_ALARM)
@@ -329,10 +340,12 @@ internal fun ChamadoUrgenteG(onAbrir: (String) -> Unit) {
             ChamadosG.responder(atual.id, aprovar, resposta, null)
                 .onSuccess { com.pwexpress.core.designsystem.PwToast.mostrar(if (atual.pular) (if (aprovar) "Parada liberada." else "Pedido negado.") else (if (aprovar) "Cancelamento aprovado." else "Cancelamento negado.")) }
                 .onFailure { com.pwexpress.core.designsystem.PwToast.mostrar(it.message ?: "Não deu certo.", com.pwexpress.core.designsystem.TipoAviso.ERRO) }
+            silenciar()
             dispensados += atual.id; fila = fila.drop(1); resposta = ""; ocupado = false
         }
     }
     PwJanela(if (atual.pular) "Liberar parada?" else "Cancelar a rota?", onFechar = { dispensados += atual.id; fila = fila.drop(1) }) {
+        if (!mudo) com.pwexpress.core.designsystem.PwBotaoVidro("Silenciar", onClick = ::silenciar, icone = PwIcones.VolumeX, modifier = Modifier.fillMaxWidth())
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(if (atual.pular) PwIcones.LockOpen else PwIcones.Hand, null, tint = c.vermelho, modifier = Modifier.size(22.dp))
             Spacer(Modifier.width(10.dp))

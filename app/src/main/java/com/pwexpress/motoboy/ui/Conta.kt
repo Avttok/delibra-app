@@ -73,7 +73,8 @@ fun RowScope.AcoesTopo(painel: Painel, podeTrocar: Boolean, onTrocar: (Painel) -
     val teste by TemaApp.modoTeste.collectAsState()
     val chat = perfil?.logico("chat_ligado", true) != false && perfil?.modulo("chat") != false
     // uma pílula só: troca motoboy/gestor e o chat (ocupa menos o topo e não aperta a foto)
-    if (podeTrocar || chat) {
+    val dev = perfil?.dev == true
+    if (podeTrocar || chat || dev) {
         val forma = RoundedCornerShape(99.dp)
         val naoLidas by com.pwexpress.core.chat.Chat.naoLidas.collectAsState()
         Row(Modifier.clip(forma).background(c.vidroForte).border(1.dp, c.borda, forma).padding(3.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -85,7 +86,12 @@ fun RowScope.AcoesTopo(painel: Painel, podeTrocar: Boolean, onTrocar: (Painel) -
                     contentAlignment = Alignment.Center,
                 ) { Icon(i, if (p == Painel.MOTOBOY) "MotoApp" else "Painel do gestor", tint = if (ativo) c.sobreOuro else c.texto3, modifier = Modifier.size(17.dp)) }
             }
-            if (podeTrocar && chat) Box(Modifier.padding(horizontal = 3.dp).width(1.dp).height(18.dp).background(c.borda))
+            // Delibra Dev direto da pílula (só para o Dev)
+            if (dev) Box(
+                Modifier.clip(forma).clickable { onTrocar(Painel.GESTOR); com.pwexpress.feature.gestor.ui.GestorNav.abrirDev() }.padding(horizontal = 10.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) { Icon(PwIcones.CodeXml, "Delibra Dev", tint = c.vermelho, modifier = Modifier.size(17.dp)) }
+            if ((podeTrocar || dev) && chat) Box(Modifier.padding(horizontal = 3.dp).width(1.dp).height(18.dp).background(c.borda))
             if (chat) Box(
                 Modifier.clip(forma).clickable { com.pwexpress.core.chat.Chat.abrir.value = true }.padding(horizontal = 10.dp, vertical = 8.dp),
                 contentAlignment = Alignment.Center,
